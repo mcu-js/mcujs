@@ -1,0 +1,55 @@
+# Build outputs
+build/
+cmake-build-*/
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.*.sw?
+
+# CMake generated
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+_deps/
+
+# Compiled outputs
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+*.dis
+*.a
+*.o
+*.obj
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Dependencies (cloned during Docker build)
+javascript/jerryscript/
+
+# Backup files
+*.bak
+Dockerfile.*.bak
+
+# Temporary and log files
+*.tmp
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.env
+.venv/
+
+# Debug files
+*.dSYM/

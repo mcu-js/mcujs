@@ -64,8 +64,7 @@ undefined
 | `.cat FILE` | Display file contents |
 | `.rm FILE` | Delete a file |
 | `.run FILE` | Execute a JavaScript file |
-| `.multiline [FILE]` | Paste multi-line input (end with `.end`) |
-| `.paste [FILE]` | Alias for `.multiline` |
+| `.multiline [FILE]` | Multi-line input (end with `.end`) |
 | `.uf2` | Reboot into UF2 mode (prompted) |
 | `.uf2!` | Reboot into UF2 mode immediately |
 | `.usbreset` | Reset USB connection (reboot) |

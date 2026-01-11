@@ -22,7 +22,7 @@
 #define REPL_MAX_COMPLETIONS 16
 #define REPL_MAX_COMPLETION_LEN 32
 #define REPL_PASTE_BUFFER_SIZE 4096
-#define REPL_PASTE_PROMPT "paste> "
+#define REPL_PASTE_PROMPT "m> "
 
 // Special characters
 #define CHAR_BACKSPACE 0x08
@@ -448,11 +448,8 @@ static void repl_process_line(void) {
         const char *path = NULL;
         size_t prefix_len = 0;
 
-        if (strncmp(command, "paste", 5) == 0 &&
-            (command[5] == '\0' || command[5] == ' ')) {
-            prefix_len = 5;
-        } else if (strncmp(command, "multiline", 9) == 0 &&
-                   (command[9] == '\0' || command[9] == ' ')) {
+        if (strncmp(command, "multiline", 9) == 0 &&
+            (command[9] == '\0' || command[9] == ' ')) {
             prefix_len = 9;
         }
 
@@ -552,11 +549,11 @@ static void repl_paste_start(const char *path) {
     if (path && path[0] != '\0') {
         strncpy(repl_state.paste_path, path, sizeof(repl_state.paste_path) - 1);
         repl_state.paste_path[sizeof(repl_state.paste_path) - 1] = '\0';
-        usb_cdc_puts("Paste mode. End with .end. Writing to ");
+        usb_cdc_puts("Multi-line input. End with .end. Writing to ");
         usb_cdc_puts(repl_state.paste_path);
         usb_cdc_puts("\r\n");
     } else {
-        usb_cdc_puts("Paste mode. End with .end.\r\n");
+        usb_cdc_puts("Multi-line input. End with .end.\r\n");
     }
 }
 
@@ -638,8 +635,7 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  .cat FILE - Display contents of a file\r\n");
         usb_cdc_puts("  .rm FILE  - Remove a file\r\n");
         usb_cdc_puts("  .run FILE   - Execute a JavaScript file\r\n");
-        usb_cdc_puts("  .multiline [FILE] - Paste multi-line input (end with .end)\r\n");
-        usb_cdc_puts("  .paste [FILE]     - Alias for .multiline\r\n");
+        usb_cdc_puts("  .multiline [FILE] - Multi-line input (end with .end)\r\n");
         usb_cdc_puts("  .uf2        - Reboot into UF2 mode (prompted)\r\n");
         usb_cdc_puts("  .uf2!       - Reboot into UF2 mode immediately\r\n");
         usb_cdc_puts("  .usbreset   - Reset USB connection (reboot)\r\n");

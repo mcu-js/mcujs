@@ -6,11 +6,13 @@
 
 #include "board.h"
 #include "board_config.h"
+#include "flash_config.h"
 
 #include "pico/stdlib.h"
 #include "pico/unique_id.h"
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
+#include "hardware/flash.h"
 
 #if defined(__has_include)
 #if __has_include("hardware/bootrom.h")
@@ -34,9 +36,12 @@ static const board_info_t s_board_info = {
     .led_pin = MCUJS_LED_PIN
 };
 
-/* External linker symbols for filesystem region */
-extern char _FS_start[];
-extern char _FS_end[];
+/* External linker symbol for firmware end */
+extern char __flash_binary_end[];
+
+static uint32_t align_up(uint32_t value, uint32_t alignment) {
+    return (value + alignment - 1) & ~(alignment - 1);
+}
 
 void mcujs_board_init(void) {
     /* Most initialization is done by pico_stdlib */
@@ -48,15 +53,30 @@ const board_info_t *board_get_info(void) {
 }
 
 uint32_t board_get_fs_start(void) {
-    return (uint32_t)(uintptr_t)_FS_start;
+    uint32_t flash_end = XIP_BASE + PICO_FLASH_SIZE_BYTES;
+    uint32_t fs_end = flash_end - EEPROM_RESERVED_SIZE;
+    uint32_t fs_start = align_up((uint32_t)(uintptr_t)__flash_binary_end, FLASH_SECTOR_SIZE);
+
+    if (fs_end <= fs_start || (fs_end - fs_start) < MIN_FILESYSTEM_SIZE) {
+        return fs_end;
+    }
+
+    return fs_start;
 }
 
 uint32_t board_get_fs_end(void) {
-    return (uint32_t)(uintptr_t)_FS_end;
+    return (uint32_t)(XIP_BASE + PICO_FLASH_SIZE_BYTES - EEPROM_RESERVED_SIZE);
 }
 
 uint32_t board_get_fs_size(void) {
-    return (uint32_t)(_FS_end - _FS_start);
+    uint32_t fs_end = board_get_fs_end();
+    uint32_t fs_start = board_get_fs_start();
+
+    if (fs_end <= fs_start) {
+        return 0;
+    }
+
+    return fs_end - fs_start;
 }
 
 void board_led_init(void) {

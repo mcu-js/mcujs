@@ -8,7 +8,7 @@ All notable changes to mcujs will be documented in this file.
 - JavaScript runtime using JerryScript v3.0.0
 - USB CDC serial REPL with multi-line input support
 - USB MSC mass storage for drag-and-drop file transfer
-- FAT12 filesystem on flash (~1MB usable) with full subdirectory support
+- FAT12 filesystem on flash using remaining space after firmware
 - Auto-run `/index.js` on boot
 - **BOOTSEL Safe Mode**: Hold BOOTSEL button during power-on to skip `index.js` auto-run (allows recovery from infinite loops)
 

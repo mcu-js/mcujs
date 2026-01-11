@@ -10,6 +10,7 @@
 
 #include "ff.h"
 #include "diskio.h"
+#include "flash_config.h"
 
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
@@ -26,22 +27,38 @@
 
 #define SECTOR_SIZE 512  /* FAT sector size */
 
-/* Filesystem flash layout for 2MB flash:
- * - Program: 0x10000000 - 0x10100000 (1MB reserved for code)
- * - Filesystem: 0x10100000 - 0x101FC000 (~1008KB)
- * - EEPROM: 0x101FC000 - 0x10200000 (16KB reserved)
+/* Filesystem flash layout
+ * - Filesystem starts after firmware end (aligned to erase boundary)
+ * - Ends at flash end minus EEPROM reservation
  */
-#define FS_FLASH_BASE   0x10000000
-#define FS_START_OFFSET 0x100000    /* 1MB offset from flash base */
-#define FS_END_OFFSET   0x1FC000    /* Leave 16KB at end for EEPROM */
-#define FS_START_ADDR   (FS_FLASH_BASE + FS_START_OFFSET)
-#define FS_END_ADDR     (FS_FLASH_BASE + FS_END_OFFSET)
+extern char __flash_binary_end[];
 
 /* Calculated filesystem parameters */
-static uint32_t s_fs_start_addr = FS_START_ADDR;
-static uint32_t s_fs_size = (FS_END_OFFSET - FS_START_OFFSET);
+static uint32_t s_fs_start_addr = 0;
+static uint32_t s_fs_size = 0;
 static uint32_t s_total_sectors;
 static DSTATUS s_disk_status = STA_NOINIT;
+
+static uint32_t align_up(uint32_t value, uint32_t alignment) {
+    return (value + alignment - 1) & ~(alignment - 1);
+}
+
+static void diskio_refresh_geometry(void) {
+    uint32_t flash_end = XIP_BASE + PICO_FLASH_SIZE_BYTES;
+    uint32_t fs_end = flash_end - EEPROM_RESERVED_SIZE;
+    uint32_t fs_start = align_up((uint32_t)(uintptr_t)__flash_binary_end, FLASH_SECTOR_SIZE);
+
+    s_fs_start_addr = fs_start;
+
+    if (fs_end <= fs_start || (fs_end - fs_start) < MIN_FILESYSTEM_SIZE) {
+        s_fs_size = 0;
+        s_total_sectors = 0;
+        return;
+    }
+
+    s_fs_size = fs_end - fs_start;
+    s_total_sectors = s_fs_size / SECTOR_SIZE;
+}
 
 /* Sector cache for read-modify-write operations */
 #define CACHE_SECTORS 4
@@ -213,9 +230,12 @@ DSTATUS disk_initialize(BYTE pdrv) {
     }
     
     /* Calculate filesystem size and sector count */
-    s_fs_start_addr = FS_START_ADDR;
-    s_fs_size = FS_END_OFFSET - FS_START_OFFSET;
-    s_total_sectors = s_fs_size / SECTOR_SIZE;
+    diskio_refresh_geometry();
+
+    if (s_fs_size == 0) {
+        s_disk_status = STA_NOINIT;
+        return s_disk_status;
+    }
     
     /* Initialize sector cache */
     cache_init();
@@ -318,8 +338,10 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
 uint32_t diskio_get_sector_count(void) {
     if (s_disk_status & STA_NOINIT) {
         /* Initialize if needed */
-        s_fs_size = FS_END_OFFSET - FS_START_OFFSET;
-        s_total_sectors = s_fs_size / SECTOR_SIZE;
+        diskio_refresh_geometry();
+    }
+    if (s_fs_size == 0) {
+        return 0;
     }
     return s_total_sectors;
 }

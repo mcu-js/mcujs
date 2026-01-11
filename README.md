@@ -135,6 +135,8 @@ fs.renameSync(oldPath, newPath);  // Rename/move file
 fs.mkdirSync(path);               // Create directory
 ```
 
+Filesystem capacity is derived from the remaining flash after the firmware image and EEPROM reservation.
+
 ### Modules (require)
 ```javascript
 // Relative imports

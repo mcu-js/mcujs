@@ -102,7 +102,7 @@ enum {
 static char const *string_desc_arr[] = {
     (const char[]){0x09, 0x04},  /* 0: Supported language is English (0x0409) */
     "mcujs",                      /* 1: Manufacturer */
-    "mcujs Runtime",              /* 2: Product */
+    "mcujs Runtime",              /* 2: Product (runtime formatted) */
     NULL,                         /* 3: Serial number (generated at runtime) */
     "mcujs Serial Console",       /* 4: CDC Interface */
     "mcujs Flash Storage",        /* 5: MSC Interface */
@@ -114,6 +114,10 @@ static uint16_t desc_str_buf[32 + 1];
 /* Serial number string buffer */
 static char serial_str[17];
 static bool serial_generated = false;
+
+/* Product string buffer */
+static char product_str[64];
+static bool product_generated = false;
 
 uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
     (void)langid;
@@ -137,6 +141,22 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
         }
         str = serial_str;
         chr_count = 16;
+        for (size_t i = 0; i < chr_count; i++) {
+            desc_str_buf[1 + i] = str[i];
+        }
+    } else if (index == STRID_PRODUCT) {
+        if (!product_generated) {
+            snprintf(product_str, sizeof(product_str),
+                     "mcu.js %s %s",
+                     MCUJS_BUILD_ID,
+                     MCUJS_BOARD_CHIP);
+            product_generated = true;
+        }
+        str = product_str;
+        chr_count = strlen(str);
+        if (chr_count > 31) {
+            chr_count = 31;
+        }
         for (size_t i = 0; i < chr_count; i++) {
             desc_str_buf[1 + i] = str[i];
         }

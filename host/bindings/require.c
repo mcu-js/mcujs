@@ -346,39 +346,99 @@ static jerry_value_t load_module(const char *resolved_path) {
 }
 
 /*
- * Built-in module names that map to global objects
+ * Built-in module descriptors
  * These modules are provided by native C bindings and should not be loaded from disk
  */
+typedef jerry_value_t (*builtin_factory_t)(void);
+
 typedef struct {
     const char *specifier;
-    const char *global_name;
+    builtin_factory_t factory;
 } builtin_module_t;
 
+static const builtin_module_t s_builtin_modules[];
+
+static jerry_value_t create_process_module(void) {
+    jerry_value_t global = jerry_current_realm();
+    jerry_value_t key = jerry_string_sz("process");
+    jerry_value_t module = jerry_object_get(global, key);
+    jerry_value_free(key);
+    jerry_value_free(global);
+    return module;
+}
+
+static const char *s_builtin_module_names[] = {
+    "fs",
+    "process",
+    "gpio",
+    "pwm",
+    "i2c",
+    "spi",
+    "adc",
+    "mcujs:module",
+    "node:module",
+    NULL
+};
+
+static jerry_value_t create_builtin_modules_list(void) {
+    jerry_value_t array = jerry_array(0);
+    uint32_t index = 0;
+
+    for (int i = 0; s_builtin_module_names[i] != NULL; i++) {
+        char index_str[8];
+        snprintf(index_str, sizeof(index_str), "%u", index++);
+        jerry_value_t entry = jerry_string_sz(s_builtin_module_names[i]);
+        jerry_value_t idx = jerry_string_sz(index_str);
+        jerry_object_set(array, idx, entry);
+        jerry_value_free(entry);
+        jerry_value_free(idx);
+    }
+
+    return array;
+}
+
+static jerry_value_t create_module_module(void) {
+    jerry_value_t module = jerry_object();
+    jerry_value_t list = create_builtin_modules_list();
+    jerry_value_t key = jerry_string_sz("builtinModules");
+    jerry_object_set(module, key, list);
+    jerry_value_free(key);
+    jerry_value_free(list);
+    return module;
+}
+
 static const builtin_module_t s_builtin_modules[] = {
-    {"fs", "fs"},
-    {"process", "process"},
-    {"adc", "adc"},
-    {"gpio", "GPIO"},
-    {"pwm", "PWM"},
-    {"i2c", "I2C"},
-    {"spi", "SPI"},
+    {"fs", js_create_fs_module},
+    {"process", create_process_module},
+    {"gpio", js_create_gpio_module},
+    {"pwm", js_create_pwm_module},
+    {"i2c", js_create_i2c_module},
+    {"spi", js_create_spi_module},
+    {"adc", js_create_adc_module},
+    {"mcujs:module", create_module_module},
     {NULL, NULL}
 };
 
+static jerry_value_t s_builtin_cache[16];
+static bool s_builtin_cached[16];
+
 /*
  * Check if a specifier is a built-in module name
- * Returns the global object if it is, or undefined if not
+ * Returns the module object if it is, or undefined if not
  */
 static jerry_value_t get_builtin_module(const char *specifier) {
+    const char *lookup = specifier;
+    if (strcmp(specifier, "node:module") == 0) {
+        lookup = "mcujs:module";
+    }
+
     for (int i = 0; s_builtin_modules[i].specifier != NULL; i++) {
-        if (strcmp(specifier, s_builtin_modules[i].specifier) == 0) {
-            /* Get the global object with this name */
-            jerry_value_t global = jerry_current_realm();
-            jerry_value_t key = jerry_string_sz(s_builtin_modules[i].global_name);
-            jerry_value_t module = jerry_object_get(global, key);
-            jerry_value_free(key);
-            jerry_value_free(global);
-            return module;
+        if (strcmp(lookup, s_builtin_modules[i].specifier) == 0) {
+            if (!s_builtin_cached[i]) {
+                s_builtin_cache[i] = s_builtin_modules[i].factory();
+                s_builtin_cached[i] = true;
+            }
+            return jerry_value_copy(s_builtin_cache[i]);
         }
     }
     return jerry_undefined();

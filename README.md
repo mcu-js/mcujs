@@ -135,6 +135,8 @@ SPI.transfer(bus, data);          // returns received data
 
 ### Filesystem (fs)
 ```javascript
+const fs = require('fs');
+
 fs.readFileSync(path);            // Read file as string
 fs.writeFileSync(path, data);     // Write string to file
 fs.appendFileSync(path, data);    // Append to file
@@ -212,6 +214,13 @@ process.version;                  // mcujs version (e.g., "v0.1.0")
 process.arch;                     // CPU architecture (e.g., "RP2040")
 process.platform;                 // Always "mcujs"
 process.versions;                 // {mcujs, jerryscript, "pico-sdk", tinyusb}
+```
+
+### Built-in Modules
+```javascript
+const { builtinModules } = require('mcujs:module');
+// alias: require('node:module')
+// builtinModules includes: fs, process, gpio, pwm, i2c, spi, adc
 ```
 
 ## Known Limitations

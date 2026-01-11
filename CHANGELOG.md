@@ -19,6 +19,7 @@ All notable changes to mcujs will be documented in this file.
 - `SPI` - SPI bus communication
 - `ADC` - Analog-to-digital converter
 - `board` object - LED control, system info, unique ID, memory stats
+- `mcujs:module` - Built-in module registry
 
 ### JavaScript APIs
 - `console.log()`, `console.warn()`, `console.error()` - Serial output

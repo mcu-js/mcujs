@@ -565,11 +565,11 @@ static jerry_value_t fs_rename_sync(const jerry_call_info_t *call_info_p,
 }
 
 /*
- * Register filesystem bindings
+ * Create filesystem module object
  */
-void js_bind_fs(void) {
+jerry_value_t js_create_fs_module(void) {
     jerry_value_t fs = jerry_object();
-    
+
     js_set_function(fs, "readFileSync", fs_read_file_sync);
     js_set_function(fs, "writeFileSync", fs_write_file_sync);
     js_set_function(fs, "appendFileSync", fs_append_file_sync);
@@ -579,7 +579,15 @@ void js_bind_fs(void) {
     js_set_function(fs, "statSync", fs_stat_sync);
     js_set_function(fs, "renameSync", fs_rename_sync);
     js_set_function(fs, "mkdirSync", fs_mkdir_sync);
-    
+
+    return fs;
+}
+
+/*
+ * Register filesystem bindings
+ */
+void js_bind_fs(void) {
+    jerry_value_t fs = js_create_fs_module();
     js_register_global("fs", fs);
     jerry_value_free(fs);
 }

@@ -40,7 +40,7 @@ let port;
 let reader;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const waitForPrompt = () => readUntil(reader, (buffer) => buffer.includes(prompt));
+const waitForPrompt = () => readUntil(reader, (buffer) => buffer.endsWith(prompt));
 
 async function openSerial() {
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -372,6 +372,8 @@ describe("modules", () => {
   let pwmOutput = "";
   let i2cOutput = "";
   let spiOutput = "";
+  let builtinOutput = "";
+  let aliasOutput = "";
 
   beforeAll(async () => {
     gpioOutput = await sendCommand(
@@ -398,6 +400,18 @@ describe("modules", () => {
       "var SPI = require(\"spi\");\rconsole.log(typeof SPI.init);",
       prompt,
     );
+    builtinOutput = await sendCommand(
+      port,
+      reader,
+      "var mod = require(\"mcujs:module\");\rconsole.log(JSON.stringify(mod.builtinModules));",
+      prompt,
+    );
+    aliasOutput = await sendCommand(
+      port,
+      reader,
+      "console.log(require(\"mcujs:module\") === require(\"node:module\"));",
+      prompt,
+    );
   });
 
   test("gpio module exports functions", () => {
@@ -414,6 +428,22 @@ describe("modules", () => {
 
   test("spi module exports functions", () => {
     expect(spiOutput).toContain("function");
+  });
+
+  test("builtin modules list includes fs", () => {
+    expect(builtinOutput).toContain("fs");
+  });
+
+  test("builtin modules list includes gpio", () => {
+    expect(builtinOutput).toContain("gpio");
+  });
+
+  test("builtin modules list includes adc", () => {
+    expect(builtinOutput).toContain("adc");
+  });
+
+  test("node module alias matches", () => {
+    expect(aliasOutput).toContain("true");
   });
 });
 

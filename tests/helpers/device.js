@@ -233,7 +233,7 @@ export async function readUntil(reader, matcher, timeoutMs = 5000) {
 
 export async function sendCommand(port, reader, command, prompt = "> ") {
   await writeToPort(port, `${command}\r`);
-  return readUntil(reader, (buffer) => buffer.includes(prompt));
+  return readUntil(reader, (buffer) => buffer.endsWith(prompt));
 }
 
 export function ensureDir(path) {

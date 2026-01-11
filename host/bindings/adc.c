@@ -167,7 +167,7 @@ static jerry_value_t adc_read_temp_handler(const jerry_call_info_t *call_info_p,
     return jerry_number(temp_c);
 }
 
-void js_bind_adc(void) {
+jerry_value_t js_create_adc_module(void) {
     jerry_value_t adc = jerry_object();
 
     js_set_function(adc, "readPin", adc_read_pin_handler);
@@ -179,6 +179,11 @@ void js_bind_adc(void) {
     js_set_number(adc, "TEMP", ADC_TEMP_CHANNEL);
     js_set_number(adc, "VSYS", 3);
 
+    return adc;
+}
+
+void js_bind_adc(void) {
+    jerry_value_t adc = js_create_adc_module();
     js_register_global("adc", adc);
     jerry_value_free(adc);
 }

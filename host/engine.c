@@ -209,14 +209,8 @@ bool js_engine_is_initialized(void) {
 void js_register_bindings(void) {
     /* Register all native JavaScript APIs */
     js_bind_console();
-    js_bind_gpio();
     js_bind_timers();
-    js_bind_pwm();
-    js_bind_i2c();
-    js_bind_spi();
-    js_bind_adc();
     js_bind_board();
-    js_bind_fs();
     js_bind_process();
     js_bind_require();
 }

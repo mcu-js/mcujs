@@ -137,14 +137,22 @@ static jerry_value_t spi_transfer_handler(const jerry_call_info_t *call_info_p,
 }
 
 /*
+ * Create SPI module object
+ */
+jerry_value_t js_create_spi_module(void) {
+    jerry_value_t spi = jerry_object();
+
+    js_set_function(spi, "init", spi_init_handler);
+    js_set_function(spi, "transfer", spi_transfer_handler);
+
+    return spi;
+}
+
+/*
  * Register SPI bindings
  */
 void js_bind_spi(void) {
-    jerry_value_t spi = jerry_object();
-    
-    js_set_function(spi, "init", spi_init_handler);
-    js_set_function(spi, "transfer", spi_transfer_handler);
-    
+    jerry_value_t spi = js_create_spi_module();
     js_register_global("SPI", spi);
     jerry_value_free(spi);
 }

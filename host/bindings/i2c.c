@@ -168,15 +168,23 @@ static jerry_value_t i2c_read_handler(const jerry_call_info_t *call_info_p,
 }
 
 /*
- * Register I2C bindings
+ * Create I2C module object
  */
-void js_bind_i2c(void) {
+jerry_value_t js_create_i2c_module(void) {
     jerry_value_t i2c = jerry_object();
-    
+
     js_set_function(i2c, "init", i2c_init_handler);
     js_set_function(i2c, "write", i2c_write_handler);
     js_set_function(i2c, "read", i2c_read_handler);
-    
+
+    return i2c;
+}
+
+/*
+ * Register I2C bindings
+ */
+void js_bind_i2c(void) {
+    jerry_value_t i2c = js_create_i2c_module();
     js_register_global("I2C", i2c);
     jerry_value_free(i2c);
 }

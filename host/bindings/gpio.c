@@ -148,23 +148,31 @@ static jerry_value_t gpio_toggle_handler(const jerry_call_info_t *call_info_p,
 }
 
 /*
- * Register GPIO bindings
+ * Create GPIO module object
  */
-void js_bind_gpio(void) {
+jerry_value_t js_create_gpio_module(void) {
     jerry_value_t gpio = jerry_object();
-    
+
     /* Methods */
     js_set_function(gpio, "init", gpio_init_handler);
     js_set_function(gpio, "set", gpio_set_handler);
     js_set_function(gpio, "get", gpio_get_handler);
     js_set_function(gpio, "toggle", gpio_toggle_handler);
-    
+
     /* Constants */
     js_set_number(gpio, "OUTPUT", GPIO_MODE_OUTPUT);
     js_set_number(gpio, "INPUT", GPIO_MODE_INPUT);
     js_set_number(gpio, "INPUT_PULLUP", GPIO_MODE_INPUT_PULLUP);
     js_set_number(gpio, "INPUT_PULLDOWN", GPIO_MODE_INPUT_PULLDOWN);
-    
+
+    return gpio;
+}
+
+/*
+ * Register GPIO bindings
+ */
+void js_bind_gpio(void) {
+    jerry_value_t gpio = js_create_gpio_module();
     js_register_global("GPIO", gpio);
     jerry_value_free(gpio);
 }

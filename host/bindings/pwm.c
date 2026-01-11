@@ -131,15 +131,23 @@ static jerry_value_t pwm_stop_handler(const jerry_call_info_t *call_info_p,
 }
 
 /*
- * Register PWM bindings
+ * Create PWM module object
  */
-void js_bind_pwm(void) {
+jerry_value_t js_create_pwm_module(void) {
     jerry_value_t pwm = jerry_object();
-    
+
     js_set_function(pwm, "init", pwm_init_handler);
     js_set_function(pwm, "setDuty", pwm_set_duty_handler);
     js_set_function(pwm, "stop", pwm_stop_handler);
-    
+
+    return pwm;
+}
+
+/*
+ * Register PWM bindings
+ */
+void js_bind_pwm(void) {
+    jerry_value_t pwm = js_create_pwm_module();
     js_register_global("PWM", pwm);
     jerry_value_free(pwm);
 }

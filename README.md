@@ -88,6 +88,8 @@ console.error('error');
 
 ### GPIO
 ```javascript
+const GPIO = require('gpio');
+
 GPIO.init(pin, GPIO.OUTPUT);      // or GPIO.INPUT, GPIO.INPUT_PULLUP, GPIO.INPUT_PULLDOWN
 GPIO.set(pin, true);              // Set high
 GPIO.set(pin, false);             // Set low
@@ -106,6 +108,8 @@ clearInterval(id);
 
 ### PWM
 ```javascript
+const PWM = require('pwm');
+
 PWM.init(pin, frequency);         // Initialize PWM on pin
 PWM.setDuty(pin, duty);           // duty: 0-65535 or 0.0-1.0
 PWM.stop(pin);
@@ -113,6 +117,8 @@ PWM.stop(pin);
 
 ### I2C
 ```javascript
+const I2C = require('i2c');
+
 I2C.init(bus, sda, scl, baudrate);
 I2C.write(bus, address, data);    // data: array of bytes
 I2C.read(bus, address, length);   // returns array of bytes
@@ -120,6 +126,8 @@ I2C.read(bus, address, length);   // returns array of bytes
 
 ### SPI
 ```javascript
+const SPI = require('spi');
+
 SPI.init(bus, sck, mosi, miso, baudrate);
 SPI.transfer(bus, data);          // returns received data
 ```

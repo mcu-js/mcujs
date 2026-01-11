@@ -350,6 +350,56 @@ describe("console output", () => {
   });
 });
 
+describe("modules", () => {
+  let gpioOutput = "";
+  let pwmOutput = "";
+  let i2cOutput = "";
+  let spiOutput = "";
+
+  beforeAll(async () => {
+    gpioOutput = await sendCommand(
+      port,
+      reader,
+      "var GPIO = require(\"gpio\");\rconsole.log(typeof GPIO.init);",
+      prompt,
+    );
+    pwmOutput = await sendCommand(
+      port,
+      reader,
+      "var PWM = require(\"pwm\");\rconsole.log(typeof PWM.init);",
+      prompt,
+    );
+    i2cOutput = await sendCommand(
+      port,
+      reader,
+      "var I2C = require(\"i2c\");\rconsole.log(typeof I2C.init);",
+      prompt,
+    );
+    spiOutput = await sendCommand(
+      port,
+      reader,
+      "var SPI = require(\"spi\");\rconsole.log(typeof SPI.init);",
+      prompt,
+    );
+  });
+
+  test("gpio module exports functions", () => {
+    expect(gpioOutput).toContain("function");
+  });
+
+  test("pwm module exports functions", () => {
+    expect(pwmOutput).toContain("function");
+  });
+
+  test("i2c module exports functions", () => {
+    expect(i2cOutput).toContain("function");
+  });
+
+  test("spi module exports functions", () => {
+    expect(spiOutput).toContain("function");
+  });
+});
+
 describe("adc", () => {
   let pinOutput = "";
   let channelOutput = "";
@@ -361,31 +411,31 @@ describe("adc", () => {
     pinOutput = await sendCommand(
       port,
       reader,
-      "const adc = require(\"adc\");\rconsole.log(adc.readPin(26));",
+      "var adc = require(\"adc\");\rconsole.log(adc.readPin(26));",
       prompt,
     );
     channelOutput = await sendCommand(
       port,
       reader,
-      "const adc = require(\"adc\");\rconsole.log(adc.readChannel(0));",
+      "var adc = require(\"adc\");\rconsole.log(adc.readChannel(0));",
       prompt,
     );
     voltageOutput = await sendCommand(
       port,
       reader,
-      "const adc = require(\"adc\");\rconsole.log(adc.readVoltagePin(26));",
+      "var adc = require(\"adc\");\rconsole.log(adc.readVoltagePin(26));",
       prompt,
     );
     tempOutput = await sendCommand(
       port,
       reader,
-      "const adc = require(\"adc\");\rconsole.log(adc.readTempC());",
+      "var adc = require(\"adc\");\rconsole.log(adc.readTempC());",
       prompt,
     );
     constantsOutput = await sendCommand(
       port,
       reader,
-      "const adc = require(\"adc\");\rconsole.log(adc.TEMP);\rconsole.log(adc.VSYS);",
+      "var adc = require(\"adc\");\rconsole.log(adc.TEMP);\rconsole.log(adc.VSYS);",
       prompt,
     );
   });

@@ -349,11 +349,20 @@ static jerry_value_t load_module(const char *resolved_path) {
  * Built-in module names that map to global objects
  * These modules are provided by native C bindings and should not be loaded from disk
  */
-static const char *s_builtin_modules[] = {
-    "fs",       /* Filesystem API */
-    "process",  /* Process API */
-    "adc",      /* ADC API */
-    NULL        /* Sentinel */
+typedef struct {
+    const char *specifier;
+    const char *global_name;
+} builtin_module_t;
+
+static const builtin_module_t s_builtin_modules[] = {
+    {"fs", "fs"},
+    {"process", "process"},
+    {"adc", "adc"},
+    {"gpio", "GPIO"},
+    {"pwm", "PWM"},
+    {"i2c", "I2C"},
+    {"spi", "SPI"},
+    {NULL, NULL}
 };
 
 /*
@@ -361,11 +370,11 @@ static const char *s_builtin_modules[] = {
  * Returns the global object if it is, or undefined if not
  */
 static jerry_value_t get_builtin_module(const char *specifier) {
-    for (int i = 0; s_builtin_modules[i] != NULL; i++) {
-        if (strcmp(specifier, s_builtin_modules[i]) == 0) {
+    for (int i = 0; s_builtin_modules[i].specifier != NULL; i++) {
+        if (strcmp(specifier, s_builtin_modules[i].specifier) == 0) {
             /* Get the global object with this name */
             jerry_value_t global = jerry_current_realm();
-            jerry_value_t key = jerry_string_sz(specifier);
+            jerry_value_t key = jerry_string_sz(s_builtin_modules[i].global_name);
             jerry_value_t module = jerry_object_get(global, key);
             jerry_value_free(key);
             jerry_value_free(global);

@@ -29,6 +29,7 @@
 
 /* Forward declarations */
 static void print_banner(void);
+static void print_banner_once(void);
 static void main_loop(void);
 
 int main(void) {
@@ -90,11 +91,11 @@ int main(void) {
     /* Initialize REPL */
     repl_init();
     
-    /* Print startup banner once CDC is connected */
-    print_banner();
-    
     /* Attempt to boot from index.js */
     boot_run_index_js();
+
+    /* Print startup banner on first CDC connect */
+    print_banner_once();
     
     /* Enter main loop */
     main_loop();
@@ -108,21 +109,8 @@ int main(void) {
  * Print startup banner to serial
  */
 static void print_banner(void) {
-    /* Wait for CDC connection (with timeout) */
-    uint32_t start = to_ms_since_boot(get_absolute_time());
-    while (!usb_cdc_connected()) {
-        tud_task();
-        sleep_ms(10);
-        if (to_ms_since_boot(get_absolute_time()) - start > 5000) {
-            return;  /* Timeout - no terminal connected */
-        }
-    }
-    
-    sleep_ms(100);
-    tud_task();
-    
     const board_info_t *info = board_get_info();
-    
+
     usb_cdc_puts("\r\n");
     usb_cdc_puts("  __  __  ___ _   _  _ ___ \r\n");
     usb_cdc_puts(" |  \\/  |/ __| | | || / __|\r\n");
@@ -139,6 +127,17 @@ static void print_banner(void) {
     usb_cdc_puts("\r\n> ");
 }
 
+static void print_banner_once(void) {
+    static bool printed = false;
+
+    if (!printed && usb_cdc_connected()) {
+        sleep_ms(100);
+        tud_task();
+        print_banner();
+        printed = true;
+    }
+}
+
 /**
  * Main application loop
  */
@@ -149,6 +148,9 @@ static void main_loop(void) {
         
         /* Process REPL input/output */
         repl_task();
+
+        /* Print banner once CDC connects */
+        print_banner_once();
         
         /* Process JS timers */
         js_engine_process_timers();

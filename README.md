@@ -75,6 +75,8 @@ The `.info` command includes the current build ID (version + git SHA).
 
 Hold the **BOOTSEL** button during power-on to skip `index.js` auto-run. This allows recovery from scripts with infinite loops without reflashing.
 
+`index.js` runs immediately on boot; the REPL banner prints the first time a CDC serial connection is opened.
+
 ## JavaScript API
 
 ### Console

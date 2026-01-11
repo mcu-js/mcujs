@@ -444,9 +444,20 @@ static void repl_process_line(void) {
     
     // Check for REPL commands (start with .)
     if (repl_state.line_buffer[0] == '.') {
-        if (strncmp(repl_state.line_buffer, ".paste", 6) == 0 &&
-            (repl_state.line_buffer[6] == '\0' || repl_state.line_buffer[6] == ' ')) {
-            const char *path = repl_state.line_buffer + 6;
+        const char *command = repl_state.line_buffer + 1;
+        const char *path = NULL;
+        size_t prefix_len = 0;
+
+        if (strncmp(command, "paste", 5) == 0 &&
+            (command[5] == '\0' || command[5] == ' ')) {
+            prefix_len = 5;
+        } else if (strncmp(command, "multiline", 9) == 0 &&
+                   (command[9] == '\0' || command[9] == ' ')) {
+            prefix_len = 9;
+        }
+
+        if (prefix_len > 0) {
+            path = command + prefix_len;
             while (*path == ' ') {
                 path++;
             }
@@ -458,7 +469,7 @@ static void repl_process_line(void) {
         }
 
         repl_history_add(repl_state.line_buffer);
-        repl_handle_command(repl_state.line_buffer + 1);
+        repl_handle_command(command);
         repl_reset();
         repl_show_prompt();
         return;
@@ -627,7 +638,8 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  .cat FILE - Display contents of a file\r\n");
         usb_cdc_puts("  .rm FILE  - Remove a file\r\n");
         usb_cdc_puts("  .run FILE   - Execute a JavaScript file\r\n");
-        usb_cdc_puts("  .paste [FILE] - Paste multi-line input (end with .end)\r\n");
+        usb_cdc_puts("  .multiline [FILE] - Paste multi-line input (end with .end)\r\n");
+        usb_cdc_puts("  .paste [FILE]     - Alias for .multiline\r\n");
         usb_cdc_puts("  .uf2        - Reboot into UF2 mode (prompted)\r\n");
         usb_cdc_puts("  .uf2!       - Reboot into UF2 mode immediately\r\n");
         usb_cdc_puts("  .usbreset   - Reset USB connection (reboot)\r\n");

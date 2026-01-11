@@ -314,7 +314,7 @@ describe("paste execution", () => {
   let pasteOutput = "";
 
   beforeAll(async () => {
-    await sendRaw(port, ".paste\rconsole.log(\"paste-exec\");\r.end\r");
+    await sendRaw(port, ".multiline\rconsole.log(\"paste-exec\");\r.end\r");
     pasteOutput = await waitForPrompt();
   });
 
@@ -513,7 +513,7 @@ describe("filesystem", () => {
     listRenamedOutput = await sendCommand(port, reader, ".ls", prompt);
     runRenamedOutput = await sendCommand(port, reader, `.run /${files.helloRenamed}`, prompt);
 
-    await sendRaw(port, `.paste /${files.paste}\rconsole.log(\"paste\");\r.end\r`);
+    await sendRaw(port, `.multiline /${files.paste}\rconsole.log(\"paste\");\r.end\r`);
     await waitForPrompt();
     pasteRunOutput = await sendCommand(port, reader, `.run /${files.paste}`, prompt);
 
@@ -561,7 +561,7 @@ describe("filesystem", () => {
     expect(runRenamedOutput).toContain("hello");
   });
 
-  test(".paste writes file", () => {
+  test(".multiline writes file", () => {
     expect(pasteRunOutput).toContain("paste");
   });
 

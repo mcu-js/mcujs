@@ -56,7 +56,7 @@ Full `require()` implementation for modular code:
 ### REPL Features
 - Command history with Up/Down arrow keys (8 entries stored)
 - Line editing with Left/Right arrows, Home/End, Backspace anywhere
-- Tab completion for global objects and properties
+- Tab completion for global objects and properties (includes REPL-defined globals)
 - Built-in commands:
   - `.help` - Show available commands
 - `.info` - Show board info (chip, memory, filesystem, build)

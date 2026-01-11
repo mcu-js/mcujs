@@ -123,4 +123,9 @@ typedef bool (*js_completion_callback_t)(const char *name, void *user_data);
  */
 int js_engine_get_completions(const char *partial, js_completion_callback_t callback, void *user_data);
 
+/*
+ * Register REPL-defined globals for completion
+ */
+void js_engine_register_global_identifier(const char *name);
+
 #endif /* MCUJS_ENGINE_H */

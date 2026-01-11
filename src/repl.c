@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 // REPL configuration
 #define REPL_MAX_LINE_LENGTH 256
@@ -92,6 +93,7 @@ static bool repl_wait_for_keypress(uint32_t timeout_ms);
 static void repl_paste_start(const char *path);
 static void repl_paste_append_line(void);
 static void repl_paste_finish(void);
+static void repl_register_identifiers(const char *source, size_t length);
 
 // Tab completion state
 typedef struct {
@@ -492,6 +494,7 @@ static void repl_process_line(void) {
                                          result_buf, sizeof(result_buf));
     
     if (result == JS_OK) {
+        repl_register_identifiers(repl_state.line_buffer, repl_state.line_len);
         if (result_buf[0] != '\0' && strcmp(result_buf, "undefined") != 0) {
             repl_print_result(result_buf);
         }
@@ -538,6 +541,144 @@ static bool repl_wait_for_keypress(uint32_t timeout_ms) {
     }
 
     return false;
+}
+
+static bool repl_is_ident_start(char c) {
+    return isalpha((unsigned char)c) || c == '_' || c == '$';
+}
+
+static bool repl_is_ident_char(char c) {
+    return isalnum((unsigned char)c) || c == '_' || c == '$';
+}
+
+static bool repl_match_keyword(const char *source, size_t len, size_t pos, const char *keyword) {
+    size_t keyword_len = strlen(keyword);
+    if (pos + keyword_len > len) {
+        return false;
+    }
+    if (pos > 0 && repl_is_ident_char(source[pos - 1])) {
+        return false;
+    }
+    if (strncmp(source + pos, keyword, keyword_len) != 0) {
+        return false;
+    }
+    if (pos + keyword_len < len && repl_is_ident_char(source[pos + keyword_len])) {
+        return false;
+    }
+    return true;
+}
+
+static void repl_register_identifiers(const char *source, size_t length) {
+    bool in_line_comment = false;
+    bool in_block_comment = false;
+    char string_delim = '\0';
+
+    for (size_t i = 0; i < length; i++) {
+        char c = source[i];
+        char next = (i + 1 < length) ? source[i + 1] : '\0';
+
+        if (in_line_comment) {
+            if (c == '\n') {
+                in_line_comment = false;
+            }
+            continue;
+        }
+        if (in_block_comment) {
+            if (c == '*' && next == '/') {
+                in_block_comment = false;
+                i++;
+            }
+            continue;
+        }
+        if (string_delim != '\0') {
+            if (c == '\\') {
+                i++;
+                continue;
+            }
+            if (c == string_delim) {
+                string_delim = '\0';
+            }
+            continue;
+        }
+
+        if (c == '/' && next == '/') {
+            in_line_comment = true;
+            i++;
+            continue;
+        }
+        if (c == '/' && next == '*') {
+            in_block_comment = true;
+            i++;
+            continue;
+        }
+        if (c == '\'' || c == '"' || c == '`') {
+            string_delim = c;
+            continue;
+        }
+
+        if (repl_match_keyword(source, length, i, "const") ||
+            repl_match_keyword(source, length, i, "let") ||
+            repl_match_keyword(source, length, i, "var")) {
+            const char *keyword = repl_match_keyword(source, length, i, "const") ? "const"
+                                  : repl_match_keyword(source, length, i, "let") ? "let"
+                                  : "var";
+            i += strlen(keyword);
+            while (i < length) {
+                while (i < length && isspace((unsigned char)source[i])) {
+                    i++;
+                }
+                if (i >= length || !repl_is_ident_start(source[i])) {
+                    break;
+                }
+                size_t start = i;
+                i++;
+                while (i < length && repl_is_ident_char(source[i])) {
+                    i++;
+                }
+                char name_buf[REPL_MAX_COMPLETION_LEN];
+                size_t name_len = i - start;
+                if (name_len > 0 && name_len < sizeof(name_buf)) {
+                    memcpy(name_buf, source + start, name_len);
+                    name_buf[name_len] = '\0';
+                    js_engine_register_global_identifier(name_buf);
+                }
+                while (i < length && isspace((unsigned char)source[i])) {
+                    i++;
+                }
+                if (i < length && source[i] == ',') {
+                    i++;
+                    continue;
+                }
+                i--;
+                break;
+            }
+            continue;
+        }
+
+        if (repl_match_keyword(source, length, i, "function") ||
+            repl_match_keyword(source, length, i, "class")) {
+            const char *keyword = repl_match_keyword(source, length, i, "function") ? "function" : "class";
+            i += strlen(keyword);
+            while (i < length && isspace((unsigned char)source[i])) {
+                i++;
+            }
+            if (i < length && repl_is_ident_start(source[i])) {
+                size_t start = i;
+                i++;
+                while (i < length && repl_is_ident_char(source[i])) {
+                    i++;
+                }
+                char name_buf[REPL_MAX_COMPLETION_LEN];
+                size_t name_len = i - start;
+                if (name_len > 0 && name_len < sizeof(name_buf)) {
+                    memcpy(name_buf, source + start, name_len);
+                    name_buf[name_len] = '\0';
+                    js_engine_register_global_identifier(name_buf);
+                }
+            }
+            continue;
+        }
+    }
 }
 
 static void repl_paste_start(const char *path) {
@@ -607,6 +748,7 @@ static void repl_paste_finish(void) {
                                              repl_state.paste_len,
                                              result_buf, sizeof(result_buf));
         if (result == JS_OK) {
+            repl_register_identifiers(repl_state.paste_buffer, repl_state.paste_len);
             if (result_buf[0] != '\0' && strcmp(result_buf, "undefined") != 0) {
                 repl_print_result(result_buf);
             }

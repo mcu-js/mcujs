@@ -219,6 +219,37 @@ bool js_engine_process_timers(void) {
     return js_timers_process();
 }
 
+#define REPL_GLOBAL_MAX 64
+#define REPL_GLOBAL_NAME_MAX 32
+
+static char s_repl_globals[REPL_GLOBAL_MAX][REPL_GLOBAL_NAME_MAX];
+static uint8_t s_repl_global_count = 0;
+
+void js_engine_register_global_identifier(const char *name) {
+    if (name == NULL || name[0] == '\0') {
+        return;
+    }
+
+    size_t name_len = strlen(name);
+    if (name_len >= REPL_GLOBAL_NAME_MAX) {
+        return;
+    }
+
+    for (uint8_t i = 0; i < s_repl_global_count; i++) {
+        if (strcmp(s_repl_globals[i], name) == 0) {
+            return;
+        }
+    }
+
+    if (s_repl_global_count >= REPL_GLOBAL_MAX) {
+        return;
+    }
+
+    strncpy(s_repl_globals[s_repl_global_count], name, REPL_GLOBAL_NAME_MAX - 1);
+    s_repl_globals[s_repl_global_count][REPL_GLOBAL_NAME_MAX - 1] = '\0';
+    s_repl_global_count++;
+}
+
 /*
  * Get completions for tab completion
  */
@@ -307,6 +338,21 @@ int js_engine_get_completions(const char *partial, js_completion_callback_t call
     }
     
     jerry_value_free(keys);
+
+    if (dot == NULL && s_repl_global_count > 0) {
+        for (uint8_t i = 0; i < s_repl_global_count; i++) {
+            const char *name = s_repl_globals[i];
+            if (prefix_len > 0 && strncmp(name, prefix, prefix_len) != 0) {
+                continue;
+            }
+
+            match_count++;
+            if (!callback(name, user_data)) {
+                break;
+            }
+        }
+    }
+
     if (dot != NULL) {
         jerry_value_free(target_obj);
     }

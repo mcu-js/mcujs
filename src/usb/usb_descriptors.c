@@ -147,9 +147,7 @@ uint16_t const *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
     } else if (index == STRID_PRODUCT) {
         if (!product_generated) {
             snprintf(product_str, sizeof(product_str),
-                     "mcu.js %s %s",
-                     MCUJS_BUILD_ID,
-                     MCUJS_BOARD_CHIP);
+                     "mcujs Runtime");
             product_generated = true;
         }
         str = product_str;

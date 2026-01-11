@@ -28,11 +28,6 @@ void js_bind_gpio(void);
 jerry_value_t js_create_gpio_module(void);
 
 /*
- * Create GPIO module object
- */
-jerry_value_t js_create_gpio_module(void);
-
-/*
  * Register timer bindings
  * setTimeout(), clearTimeout(), setInterval(), clearInterval()
  */

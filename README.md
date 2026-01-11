@@ -64,8 +64,14 @@ undefined
 | `.cat FILE` | Display file contents |
 | `.rm FILE` | Delete a file |
 | `.run FILE` | Execute a JavaScript file |
+| `.uf2` | Reboot into UF2 mode (prompted) |
+| `.uf2!` | Reboot into UF2 mode immediately |
+| `.usbreset` | Reset USB connection (reboot) |
+
+The `.info` command includes the current build ID (version + git SHA).
 
 ### Safe Mode
+
 
 Hold the **BOOTSEL** button during power-on to skip `index.js` auto-run. This allows recovery from scripts with infinite loops without reflashing.
 
@@ -169,7 +175,8 @@ board.freeMemory();               // Free JS heap memory in bytes
 board.uniqueId();                 // Board unique ID (hex string)
 board.millis();                   // Milliseconds since boot
 board.delay(ms);                  // Blocking delay
-board.reset();                    // Reset the board
+board.reset();                    // Reset USB connection (reboot)
+board.enterUf2();                 // Reboot into UF2 bootloader
 ```
 
 ### Process
@@ -224,6 +231,18 @@ Files written from JavaScript are always persisted to flash immediately - they w
 Output files are in `build/`:
 - `mcujs-0.1.0-pico.uf2`
 - `mcujs-0.1.0-pico2.uf2`
+
+### End-to-End Tests (Bun)
+
+The Bun test suite builds firmware, flashes UF2 if needed, and exercises REPL, filesystem, and JS APIs.
+
+```bash
+bun run e2e
+```
+
+Requirements:
+- Pico connected via USB (CDC + MSC visible)
+- `bun`, `udisksctl`, and `lsblk` available
 
 ### Manual Build
 

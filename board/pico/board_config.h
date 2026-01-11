@@ -16,6 +16,7 @@
 #define MCUJS_BOARD_NAME        "pico"
 #define MCUJS_BOARD_CHIP        "RP2040"
 #define MCUJS_BOARD_CHIP_ID     0x2040
+#define MCUJS_HAS_UF2           1
 
 /* Memory configuration */
 #define MCUJS_FLASH_SIZE        FLASH_SIZE_2MB

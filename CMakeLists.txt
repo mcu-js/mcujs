@@ -28,9 +28,23 @@ set(CMAKE_CXX_STANDARD 17)
 # Initialize Pico SDK (must be after project())
 pico_sdk_init()
 
+# Derive build ID from git
+execute_process(
+    COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+    OUTPUT_VARIABLE MCUJS_GIT_SHA
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT MCUJS_GIT_SHA)
+    set(MCUJS_GIT_SHA "unknown")
+endif()
+set(MCUJS_BUILD_ID "${MCUJS_VERSION}+${MCUJS_GIT_SHA}")
+
 # Global compile definitions
 add_compile_definitions(
     MCUJS_VERSION="${MCUJS_VERSION}"
+    MCUJS_BUILD_ID="${MCUJS_BUILD_ID}"
     MCUJS_BOARD="${BOARD}"
     JERRYSCRIPT_VERSION="3.0.0"
     PICO_SDK_VERSION="2.2.0"

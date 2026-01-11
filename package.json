@@ -1,0 +1,8 @@
+{
+  "name": "mcujs-e2e",
+  "private": true,
+  "scripts": {
+    "test": "bun test",
+    "e2e": "bun test tests/e2e.test.js"
+  }
+}

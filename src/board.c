@@ -12,6 +12,18 @@
 #include "hardware/gpio.h"
 #include "hardware/clocks.h"
 
+#if defined(__has_include)
+#if __has_include("hardware/bootrom.h")
+#include "hardware/bootrom.h"
+#elif __has_include("pico/bootrom.h")
+#include "pico/bootrom.h"
+#endif
+#elif defined(PICO_BUILD)
+#include "pico/bootrom.h"
+#else
+#include "hardware/bootrom.h"
+#endif
+
 /* Static board info structure */
 static const board_info_t s_board_info = {
     .name = MCUJS_BOARD_NAME,
@@ -88,4 +100,13 @@ void board_get_unique_id(uint8_t *id, size_t len) {
     for (size_t i = copy_len; i < len; i++) {
         id[i] = 0;
     }
+}
+
+bool board_enter_uf2(void) {
+#if MCUJS_HAS_UF2
+    reset_usb_boot(0, 0);
+    return true;
+#else
+    return false;
+#endif
 }

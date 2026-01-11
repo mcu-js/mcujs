@@ -64,4 +64,9 @@ bool usb_cdc_connected(void);
  */
 void usb_cdc_flush(void);
 
+/*
+ * Reset USB connection (soft disconnect + reboot)
+ */
+void usb_cdc_reset_usb(uint32_t delay_ms);
+
 #endif /* MCUJS_USB_CDC_H */

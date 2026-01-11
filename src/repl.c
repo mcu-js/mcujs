@@ -81,6 +81,7 @@ static void repl_cursor_right(void);
 static void repl_delete_char(void);
 static void repl_insert_char(char c);
 static void repl_handle_tab(void);
+static bool repl_wait_for_keypress(uint32_t timeout_ms);
 
 // Tab completion state
 typedef struct {
@@ -474,6 +475,26 @@ static bool repl_ls_callback(const fs_entry_t *entry, void *user_data) {
 }
 
 /**
+ * Wait for a keypress within timeout
+ */
+static bool repl_wait_for_keypress(uint32_t timeout_ms) {
+    const uint32_t step_ms = 50;
+    uint32_t elapsed = 0;
+
+    while (elapsed < timeout_ms) {
+        usb_cdc_task();
+        if (usb_cdc_available()) {
+            usb_cdc_getchar();
+            return true;
+        }
+        board_delay_ms(step_ms);
+        elapsed += step_ms;
+    }
+
+    return false;
+}
+
+/**
  * Handle REPL dot commands
  */
 static void repl_handle_command(const char* cmd) {
@@ -485,6 +506,9 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  .cat FILE - Display contents of a file\r\n");
         usb_cdc_puts("  .rm FILE  - Remove a file\r\n");
         usb_cdc_puts("  .run FILE - Execute a JavaScript file\r\n");
+        usb_cdc_puts("  .uf2      - Reboot into UF2 mode (prompted)\r\n");
+        usb_cdc_puts("  .uf2!     - Reboot into UF2 mode immediately\r\n");
+        usb_cdc_puts("  .usbreset - Reset USB connection (reboot)\r\n");
         usb_cdc_puts("\r\n");
         usb_cdc_puts("JavaScript APIs:\r\n");
         usb_cdc_puts("  console.log(), GPIO, PWM, I2C, SPI\r\n");
@@ -499,6 +523,10 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("\r\n");
         usb_cdc_puts("Chip: ");
         usb_cdc_puts(info->chip);
+        usb_cdc_puts("\r\n");
+        
+        usb_cdc_puts("Build: ");
+        usb_cdc_puts(MCUJS_BUILD_ID);
         usb_cdc_puts("\r\n");
         
         snprintf(buf, sizeof(buf), "Flash: %lu KB\r\n", (unsigned long)(info->flash_size / 1024));
@@ -572,6 +600,28 @@ static void repl_handle_command(const char* cmd) {
             js_engine_get_error(error_buf, sizeof(error_buf));
             repl_print_error(error_buf);
         }
+    }
+    else if (strcmp(cmd, "uf2") == 0) {
+        usb_cdc_puts("Entering UF2 mode in 3s. Press any key to cancel.\r\n");
+        if (repl_wait_for_keypress(3000)) {
+            usb_cdc_puts("UF2 entry cancelled.\r\n");
+            return;
+        }
+        usb_cdc_puts("Rebooting into UF2 mode...\r\n");
+        if (!board_enter_uf2()) {
+            usb_cdc_puts("UF2 boot not supported on this board.\r\n");
+        }
+    }
+    else if (strcmp(cmd, "uf2!") == 0) {
+        usb_cdc_puts("Rebooting into UF2 mode...\r\n");
+        if (!board_enter_uf2()) {
+            usb_cdc_puts("UF2 boot not supported on this board.\r\n");
+        }
+    }
+    else if (strcmp(cmd, "usbreset") == 0) {
+        usb_cdc_puts("Resetting USB connection...\r\n");
+        usb_cdc_flush();
+        usb_cdc_reset_usb(250);
     }
     else {
         usb_cdc_puts("Unknown command. Type .help for available commands.\r\n");

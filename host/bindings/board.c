@@ -7,6 +7,8 @@
 #include "bindings.h"
 #include "jerryscript.h"
 #include "board_config.h"
+#include "board.h"
+#include "usb/usb_cdc.h"
 
 #include <stdio.h>
 #include "pico/stdlib.h"
@@ -77,13 +79,7 @@ static jerry_value_t board_reset_handler(const jerry_call_info_t *call_info_p,
     (void)args;
     (void)argc;
     
-    /* Trigger a watchdog reset */
-    watchdog_enable(1, false);
-    while (1) {
-        tight_loop_contents();
-    }
-    
-    /* Never reached */
+    usb_cdc_reset_usb(250);
     return jerry_undefined();
 }
 
@@ -99,6 +95,22 @@ static jerry_value_t board_millis_handler(const jerry_call_info_t *call_info_p,
     (void)argc;
     
     return jerry_number((double)to_ms_since_boot(get_absolute_time()));
+}
+
+/*
+ * board.enterUf2()
+ * Enter UF2 bootloader mode
+ */
+static jerry_value_t board_enter_uf2_handler(const jerry_call_info_t *call_info_p,
+                                             const jerry_value_t args[],
+                                             const jerry_length_t argc) {
+    (void)call_info_p;
+    (void)args;
+    (void)argc;
+
+    board_enter_uf2();
+
+    return jerry_undefined();
 }
 
 /*
@@ -159,6 +171,7 @@ void js_bind_board(void) {
     js_set_function(board, "uniqueId", board_unique_id_handler);
     js_set_function(board, "reset", board_reset_handler);
     js_set_function(board, "millis", board_millis_handler);
+    js_set_function(board, "enterUf2", board_enter_uf2_handler);
     js_set_function(board, "delay", board_delay_handler);
     js_set_function(board, "led", board_led_handler);
     

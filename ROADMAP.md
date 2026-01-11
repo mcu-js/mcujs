@@ -63,6 +63,11 @@ while (1) {
 
 ### REPL Commands
 - [x] Implement `.rm FILE` to delete files
+- [x] Implement `.uf2` / `.uf2!` to enter UF2 mode
+- [x] Implement `.usbreset` to reset USB connection
+
+### Testing
+- [x] Bun end-to-end harness (build/flash/REPL/filesystem)
 
 ---
 
@@ -70,6 +75,7 @@ while (1) {
 
 ### REPL Enhancements
 - [x] Tab completion for global objects and properties
+- [x] Include build ID in `.info` output
 - [ ] Multi-line paste support
 - [ ] `.edit` command to edit files in-place
 

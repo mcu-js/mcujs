@@ -72,4 +72,10 @@ uint32_t board_get_ticks_ms(void);
  */
 void board_get_unique_id(uint8_t *id, size_t len);
 
+/*
+ * Enter UF2 bootloader mode (if supported)
+ * Returns true if supported and triggered.
+ */
+bool board_enter_uf2(void);
+
 #endif /* MCUJS_BOARD_H */

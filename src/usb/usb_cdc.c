@@ -6,6 +6,8 @@
 
 #include "usb_cdc.h"
 #include "tusb.h"
+#include "pico/stdlib.h"
+#include "hardware/watchdog.h"
 #include <string.h>
 
 void usb_cdc_init(void) {
@@ -99,6 +101,15 @@ bool usb_cdc_connected(void) {
 
 void usb_cdc_flush(void) {
     tud_cdc_write_flush();
+}
+
+void usb_cdc_reset_usb(uint32_t delay_ms) {
+    tud_disconnect();
+    sleep_ms(delay_ms);
+    watchdog_enable(1, false);
+    while (1) {
+        tight_loop_contents();
+    }
 }
 
 /*--------------------------------------------------------------------

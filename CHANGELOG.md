@@ -57,11 +57,15 @@ Full `require()` implementation for modular code:
 - Tab completion for global objects and properties
 - Built-in commands:
   - `.help` - Show available commands
-  - `.info` - Show board info (chip, memory, filesystem)
-  - `.ls` - List files on the device with sizes
-  - `.cat FILE` - Display file contents
-  - `.rm FILE` - Delete a file
-  - `.run FILE` - Execute a JavaScript file
+- `.info` - Show board info (chip, memory, filesystem, build)
+- `.ls` - List files on the device with sizes
+- `.cat FILE` - Display file contents
+- `.rm FILE` - Delete a file
+- `.run FILE` - Execute a JavaScript file
+- `.uf2` - Reboot into UF2 mode (prompted)
+- `.uf2!` - Reboot into UF2 mode immediately
+- `.usbreset` - Reset USB connection (reboot)
+
 
 ### Build System
 - Docker-based build for reproducibility

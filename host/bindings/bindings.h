@@ -52,6 +52,12 @@ void js_bind_i2c(void);
 void js_bind_spi(void);
 
 /*
+ * Register ADC bindings
+ * adc.readPin(), adc.readChannel(), adc.readTempC(), adc.TEMP
+ */
+void js_bind_adc(void);
+
+/*
  * Register board bindings
  * board.name, board.chip, board.freeMemory()
  */

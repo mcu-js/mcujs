@@ -183,6 +183,20 @@ board.reset();                    // Reset USB connection (reboot)
 board.enterUf2();                 // Reboot into UF2 bootloader
 ```
 
+### ADC
+```javascript
+const adc = require('adc');
+
+adc.readPin(26);                  // Raw ADC reading (0-4095)
+adc.readChannel(0);               // Raw ADC reading by channel
+adc.readVoltagePin(26);           // Voltage using 3.3V reference
+adc.readVoltageChannel(0);        // Voltage using 3.3V reference
+adc.readTempC();                  // Internal temperature sensor (°C)
+
+adc.TEMP;                         // Internal temperature channel
+adc.VSYS;                         // VSYS channel
+```
+
 ### Process
 ```javascript
 process.version;                  // mcujs version (e.g., "v0.1.0")

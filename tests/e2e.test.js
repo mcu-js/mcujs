@@ -350,6 +350,71 @@ describe("console output", () => {
   });
 });
 
+describe("adc", () => {
+  let pinOutput = "";
+  let channelOutput = "";
+  let voltageOutput = "";
+  let tempOutput = "";
+  let constantsOutput = "";
+
+  beforeAll(async () => {
+    pinOutput = await sendCommand(
+      port,
+      reader,
+      "const adc = require(\"adc\");\rconsole.log(adc.readPin(26));",
+      prompt,
+    );
+    channelOutput = await sendCommand(
+      port,
+      reader,
+      "const adc = require(\"adc\");\rconsole.log(adc.readChannel(0));",
+      prompt,
+    );
+    voltageOutput = await sendCommand(
+      port,
+      reader,
+      "const adc = require(\"adc\");\rconsole.log(adc.readVoltagePin(26));",
+      prompt,
+    );
+    tempOutput = await sendCommand(
+      port,
+      reader,
+      "const adc = require(\"adc\");\rconsole.log(adc.readTempC());",
+      prompt,
+    );
+    constantsOutput = await sendCommand(
+      port,
+      reader,
+      "const adc = require(\"adc\");\rconsole.log(adc.TEMP);\rconsole.log(adc.VSYS);",
+      prompt,
+    );
+  });
+
+  test("readPin returns number", () => {
+    expect(pinOutput).toMatch(/\d+/);
+  });
+
+  test("readChannel returns number", () => {
+    expect(channelOutput).toMatch(/\d+/);
+  });
+
+  test("readVoltagePin returns number", () => {
+    expect(voltageOutput).toMatch(/\d+(\.\d+)?/);
+  });
+
+  test("readTempC returns number", () => {
+    expect(tempOutput).toMatch(/-?\d+(\.\d+)?/);
+  });
+
+  test("TEMP constant is 4", () => {
+    expect(constantsOutput).toContain("4");
+  });
+
+  test("VSYS constant is 3", () => {
+    expect(constantsOutput).toContain("3");
+  });
+});
+
 describe("filesystem", () => {
   let runHelloOutput = "";
   let listOutput = "";

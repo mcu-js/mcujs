@@ -352,6 +352,7 @@ static jerry_value_t load_module(const char *resolved_path) {
 static const char *s_builtin_modules[] = {
     "fs",       /* Filesystem API */
     "process",  /* Process API */
+    "adc",      /* ADC API */
     NULL        /* Sentinel */
 };
 

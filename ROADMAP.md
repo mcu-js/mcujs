@@ -106,7 +106,8 @@ while (1) {
 ## Future Features
 
 ### Additional Hardware APIs
-- [ ] `ADC` - Analog-to-digital converter
+- [x] `ADC` - Analog-to-digital converter
+- [ ] `ADC` configurable Vref / calibration
 - [ ] `UART` - Serial communication
 - [ ] `PIO` - Programmable I/O (RP2040/RP2350 unique feature)
 - [ ] `DMA` - Direct memory access for high-speed transfers

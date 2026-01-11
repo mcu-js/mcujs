@@ -17,6 +17,7 @@ All notable changes to mcujs will be documented in this file.
 - `PWM` - Pulse width modulation
 - `I2C` - I2C bus communication
 - `SPI` - SPI bus communication
+- `ADC` - Analog-to-digital converter
 - `board` object - LED control, system info, unique ID, memory stats
 
 ### JavaScript APIs

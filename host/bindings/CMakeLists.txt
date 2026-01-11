@@ -9,6 +9,7 @@ add_library(mcujs_bindings STATIC
     pwm.c
     i2c.c
     spi.c
+    adc.c
     board.c
     fs.c
     process.c
@@ -35,5 +36,6 @@ target_link_libraries(mcujs_bindings PUBLIC
     hardware_pwm
     hardware_i2c
     hardware_spi
+    hardware_adc
     hardware_timer
 )

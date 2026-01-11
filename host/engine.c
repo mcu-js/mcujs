@@ -214,6 +214,7 @@ void js_register_bindings(void) {
     js_bind_pwm();
     js_bind_i2c();
     js_bind_spi();
+    js_bind_adc();
     js_bind_board();
     js_bind_fs();
     js_bind_process();

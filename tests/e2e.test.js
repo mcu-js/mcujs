@@ -9,6 +9,7 @@ import {
   openReader,
   sendCommand,
   sendRaw,
+  readUntil,
   waitForLabel,
   waitForLabelDisconnect,
   waitForLabelAvailable,
@@ -32,12 +33,14 @@ const files = {
   helloRenamed: "helloWorldRenamed.js",
   lib: "libTest.js",
   libRenamed: "libTestRenamed.js",
+  paste: "paste.js",
 };
 
 let port;
 let reader;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const waitForPrompt = () => readUntil(reader, (buffer) => buffer.includes(prompt));
 
 async function openSerial() {
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -114,6 +117,7 @@ afterAll(() => {
   }
   removeFile(join(mcujsMount, files.hello));
   removeFile(join(mcujsMount, files.helloRenamed));
+  removeFile(join(mcujsMount, files.paste));
   removeFile(join(mcujsMount, "lib", files.lib));
   removeFile(join(mcujsMount, "lib", files.libRenamed));
 });
@@ -306,6 +310,19 @@ describe("repl evaluation", () => {
   });
 });
 
+describe("paste execution", () => {
+  let pasteOutput = "";
+
+  beforeAll(async () => {
+    await sendRaw(port, ".paste\rconsole.log(\"paste-exec\");\r.end\r");
+    pasteOutput = await waitForPrompt();
+  });
+
+  test("paste runs inline code", () => {
+    expect(pasteOutput).toContain("paste-exec");
+  });
+});
+
 describe("console output", () => {
   let output = "";
   let multiOutput = "";
@@ -470,6 +487,7 @@ describe("filesystem", () => {
   let listOutput = "";
   let listRenamedOutput = "";
   let runRenamedOutput = "";
+  let pasteRunOutput = "";
   let requireOutput = "";
   let requireRenamedOutput = "";
   let missingCatOutput = "";
@@ -494,6 +512,10 @@ describe("filesystem", () => {
 
     listRenamedOutput = await sendCommand(port, reader, ".ls", prompt);
     runRenamedOutput = await sendCommand(port, reader, `.run /${files.helloRenamed}`, prompt);
+
+    await sendRaw(port, `.paste /${files.paste}\rconsole.log(\"paste\");\r.end\r`);
+    await waitForPrompt();
+    pasteRunOutput = await sendCommand(port, reader, `.run /${files.paste}`, prompt);
 
     writeFile(join(libDir, files.lib), "module.exports = { msg: \"hello-from-lib\" };\n");
     syncFilesystem();
@@ -537,6 +559,10 @@ describe("filesystem", () => {
 
   test(".run after rename", () => {
     expect(runRenamedOutput).toContain("hello");
+  });
+
+  test(".paste writes file", () => {
+    expect(pasteRunOutput).toContain("paste");
   });
 
   test("require from lib works", () => {

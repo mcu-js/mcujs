@@ -21,6 +21,8 @@
 #define REPL_CONTINUATION_PROMPT "... "
 #define REPL_MAX_COMPLETIONS 16
 #define REPL_MAX_COMPLETION_LEN 32
+#define REPL_PASTE_BUFFER_SIZE 4096
+#define REPL_PASTE_PROMPT "paste> "
 
 // Special characters
 #define CHAR_BACKSPACE 0x08
@@ -51,7 +53,12 @@ typedef struct {
     bool prompt_shown;
     bool initialized;
     esc_state_t esc_state;
-    
+
+    bool paste_mode;
+    char paste_buffer[REPL_PASTE_BUFFER_SIZE];
+    uint16_t paste_len;
+    char paste_path[REPL_MAX_LINE_LENGTH];
+
     // History
     char history[REPL_HISTORY_SIZE][REPL_MAX_LINE_LENGTH];
     uint8_t history_count;  // Number of items in history
@@ -82,6 +89,9 @@ static void repl_delete_char(void);
 static void repl_insert_char(char c);
 static void repl_handle_tab(void);
 static bool repl_wait_for_keypress(uint32_t timeout_ms);
+static void repl_paste_start(const char *path);
+static void repl_paste_append_line(void);
+static void repl_paste_finish(void);
 
 // Tab completion state
 typedef struct {
@@ -134,7 +144,9 @@ void repl_task(void) {
  * Show the REPL prompt
  */
 static void repl_show_prompt(void) {
-    if (repl_state.multiline_mode) {
+    if (repl_state.paste_mode) {
+        usb_cdc_puts(REPL_PASTE_PROMPT);
+    } else if (repl_state.multiline_mode) {
         usb_cdc_puts(REPL_CONTINUATION_PROMPT);
     } else {
         usb_cdc_puts(REPL_PROMPT);
@@ -403,6 +415,19 @@ static void repl_handle_char(char c) {
  * Process a complete line of input
  */
 static void repl_process_line(void) {
+    if (repl_state.paste_mode) {
+        if (repl_state.line_len == 4 && strcmp(repl_state.line_buffer, ".end") == 0) {
+            repl_paste_finish();
+        } else {
+            repl_paste_append_line();
+        }
+        repl_state.line_len = 0;
+        repl_state.cursor_pos = 0;
+        repl_state.line_buffer[0] = '\0';
+        repl_show_prompt();
+        return;
+    }
+
     // Trim trailing whitespace
     while (repl_state.line_len > 0 && 
            (repl_state.line_buffer[repl_state.line_len - 1] == ' ' ||
@@ -419,6 +444,19 @@ static void repl_process_line(void) {
     
     // Check for REPL commands (start with .)
     if (repl_state.line_buffer[0] == '.') {
+        if (strncmp(repl_state.line_buffer, ".paste", 6) == 0 &&
+            (repl_state.line_buffer[6] == '\0' || repl_state.line_buffer[6] == ' ')) {
+            const char *path = repl_state.line_buffer + 6;
+            while (*path == ' ') {
+                path++;
+            }
+            repl_history_add(repl_state.line_buffer);
+            repl_reset();
+            repl_paste_start(path[0] != '\0' ? path : NULL);
+            repl_show_prompt();
+            return;
+        }
+
         repl_history_add(repl_state.line_buffer);
         repl_handle_command(repl_state.line_buffer + 1);
         repl_reset();
@@ -494,6 +532,89 @@ static bool repl_wait_for_keypress(uint32_t timeout_ms) {
     return false;
 }
 
+static void repl_paste_start(const char *path) {
+    repl_state.paste_mode = true;
+    repl_state.paste_len = 0;
+    repl_state.paste_buffer[0] = '\0';
+    repl_state.paste_path[0] = '\0';
+
+    if (path && path[0] != '\0') {
+        strncpy(repl_state.paste_path, path, sizeof(repl_state.paste_path) - 1);
+        repl_state.paste_path[sizeof(repl_state.paste_path) - 1] = '\0';
+        usb_cdc_puts("Paste mode. End with .end. Writing to ");
+        usb_cdc_puts(repl_state.paste_path);
+        usb_cdc_puts("\r\n");
+    } else {
+        usb_cdc_puts("Paste mode. End with .end.\r\n");
+    }
+}
+
+static void repl_paste_append_line(void) {
+    size_t required = repl_state.paste_len + repl_state.line_len + 1;
+    if (required >= REPL_PASTE_BUFFER_SIZE) {
+        usb_cdc_puts("Error: Paste buffer full\r\n");
+        repl_state.paste_mode = false;
+        repl_state.paste_len = 0;
+        repl_state.paste_buffer[0] = '\0';
+        repl_state.paste_path[0] = '\0';
+        return;
+    }
+
+    memcpy(&repl_state.paste_buffer[repl_state.paste_len],
+           repl_state.line_buffer,
+           repl_state.line_len);
+    repl_state.paste_len += repl_state.line_len;
+    repl_state.paste_buffer[repl_state.paste_len++] = '\n';
+    repl_state.paste_buffer[repl_state.paste_len] = '\0';
+}
+
+static void repl_paste_finish(void) {
+    if (repl_state.paste_len == 0) {
+        repl_state.paste_mode = false;
+        return;
+    }
+
+    if (repl_state.paste_path[0] != '\0') {
+        fs_invalidate();
+        fs_file_t file;
+        fs_result_t result = fs_open(&file, repl_state.paste_path,
+                                     FS_MODE_WRITE | FS_MODE_CREATE | FS_MODE_TRUNCATE);
+        if (result != FS_OK) {
+            usb_cdc_puts("Error: Could not open file for paste\r\n");
+        } else {
+            size_t bytes_written = 0;
+            result = fs_write(&file, repl_state.paste_buffer, repl_state.paste_len, &bytes_written);
+            fs_close(&file);
+            if (result == FS_OK && bytes_written == repl_state.paste_len) {
+                fs_sync();
+                fs_notify_host();
+                usb_cdc_puts("Paste saved\r\n");
+            } else {
+                usb_cdc_puts("Error: Failed to write paste\r\n");
+            }
+        }
+    } else {
+        char result_buf[256];
+        js_result_t result = js_engine_exec(repl_state.paste_buffer,
+                                             repl_state.paste_len,
+                                             result_buf, sizeof(result_buf));
+        if (result == JS_OK) {
+            if (result_buf[0] != '\0' && strcmp(result_buf, "undefined") != 0) {
+                repl_print_result(result_buf);
+            }
+        } else {
+            char error_buf[128];
+            js_engine_get_error(error_buf, sizeof(error_buf));
+            repl_print_error(error_buf);
+        }
+    }
+
+    repl_state.paste_mode = false;
+    repl_state.paste_len = 0;
+    repl_state.paste_buffer[0] = '\0';
+    repl_state.paste_path[0] = '\0';
+}
+
 /**
  * Handle REPL dot commands
  */
@@ -505,10 +626,11 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  .ls       - List files on the device\r\n");
         usb_cdc_puts("  .cat FILE - Display contents of a file\r\n");
         usb_cdc_puts("  .rm FILE  - Remove a file\r\n");
-        usb_cdc_puts("  .run FILE - Execute a JavaScript file\r\n");
-        usb_cdc_puts("  .uf2      - Reboot into UF2 mode (prompted)\r\n");
-        usb_cdc_puts("  .uf2!     - Reboot into UF2 mode immediately\r\n");
-        usb_cdc_puts("  .usbreset - Reset USB connection (reboot)\r\n");
+        usb_cdc_puts("  .run FILE   - Execute a JavaScript file\r\n");
+        usb_cdc_puts("  .paste [FILE] - Paste multi-line input (end with .end)\r\n");
+        usb_cdc_puts("  .uf2        - Reboot into UF2 mode (prompted)\r\n");
+        usb_cdc_puts("  .uf2!       - Reboot into UF2 mode immediately\r\n");
+        usb_cdc_puts("  .usbreset   - Reset USB connection (reboot)\r\n");
         usb_cdc_puts("\r\n");
         usb_cdc_puts("JavaScript APIs:\r\n");
         usb_cdc_puts("  console.log(), GPIO, PWM, I2C, SPI\r\n");
@@ -750,6 +872,10 @@ void repl_reset(void) {
     repl_state.bracket_depth = 0;
     repl_state.history_pos = -1;
     repl_state.esc_state = ESC_NONE;
+    repl_state.paste_mode = false;
+    repl_state.paste_len = 0;
+    repl_state.paste_buffer[0] = '\0';
+    repl_state.paste_path[0] = '\0';
 }
 
 /**

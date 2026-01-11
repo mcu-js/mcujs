@@ -76,8 +76,7 @@ while (1) {
 ### REPL Enhancements
 - [x] Tab completion for global objects and properties
 - [x] Include build ID in `.info` output
-- [ ] Multi-line paste support
-- [ ] `.edit` command to edit files in-place
+- [x] Multi-line paste support
 
 ### Error Handling
 - [ ] Stack traces with line numbers

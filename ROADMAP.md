@@ -54,7 +54,7 @@ while (1) {
 ## Short-Term (Next Up)
 
 ### USB Mass Storage
-- [ ] Test Windows/Mac compatibility
+- [x] Test Windows/Mac compatibility
 
 ### Filesystem from JavaScript
 - [x] Implement `fs.readFileSync()` to read files from JavaScript

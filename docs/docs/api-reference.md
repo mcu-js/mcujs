@@ -1,0 +1,29 @@
+---
+sidebar_position: 7
+---
+
+# API Reference
+
+## Runtime JavaScript
+
+- Console, timers, and globals: see [Runtime JavaScript](./runtime-javascript.md)
+
+## Modules
+
+- Core modules: [Built-in Modules](./built-in-modules.md)
+- Hardware modules: [Built-in Modules](./built-in-modules.md)
+
+## Notes
+
+Refer to the [REPL](./glossary.md#repl) `.help` output or the runtime source for details while the API docs expand.
+If something feels missing, check the source or open an issue so we can document it.
+
+## Example map
+
+- Want timers or console? Start at [Runtime JavaScript](./runtime-javascript.md)
+- Want GPIO or files? Start at [Built-in Modules](./built-in-modules.md)
+
+## Key terms
+
+- [Runtime](./glossary.md#runtime)
+- [CommonJS](./glossary.md#commonjs)

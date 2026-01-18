@@ -1,0 +1,311 @@
+:root {
+  --mcujs-ink: #141414;
+  --mcujs-ink-soft: #2c2c2c;
+  --mcujs-accent: #f26d3d;
+  --mcujs-accent-deep: #d5562b;
+  --mcujs-sand: #f4f0ea;
+  --mcujs-sand-deep: #ece3d7;
+  --mcujs-shadow: rgba(20, 20, 20, 0.12);
+  --mcujs-panel: #161616;
+  --mcujs-panel-text: #e9e1d6;
+  --mcujs-panel-muted: rgba(233, 225, 214, 0.65);
+  --mcujs-panel-border: rgba(233, 225, 214, 0.12);
+}
+
+.page {
+  background: radial-gradient(circle at top, #f8f4ee 0%, #f1e7d9 45%, #efe2d2 100%);
+  color: var(--mcujs-ink);
+  min-height: 100vh;
+}
+
+.hero {
+  padding: 5rem 1.5rem 3rem;
+  overflow: visible;
+}
+
+.heroInner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2.5rem;
+  align-items: center;
+  overflow: visible;
+}
+
+.heroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.title {
+  font-size: clamp(2.5rem, 4vw, 3.4rem);
+  letter-spacing: -0.03em;
+  margin-bottom: 0.25rem;
+}
+
+.tagline {
+  font-size: 1.1rem;
+  color: var(--mcujs-ink-soft);
+}
+
+.subtitle {
+  font-size: 1rem;
+  max-width: 32rem;
+  color: var(--mcujs-ink-soft);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.primaryAction,
+.secondaryAction,
+.tertiaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.4rem;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primaryAction {
+  background: var(--mcujs-accent);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(242, 109, 61, 0.3);
+}
+
+.primaryAction:hover {
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(242, 109, 61, 0.35);
+}
+
+.secondaryAction {
+  background: rgba(20, 20, 20, 0.06);
+  color: var(--mcujs-ink);
+}
+
+.secondaryAction:hover,
+.tertiaryAction:hover {
+  color: var(--mcujs-ink);
+  transform: translateY(-1px);
+}
+
+.tertiaryAction {
+  background: transparent;
+  border: 1px solid rgba(20, 20, 20, 0.18);
+  color: var(--mcujs-ink);
+}
+
+.heroMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--mcujs-ink-soft);
+}
+
+.heroMeta span {
+  background: rgba(20, 20, 20, 0.05);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+}
+
+.heroPanel {
+  background: var(--mcujs-panel);
+  color: var(--mcujs-panel-text);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(22, 22, 22, 0.3);
+  overflow: visible;
+  position: relative;
+}
+
+.panelHeader {
+  padding: 0.85rem 1.2rem;
+  border-bottom: 1px solid var(--mcujs-panel-border);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.chippyWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.panelButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.panelIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  transition: transform 0.2s ease;
+}
+
+.panelButton:hover .panelIcon {
+  transform: translateY(-2px);
+}
+
+@keyframes chippyFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.chippyBubble {
+  position: absolute;
+  bottom: calc(100% + 28px);
+  left: -24px;
+  background: #f6e7d5;
+  color: #2c1f16;
+  border-radius: 14px;
+  padding: 0.75rem 0.9rem;
+  box-shadow: 0 16px 28px rgba(22, 22, 22, 0.2);
+  display: grid;
+  gap: 0.5rem;
+  min-width: 160px;
+  z-index: 6;
+  animation: chippyPop 0.2s ease-out;
+}
+
+.chippyBubble::after {
+  content: '';
+  position: absolute;
+  left: 30px;
+  bottom: -10px;
+  width: 18px;
+  height: 18px;
+  background: #f6e7d5;
+  transform: rotate(45deg);
+  border-radius: 4px;
+}
+
+
+@keyframes chippyPop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.chippyText {
+  font-family: "Press Start 2P", "IBM Plex Mono", "SFMono-Regular", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.chippyLink {
+  color: #b3441f;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.chippyLink:hover {
+  text-decoration: underline;
+}
+
+.chippyClose {
+  border: none;
+  background: rgba(22, 22, 22, 0.08);
+  color: #2c1f16;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.panelBody {
+  padding: 1.25rem;
+  font-family: "IBM Plex Mono", "SFMono-Regular", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.92rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.panelLine {
+  color: var(--mcujs-panel-muted);
+}
+
+.panelLine:nth-child(1),
+.panelLine:nth-child(2),
+.panelLine:nth-child(3) {
+  color: var(--mcujs-panel-text);
+}
+
+.sections {
+  padding: 0 1.5rem 5rem;
+}
+
+.sectionGrid {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 18px;
+  padding: 1.75rem;
+  box-shadow: 0 14px 30px rgba(20, 20, 20, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.card h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.cardLink {
+  color: var(--mcujs-accent-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cardLink:hover {
+  color: var(--mcujs-accent-deep);
+  text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .hero {
+    padding-top: 3.5rem;
+  }
+
+  .heroPanel {
+    order: -1;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

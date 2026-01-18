@@ -4,27 +4,18 @@
 
 **Problem:** An infinite loop in `index.js` blocks the entire system, making the filesystem inaccessible. Users cannot fix their code without reflashing the device.
 
-### Solution: Dual-Core Execution (Recommended)
+### Solution: Boot-Safe Recovery (Recommended)
 
-The RP2040 and RP2350 both have two ARM cores. We can isolate JavaScript execution from the USB stack:
-
-| Core | Responsibilities |
-|------|------------------|
-| Core 0 | USB stack (TinyUSB), filesystem (FAT12), REPL input |
-| Core 1 | JavaScript engine (JerryScript), timer callbacks |
+We already have a safe boot path: hold the button during boot to skip auto-loading `index.js`. That keeps USB mass storage accessible so users can delete or fix broken scripts without reflashing.
 
 **Benefits:**
-- Filesystem remains accessible even if JS hangs
-- User can delete/edit `index.js` via USB mass storage
-- REPL can send abort signal to Core 1
+- Simple recovery path with no multicore complexity
+- Filesystem remains accessible for repair
 - No device reflash required to recover
 
 **Implementation:**
-- Use `pico_multicore` library
-- Core 0 runs `main_loop()` with `tud_task()` and `repl_task()`
-- Core 1 runs JS engine in separate loop
-- Inter-core FIFO for communication (abort signals, REPL eval requests)
-- Shared memory for console output buffer
+- Document the button-hold boot behavior in user-facing docs
+- Surface a clear boot message when safe mode is active
 
 ### Solution: Watchdog Timer (Fallback)
 

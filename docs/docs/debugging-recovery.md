@@ -12,6 +12,18 @@ Hold the **BOOTSEL** button during power-on to skip `index.js` auto-run. This ke
 
 If you are stuck in a loop, this is the fastest way back in.
 
+## Boot status indicator
+
+On startup the board blinks its LED (or NeoPixel on boards without an LED) to show boot progress:
+
+| Pattern | Meaning |
+| --- | --- |
+| 3 blinks | Reached main successfully |
+| 10 rapid blinks + pause (repeating) | Filesystem init failed |
+| 5 rapid blinks + pause (repeating) | JavaScript engine init failed |
+
+If you see repeating rapid blinks, try reflashing the firmware.
+
 ## [UF2](./glossary.md#uf2) mode
 
 - Use `.uf2` to reboot into [UF2](./glossary.md#uf2) mode (prompted)

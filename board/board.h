@@ -26,6 +26,7 @@ typedef struct {
     uint32_t ram_size;          /* Total RAM size in bytes */
     uint32_t cpu_freq;          /* CPU frequency in Hz */
     uint8_t led_pin;            /* Onboard LED pin (255 if none) */
+    uint8_t neopixel_pin;       /* Onboard NeoPixel pin (255 if none) */
 } board_info_t;
 
 /*

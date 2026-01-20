@@ -21,9 +21,12 @@ If something feels missing, check the source or open an issue so we can document
 ## Example map
 
 - Want timers or console? Start at [Runtime JavaScript](./runtime-javascript.md)
-- Want GPIO or files? Start at [Built-in Modules](./built-in-modules.md)
+- Want GPIO, files, or NeoPixels? Start at [Built-in Modules](./built-in-modules.md)
 
 ## Key terms
 
 - [Runtime](./glossary.md#runtime)
 - [CommonJS](./glossary.md#commonjs)
+- [NeoPixel](./glossary.md#neopixel)
+- [GPIO](./glossary.md#gpio)
+- [ADC](./glossary.md#adc)

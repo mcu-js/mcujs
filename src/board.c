@@ -33,8 +33,11 @@ static const board_info_t s_board_info = {
     .flash_size = MCUJS_FLASH_SIZE,
     .ram_size = MCUJS_RAM_SIZE,
     .cpu_freq = MCUJS_CPU_FREQ_HZ,
-    .led_pin = MCUJS_LED_PIN
+    .led_pin = MCUJS_LED_PIN,
+    .neopixel_pin = MCUJS_NEOPIXEL_PIN
 };
+
+
 
 /* External linker symbol for firmware end */
 extern char __flash_binary_end[];
@@ -80,17 +83,25 @@ uint32_t board_get_fs_size(void) {
 }
 
 void board_led_init(void) {
+#if MCUJS_LED_PIN != 255
     gpio_init(MCUJS_LED_PIN);
     gpio_set_dir(MCUJS_LED_PIN, GPIO_OUT);
     gpio_put(MCUJS_LED_PIN, 0);
+#endif
 }
 
 void board_led_set(bool on) {
+#if MCUJS_LED_PIN != 255
     gpio_put(MCUJS_LED_PIN, on ? 1 : 0);
+#else
+    (void)on;
+#endif
 }
 
 void board_led_toggle(void) {
+#if MCUJS_LED_PIN != 255
     gpio_put(MCUJS_LED_PIN, !gpio_get(MCUJS_LED_PIN));
+#endif
 }
 
 void board_delay_ms(uint32_t ms) {

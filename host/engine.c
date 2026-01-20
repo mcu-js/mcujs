@@ -211,6 +211,7 @@ void js_register_bindings(void) {
     js_bind_console();
     js_bind_timers();
     js_bind_board();
+    js_bind_neopixel();
     js_bind_process();
     js_bind_require();
 }

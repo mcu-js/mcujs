@@ -29,9 +29,10 @@ show_help() {
     echo "Usage: ./build.sh [board] [options]"
     echo ""
     echo "Boards:"
-    echo "  pico     Build for Raspberry Pi Pico (RP2040)"
-    echo "  pico2    Build for Raspberry Pi Pico 2 (RP2350)"
-    echo "  all      Build for all supported boards (default)"
+    echo "  pico                 Build for Raspberry Pi Pico (RP2040)"
+    echo "  pico2                Build for Raspberry Pi Pico 2 (RP2350)"
+    echo "  waveshare_rp2040_zero Build for Waveshare RP2040-Zero (RP2040)"
+    echo "  all                  Build for all supported boards (default)"
     echo ""
     echo "Options:"
     echo "  --clean       Clean build directories before building"
@@ -53,7 +54,7 @@ USE_DOCKER=1
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        pico|pico2|all)
+        pico|pico2|waveshare_rp2040_zero|all)
             BOARD="$1"
             shift
             ;;
@@ -148,6 +149,7 @@ else
         "all")
             build_board "pico"
             build_board "pico2"
+            build_board "waveshare_rp2040_zero"
             ;;
         *)
             build_board "${BOARD}"

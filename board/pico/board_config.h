@@ -27,6 +27,10 @@
 
 /* Pin configuration */
 #define MCUJS_LED_PIN           25      /* Onboard LED */
+#define MCUJS_NEOPIXEL_PIN      255     /* No onboard NeoPixel */
+#define MCUJS_HAS_NEOPIXEL      0
+#define MCUJS_NEOPIXEL_LENGTH   0
+#define MCUJS_NEOPIXEL_ORDER_GRB 1
 
 /* Default I2C pins */
 #define MCUJS_I2C0_SDA_PIN      4

@@ -17,7 +17,8 @@ mcujs is a JavaScript runtime for microcontrollers, built for Raspberry Pi Pico 
 
 - A simple on-device drive for `index.js`
 - A [REPL](./glossary.md#repl) over [USB](./glossary.md#usb) serial for quick experiments
-- Core hardware APIs ([GPIO](./glossary.md#gpio), [PWM](./glossary.md#pwm), [I2C](./glossary.md#i2c), [SPI](./glossary.md#spi), [ADC](./glossary.md#adc))
+- Core hardware APIs ([GPIO](./glossary.md#gpio), [PWM](./glossary.md#pwm), [I2C](./glossary.md#i2c), [SPI](./glossary.md#spi), [ADC](./glossary.md#adc), [NeoPixel](./glossary.md#neopixel))
+- Works with boards that include onboard RGB LEDs
 - CommonJS-style modules with `/lib/` resolution
 
 ## If you are coming from Node or Bun

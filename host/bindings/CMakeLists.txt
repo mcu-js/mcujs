@@ -10,6 +10,7 @@ add_library(mcujs_bindings STATIC
     i2c.c
     spi.c
     adc.c
+    neopixel.c
     board.c
     fs.c
     process.c
@@ -26,7 +27,10 @@ target_include_directories(mcujs_bindings PUBLIC
     ${CMAKE_SOURCE_DIR}/board/${BOARD}
     ${CMAKE_SOURCE_DIR}/javascript
     ${CMAKE_SOURCE_DIR}/javascript/jerryscript-core
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
+
+pico_generate_pio_header(mcujs_bindings ${CMAKE_CURRENT_LIST_DIR}/neopixel.pio)
 
 target_link_libraries(mcujs_bindings PUBLIC
     mcujs_jerry
@@ -38,4 +42,5 @@ target_link_libraries(mcujs_bindings PUBLIC
     hardware_spi
     hardware_adc
     hardware_timer
+    hardware_pio
 )

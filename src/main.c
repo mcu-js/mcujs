@@ -23,8 +23,8 @@
 #define MCUJS_VERSION "0.1.0"
 #endif
 
-#ifndef PICO_DEFAULT_LED_PIN
-#define PICO_DEFAULT_LED_PIN 25
+#ifndef MCUJS_LED_PIN
+#define MCUJS_LED_PIN 255
 #endif
 
 /* Forward declarations */
@@ -37,16 +37,18 @@ int main(void) {
     stdio_init_all();
     
     /* Setup LED for status indication */
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+#if MCUJS_LED_PIN != 255
+    gpio_init(MCUJS_LED_PIN);
+    gpio_set_dir(MCUJS_LED_PIN, GPIO_OUT);
     
     /* Blink LED 3 times to show we reached main() */
     for (int i = 0; i < 3; i++) {
-        gpio_put(PICO_DEFAULT_LED_PIN, 1);
+        gpio_put(MCUJS_LED_PIN, 1);
         sleep_ms(200);
-        gpio_put(PICO_DEFAULT_LED_PIN, 0);
+        gpio_put(MCUJS_LED_PIN, 0);
         sleep_ms(200);
     }
+#endif
     
     /* Initialize TinyUSB */
     tusb_init();
@@ -62,14 +64,19 @@ int main(void) {
     if (fs_result != FS_OK) {
         /* Filesystem init failed - indicate with rapid blinks */
         while (1) {
+#if MCUJS_LED_PIN != 255
             for (int i = 0; i < 10; i++) {
-                gpio_put(PICO_DEFAULT_LED_PIN, 1);
+                gpio_put(MCUJS_LED_PIN, 1);
                 sleep_ms(50);
-                gpio_put(PICO_DEFAULT_LED_PIN, 0);
+                gpio_put(MCUJS_LED_PIN, 0);
                 sleep_ms(50);
                 tud_task();
             }
             sleep_ms(500);
+#else
+            tud_task();
+            sleep_ms(500);
+#endif
         }
     }
     
@@ -77,14 +84,19 @@ int main(void) {
     if (js_engine_init() != JS_OK) {
         /* Fatal error - 5 rapid blinks then pause */
         while (1) {
+#if MCUJS_LED_PIN != 255
             for (int i = 0; i < 5; i++) {
-                gpio_put(PICO_DEFAULT_LED_PIN, 1);
+                gpio_put(MCUJS_LED_PIN, 1);
                 sleep_ms(100);
-                gpio_put(PICO_DEFAULT_LED_PIN, 0);
+                gpio_put(MCUJS_LED_PIN, 0);
                 sleep_ms(100);
                 tud_task();
             }
             sleep_ms(1000);
+#else
+            tud_task();
+            sleep_ms(1000);
+#endif
         }
     }
     

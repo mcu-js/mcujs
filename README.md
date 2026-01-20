@@ -6,9 +6,10 @@ A minimal JavaScript runtime for Raspberry Pi Pico and Pico 2 microcontrollers.
 
 - **USB Flash Drive**: Mount your Pico as a USB drive and drop in your `index.js`
 - **Serial REPL**: Interactive JavaScript console over USB serial
-- **Hardware APIs**: GPIO, PWM, I2C, SPI, and timers
+- **Hardware APIs**: GPIO, PWM, I2C, SPI, ADC, and NeoPixel
 - **ES Modules**: Use `require()` for modular code with `/lib/` module resolution
 - **Minimal Footprint**: Built on JerryScript for embedded systems
+
 
 ## Quick Start
 
@@ -183,9 +184,14 @@ console.log(__dirname);   // e.g., "/lib"
 ```javascript
 board.name;                       // Board name (e.g., "pico")
 board.chip;                       // Chip (e.g., "RP2040")
-board.ledPin;                     // Onboard LED pin number
+board.ledPin;                     // Onboard LED pin number (-1 if none)
 board.led(true);                  // Control onboard LED
 board.led();                      // Read LED state
+board.neopixelPin;                // Onboard NeoPixel pin (if present)
+board.neopixelLength;             // Onboard NeoPixel count (if present)
+board.neopixel([255, 80, 10]);    // Convenience for onboard NeoPixel
+board.neopixel({ r: 255, g: 80, b: 10 });
+board.neopixel([[255, 0, 0], [0, 255, 0]]); // Truncated to onboard length
 board.freeMemory();               // Free JS heap memory in bytes
 board.uniqueId();                 // Board unique ID (hex string)
 board.millis();                   // Milliseconds since boot
@@ -193,6 +199,8 @@ board.delay(ms);                  // Blocking delay
 board.reset();                    // Reset USB connection (reboot)
 board.enterUf2();                 // Reboot into UF2 bootloader
 ```
+
+Missing color values default to 0. Extra pixels are ignored. Object inputs are RGB; array inputs follow the active `neopixel.init()` order. Array-of-objects stays RGB.
 
 ### ADC
 ```javascript
@@ -216,11 +224,21 @@ process.platform;                 // Always "mcujs"
 process.versions;                 // {mcujs, jerryscript, "pico-sdk", tinyusb}
 ```
 
+### NeoPixel
+```javascript
+const neopixel = require('neopixel');
+
+neopixel.init({ pin: 16, length: 1, order: 'GRB' });
+// order can be "GRB" (default) or "RGB"
+neopixel.setPixel(0, 255, 80, 10);
+neopixel.show();
+```
+
 ### Built-in Modules
 ```javascript
 const { builtinModules } = require('mcujs:module');
 // alias: require('node:module')
-// builtinModules includes: fs, process, gpio, pwm, i2c, spi, adc
+// builtinModules includes: fs, process, gpio, pwm, i2c, spi, adc, neopixel
 ```
 
 ## Known Limitations
@@ -296,7 +314,8 @@ make -j$(nproc)
 |-------|------|-------|--------|
 | Raspberry Pi Pico | RP2040 | 2MB | Supported |
 | Raspberry Pi Pico 2 | RP2350 | 4MB | Supported |
-| WaveShare RP2040/RP2350 | Various | Various | Planned |
+| Waveshare RP2040-Zero | RP2040 | 2MB | Supported |
+| Waveshare RP2040/RP2350 | Various | Various | Planned |
 | Adafruit Feather RP2040/RP2350 | Various | Various | Planned |
 
 ## Architecture

@@ -90,6 +90,17 @@ jerry_value_t js_create_adc_module(void);
 void js_bind_board(void);
 
 /*
+ * Register NeoPixel bindings
+ * neopixel.init(), neopixel.setPixel(), neopixel.show(), neopixel.clear()
+ */
+void js_bind_neopixel(void);
+
+/*
+ * Create NeoPixel module object
+ */
+jerry_value_t js_create_neopixel_module(void);
+
+/*
  * Register filesystem bindings (Node.js-compatible)
  * fs.readFileSync(), fs.writeFileSync(), fs.existsSync(), etc.
  */
@@ -111,6 +122,23 @@ void js_bind_process(void);
  * require(), module.exports, exports
  */
 void js_bind_require(void);
+
+/*
+ * Helper functions for bindings
+ */
+void js_set_property(jerry_value_t object, const char *name, jerry_value_t value);
+void js_set_function(jerry_value_t object, const char *name, jerry_external_handler_t handler);
+void js_set_number(jerry_value_t object, const char *name, double value);
+void js_set_string(jerry_value_t object, const char *name, const char *value);
+void js_set_boolean(jerry_value_t object, const char *name, bool value);
+void js_register_global(const char *name, jerry_value_t object);
+
+double js_get_number_arg(const jerry_value_t args[], jerry_length_t argc,
+                         jerry_length_t index, double default_value);
+bool js_get_boolean_arg(const jerry_value_t args[], jerry_length_t argc,
+                        jerry_length_t index, bool default_value);
+size_t js_get_string_arg(const jerry_value_t args[], jerry_length_t argc,
+                         jerry_length_t index, char *buffer, size_t buffer_size);
 
 /*
  * Clear the module cache (useful for hot reloading)

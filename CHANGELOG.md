@@ -18,7 +18,8 @@ All notable changes to mcujs will be documented in this file.
 - `I2C` - I2C bus communication
 - `SPI` - SPI bus communication
 - `ADC` - Analog-to-digital converter
-- `board` object - LED control, system info, unique ID, memory stats
+- `NeoPixel` - WS2812B addressable LED support with configurable wire order (RGB/GRB)
+- `board` object - LED control, NeoPixel helper, system info, unique ID, memory stats
 - `mcujs:module` - Built-in module registry
 
 ### JavaScript APIs

@@ -151,3 +151,4 @@ setInterval(() => {
 - [Runtime](./glossary.md#runtime)
 - [REPL](./glossary.md#repl)
 - [GPIO](./glossary.md#gpio)
+- [NeoPixel](./glossary.md#neopixel)

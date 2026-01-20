@@ -44,6 +44,10 @@ Serial Peripheral Interface. Fast serial bus for displays, sensors, and storage.
 
 Analog-to-Digital Converter. Reads analog voltages.
 
+## NeoPixel
+
+Brand name for WS2812 addressable RGB LEDs, often using GRB color order.
+
 ## RP2040
 
 Dual-core microcontroller used in Raspberry Pi Pico.

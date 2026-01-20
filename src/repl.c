@@ -787,7 +787,7 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  setTimeout(), clearTimeout(), setInterval(), clearInterval()\r\n");
         usb_cdc_puts("  board (reset, enterUf2, millis, led, ids)\r\n");
         usb_cdc_puts("Runtime Module APIs:\r\n");
-        usb_cdc_puts("  require('fs'), require('gpio'), require('pwm'), require('i2c'), require('spi'), require('adc')\r\n");
+        usb_cdc_puts("  require('fs'), require('gpio'), require('pwm'), require('i2c'), require('spi'), require('adc'), require('neopixel')\r\n");
         usb_cdc_puts("Runtime APIs:\r\n");
         usb_cdc_puts("  process.version, process.versions, process.arch, process.platform\r\n");
         usb_cdc_puts("  require('mcujs:module').builtinModules\r\n");

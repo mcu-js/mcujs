@@ -1,10 +1,10 @@
 /*
- * mcujs - Raspberry Pi Pico 2 Board Configuration
+ * mcujs - Waveshare RP2040-Zero Board Configuration
  * 
- * Board: Raspberry Pi Pico 2
- * Chip: RP2350
- * Flash: 4MB
- * RAM: 520KB
+ * Board: Waveshare RP2040-Zero
+ * Chip: RP2040
+ * Flash: 2MB
+ * RAM: 264KB
  */
 
 #ifndef MCUJS_BOARD_CONFIG_H
@@ -13,24 +13,24 @@
 #include "../flash_config.h"
 
 /* Board identification */
-#define MCUJS_BOARD_NAME        "pico2"
-#define MCUJS_BOARD_CHIP        "RP2350"
-#define MCUJS_BOARD_CHIP_ID     0x2350
+#define MCUJS_BOARD_NAME        "waveshare_rp2040_zero"
+#define MCUJS_BOARD_CHIP        "RP2040"
+#define MCUJS_BOARD_CHIP_ID     0x2040
 #define MCUJS_HAS_UF2           1
 
 /* Memory configuration */
-#define MCUJS_FLASH_SIZE        FLASH_SIZE_4MB
-#define MCUJS_RAM_SIZE          (520 * 1024)
+#define MCUJS_FLASH_SIZE        FLASH_SIZE_2MB
+#define MCUJS_RAM_SIZE          (264 * 1024)
 
 /* Clock configuration */
-#define MCUJS_CPU_FREQ_HZ       (150 * 1000 * 1000)  /* 150 MHz */
+#define MCUJS_CPU_FREQ_HZ       (125 * 1000 * 1000)  /* 125 MHz */
 
 /* Pin configuration */
-#define MCUJS_LED_PIN           25      /* Onboard LED */
-#define MCUJS_NEOPIXEL_PIN      255     /* No onboard NeoPixel */
-#define MCUJS_HAS_NEOPIXEL      0
-#define MCUJS_NEOPIXEL_LENGTH   0
-#define MCUJS_NEOPIXEL_ORDER_GRB 1
+#define MCUJS_LED_PIN           255      /* No discrete LED */
+#define MCUJS_NEOPIXEL_PIN      16       /* WS2812B DIN */
+#define MCUJS_HAS_NEOPIXEL      1
+#define MCUJS_NEOPIXEL_LENGTH   1
+#define MCUJS_NEOPIXEL_ORDER_GRB 0
 
 /* Default I2C pins */
 #define MCUJS_I2C0_SDA_PIN      4
@@ -43,6 +43,7 @@
 #define MCUJS_SPI0_MOSI_PIN     19
 #define MCUJS_SPI0_MISO_PIN     16
 #define MCUJS_SPI0_CS_PIN       17
+/* NOTE: MISO shares GPIO16 with NeoPixel; avoid SPI0 MISO when using NeoPixel */
 
 #define MCUJS_SPI1_SCK_PIN      10
 #define MCUJS_SPI1_MOSI_PIN     11
@@ -66,6 +67,6 @@
 
 /* USB configuration */
 #define MCUJS_USB_VID           0x2E8A  /* Raspberry Pi VID */
-#define MCUJS_USB_PID           0x000B  /* Custom PID for mcujs pico2 */
+#define MCUJS_USB_PID           0x000C  /* Custom PID for mcujs waveshare rp2040 zero */
 
 #endif /* MCUJS_BOARD_CONFIG_H */

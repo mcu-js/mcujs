@@ -1,0 +1,36 @@
+.program ws2812
+.program mcujs_ws2812
+.side_set 1
+.define public MCUJS_WS2812_T1 2
+.define public MCUJS_WS2812_T2 5
+.define public MCUJS_WS2812_T3 3
+
+bitloop:
+    out x, 1 side 0 [MCUJS_WS2812_T3 - 1]
+    jmp !x do_zero side 1 [MCUJS_WS2812_T1 - 1]
+    jmp bitloop side 1 [MCUJS_WS2812_T2 - 1]
+
+do_zero:
+    nop side 0 [MCUJS_WS2812_T2 - 1]
+    jmp bitloop side 0
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/pio.h"
+
+static inline void mcujs_ws2812_program_init(PIO pio, uint sm, uint offset, uint pin, float freq, bool rgbw) {
+    pio_sm_config c = mcujs_ws2812_program_get_default_config(offset);
+    sm_config_set_sideset_pins(&c, pin);
+    sm_config_set_out_shift(&c, false, true, rgbw ? 32 : 24);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+
+    int cycles_per_bit = mcujs_ws2812_MCUJS_WS2812_T1 + mcujs_ws2812_MCUJS_WS2812_T2 + mcujs_ws2812_MCUJS_WS2812_T3;
+    float div = (float)clock_get_hz(clk_sys) / (freq * cycles_per_bit);
+    sm_config_set_clkdiv(&c, div);
+
+    pio_gpio_init(pio, pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}

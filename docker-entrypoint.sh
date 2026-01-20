@@ -54,13 +54,14 @@ case "${BOARDS}" in
     "all")
         build_board "pico"
         build_board "pico2"
+        build_board "waveshare_rp2040_zero"
         ;;
-    "pico"|"pico2")
+    "pico"|"pico2"|"waveshare_rp2040_zero")
         build_board "${BOARDS}"
         ;;
     *)
         log_error "Unknown board: ${BOARDS}"
-        log_info "Available boards: pico, pico2, all"
+        log_info "Available boards: pico, pico2, waveshare_rp2040_zero, all"
         exit 1
         ;;
 esac

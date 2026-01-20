@@ -11,6 +11,7 @@ All notable changes to mcujs will be documented in this file.
 - FAT12 filesystem on flash using remaining space after firmware
 - Auto-run `/index.js` on boot
 - **BOOTSEL Safe Mode**: Hold BOOTSEL button during power-on to skip `index.js` auto-run (allows recovery from infinite loops)
+- **Boot Status Indicator**: LED or NeoPixel blinks on startup to show boot progress (3 blinks = success, rapid blinks = error)
 
 ### Hardware APIs
 - `GPIO` - Digital input/output with pull-up/pull-down support

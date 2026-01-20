@@ -18,6 +18,10 @@
 #include "repl.h"
 #include "boot.h"
 
+#if MCUJS_HAS_NEOPIXEL
+#include "neopixel.h"
+#endif
+
 /* Version info (from CMake) */
 #ifndef MCUJS_VERSION
 #define MCUJS_VERSION "0.1.0"
@@ -31,6 +35,9 @@
 static void print_banner(void);
 static void print_banner_once(void);
 static void main_loop(void);
+static void boot_blink(int count, int on_ms, int off_ms);
+static void boot_status_on(void);
+static void boot_status_off(void);
 
 int main(void) {
     /* Initialize basic Pico SDK (clocks, etc.) but NOT stdio */
@@ -40,15 +47,20 @@ int main(void) {
 #if MCUJS_LED_PIN != 255
     gpio_init(MCUJS_LED_PIN);
     gpio_set_dir(MCUJS_LED_PIN, GPIO_OUT);
-    
-    /* Blink LED 3 times to show we reached main() */
-    for (int i = 0; i < 3; i++) {
-        gpio_put(MCUJS_LED_PIN, 1);
-        sleep_ms(200);
-        gpio_put(MCUJS_LED_PIN, 0);
-        sleep_ms(200);
-    }
 #endif
+
+#if MCUJS_HAS_NEOPIXEL && MCUJS_LED_PIN == 255
+    /* Initialize NeoPixel for status indication on boards without LED */
+    neopixel_init(MCUJS_NEOPIXEL_PIN, MCUJS_NEOPIXEL_LENGTH);
+#if MCUJS_NEOPIXEL_ORDER_GRB
+    neopixel_set_order(true);
+#else
+    neopixel_set_order(false);
+#endif
+#endif
+
+    /* Blink 3 times to show we reached main() */
+    boot_blink(3, 200, 200);
     
     /* Initialize TinyUSB */
     tusb_init();
@@ -64,19 +76,9 @@ int main(void) {
     if (fs_result != FS_OK) {
         /* Filesystem init failed - indicate with rapid blinks */
         while (1) {
-#if MCUJS_LED_PIN != 255
-            for (int i = 0; i < 10; i++) {
-                gpio_put(MCUJS_LED_PIN, 1);
-                sleep_ms(50);
-                gpio_put(MCUJS_LED_PIN, 0);
-                sleep_ms(50);
-                tud_task();
-            }
+            boot_blink(10, 50, 50);
             sleep_ms(500);
-#else
             tud_task();
-            sleep_ms(500);
-#endif
         }
     }
     
@@ -84,19 +86,9 @@ int main(void) {
     if (js_engine_init() != JS_OK) {
         /* Fatal error - 5 rapid blinks then pause */
         while (1) {
-#if MCUJS_LED_PIN != 255
-            for (int i = 0; i < 5; i++) {
-                gpio_put(MCUJS_LED_PIN, 1);
-                sleep_ms(100);
-                gpio_put(MCUJS_LED_PIN, 0);
-                sleep_ms(100);
-                tud_task();
-            }
+            boot_blink(5, 100, 100);
             sleep_ms(1000);
-#else
             tud_task();
-            sleep_ms(1000);
-#endif
         }
     }
     
@@ -193,4 +185,36 @@ void tud_suspend_cb(bool remote_wakeup_en) {
 
 /* Invoked when USB bus is resumed */
 void tud_resume_cb(void) {
+}
+
+/*--------------------------------------------------------------------
+ * Boot Status Helpers (LED or NeoPixel)
+ *--------------------------------------------------------------------*/
+
+static void boot_status_on(void) {
+#if MCUJS_LED_PIN != 255
+    gpio_put(MCUJS_LED_PIN, 1);
+#elif MCUJS_HAS_NEOPIXEL
+    /* White at low brightness */
+    neopixel_set_pixel(0, 32, 32, 32);
+    neopixel_show();
+#endif
+}
+
+static void boot_status_off(void) {
+#if MCUJS_LED_PIN != 255
+    gpio_put(MCUJS_LED_PIN, 0);
+#elif MCUJS_HAS_NEOPIXEL
+    neopixel_set_pixel(0, 0, 0, 0);
+    neopixel_show();
+#endif
+}
+
+static void boot_blink(int count, int on_ms, int off_ms) {
+    for (int i = 0; i < count; i++) {
+        boot_status_on();
+        sleep_ms(on_ms);
+        boot_status_off();
+        sleep_ms(off_ms);
+    }
 }

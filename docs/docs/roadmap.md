@@ -26,7 +26,7 @@ Open an issue with your use case, especially if you are shipping a product or a 
 ## Future Features
 
 - Additional hardware APIs (UART, PIO, DMA, RTC, WS2812)
-- More board support
+- More board support (Pico W, Waveshare RP2350, Adafruit, Pimoroni)
 - Host tooling (CLI, VS Code extension)
 - Debugger support
-- Networking (Pico W)
+- Networking for Pico W / Pico 2 W (WiFi, HTTP, WebSocket, MQTT, Bluetooth)

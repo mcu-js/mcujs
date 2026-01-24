@@ -17,6 +17,10 @@
 #include "hardware/watchdog.h"
 #include "hardware/gpio.h"
 
+#if MCUJS_HAS_CYW43
+#include "pico/cyw43_arch.h"
+#endif
+
 /* External helpers from bindings.c */
 extern void js_set_function(jerry_value_t object, const char *name, 
                             jerry_external_handler_t handler);
@@ -142,7 +146,20 @@ static jerry_value_t board_led_handler(const jerry_call_info_t *call_info_p,
                                         const jerry_length_t argc) {
     (void)call_info_p;
 
-#if MCUJS_LED_PIN == 255
+#if MCUJS_HAS_CYW43
+    /* Pico W / Pico 2 W - LED is on CYW43 chip */
+    static bool cyw43_led_state = false;
+    
+    if (argc < 1) {
+        /* No argument - return current state */
+        return jerry_boolean(cyw43_led_state);
+    }
+
+    cyw43_led_state = jerry_value_to_boolean(args[0]);
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, cyw43_led_state ? 1 : 0);
+
+    return jerry_undefined();
+#elif MCUJS_LED_PIN == 255
     (void)args;
     (void)argc;
     return jerry_undefined();

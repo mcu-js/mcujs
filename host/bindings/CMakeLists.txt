@@ -46,3 +46,10 @@ target_link_libraries(mcujs_bindings PUBLIC
     hardware_pio
     hardware_dma
 )
+
+# Add CYW43 driver for WiFi boards (Pico W, Pico 2 W)
+if(MCUJS_HAS_CYW43)
+    target_link_libraries(mcujs_bindings PUBLIC
+        pico_cyw43_arch_none  # Minimal CYW43 support (GPIO only, no network stack)
+    )
+endif()

@@ -22,6 +22,10 @@
 #include "neopixel.h"
 #endif
 
+#if MCUJS_HAS_CYW43
+#include "pico/cyw43_arch.h"
+#endif
+
 /* Version info (from CMake) */
 #ifndef MCUJS_VERSION
 #define MCUJS_VERSION "0.1.0"
@@ -43,8 +47,19 @@ int main(void) {
     /* Initialize basic Pico SDK (clocks, etc.) but NOT stdio */
     stdio_init_all();
     
+#if MCUJS_HAS_CYW43
+    /* Initialize CYW43 for Pico W / Pico 2 W boards */
+    /* This must be done before any CYW43 GPIO access (including LED) */
+    if (cyw43_arch_init()) {
+        /* CYW43 init failed - can't indicate via LED since it's on CYW43 */
+        /* Just continue without CYW43 support */
+    }
+#endif
+    
     /* Setup LED for status indication */
-#if MCUJS_LED_PIN != 255
+#if MCUJS_HAS_CYW43
+    /* LED is on CYW43, already initialized above */
+#elif MCUJS_LED_PIN != 255
     gpio_init(MCUJS_LED_PIN);
     gpio_set_dir(MCUJS_LED_PIN, GPIO_OUT);
 #endif
@@ -192,7 +207,9 @@ void tud_resume_cb(void) {
  *--------------------------------------------------------------------*/
 
 static void boot_status_on(void) {
-#if MCUJS_LED_PIN != 255
+#if MCUJS_HAS_CYW43
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+#elif MCUJS_LED_PIN != 255
     gpio_put(MCUJS_LED_PIN, 1);
 #elif MCUJS_HAS_NEOPIXEL
     /* White at low brightness */
@@ -202,7 +219,9 @@ static void boot_status_on(void) {
 }
 
 static void boot_status_off(void) {
-#if MCUJS_LED_PIN != 255
+#if MCUJS_HAS_CYW43
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+#elif MCUJS_LED_PIN != 255
     gpio_put(MCUJS_LED_PIN, 0);
 #elif MCUJS_HAS_NEOPIXEL
     neopixel_set_pixel(0, 0, 0, 0);

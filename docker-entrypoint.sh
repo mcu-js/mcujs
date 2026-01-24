@@ -54,15 +54,16 @@ case "${BOARDS}" in
     "all")
         build_board "pico"
         build_board "pico2"
+        build_board "pico2_w"
         build_board "waveshare_rp2040_zero"
         build_board "waveshare_rp2040_touch_lcd_1.28"
         ;;
-    "pico"|"pico2"|"waveshare_rp2040_zero"|"waveshare_rp2040_touch_lcd_1.28")
+    "pico"|"pico2"|"pico2_w"|"waveshare_rp2040_zero"|"waveshare_rp2040_touch_lcd_1.28")
         build_board "${BOARDS}"
         ;;
     *)
         log_error "Unknown board: ${BOARDS}"
-        log_info "Available boards: pico, pico2, waveshare_rp2040_zero, waveshare_rp2040_touch_lcd_1.28, all"
+        log_info "Available boards: pico, pico2, pico2_w, waveshare_rp2040_zero, waveshare_rp2040_touch_lcd_1.28, all"
         exit 1
         ;;
 esac

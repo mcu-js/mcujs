@@ -14,6 +14,10 @@
 #include "hardware/clocks.h"
 #include "hardware/flash.h"
 
+#if MCUJS_HAS_CYW43
+#include "pico/cyw43_arch.h"
+#endif
+
 #if defined(__has_include)
 #if __has_include("hardware/bootrom.h")
 #include "hardware/bootrom.h"
@@ -83,7 +87,10 @@ uint32_t board_get_fs_size(void) {
 }
 
 void board_led_init(void) {
-#if MCUJS_LED_PIN != 255
+#if MCUJS_HAS_CYW43
+    /* CYW43 LED is initialized via cyw43_arch_init() in main.c */
+    /* Nothing to do here */
+#elif MCUJS_LED_PIN != 255
     gpio_init(MCUJS_LED_PIN);
     gpio_set_dir(MCUJS_LED_PIN, GPIO_OUT);
     gpio_put(MCUJS_LED_PIN, 0);
@@ -91,7 +98,9 @@ void board_led_init(void) {
 }
 
 void board_led_set(bool on) {
-#if MCUJS_LED_PIN != 255
+#if MCUJS_HAS_CYW43
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, on ? 1 : 0);
+#elif MCUJS_LED_PIN != 255
     gpio_put(MCUJS_LED_PIN, on ? 1 : 0);
 #else
     (void)on;
@@ -99,7 +108,11 @@ void board_led_set(bool on) {
 }
 
 void board_led_toggle(void) {
-#if MCUJS_LED_PIN != 255
+#if MCUJS_HAS_CYW43
+    static bool led_state = false;
+    led_state = !led_state;
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, led_state ? 1 : 0);
+#elif MCUJS_LED_PIN != 255
     gpio_put(MCUJS_LED_PIN, !gpio_get(MCUJS_LED_PIN));
 #endif
 }

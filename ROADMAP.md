@@ -109,6 +109,8 @@ while (1) {
 ### Board Support
 - [x] Waveshare RP2040-Zero (NeoPixel on GPIO 16)
 - [x] Waveshare RP2040 Touch LCD 1.28" (GC9A01A display, CST816S touch, QMI8658 IMU)
+- [x] Raspberry Pi Pico 2 W (CYW43 WiFi/BLE chip, LED on CYW43)
+- [ ] Raspberry Pi Pico W (CYW43 WiFi/BLE chip)
 - [ ] Waveshare RP2350 boards
 - [ ] Adafruit Feather RP2040/RP2350
 - [ ] Pimoroni boards
@@ -141,11 +143,27 @@ while (1) {
 - [ ] Variable inspection
 - [ ] Step execution
 
-### Networking (Future Hardware)
-- [ ] Pico W support (WiFi)
+### Networking (Pico W / Pico 2 W)
+- [x] Pico 2 W board support (LED via CYW43)
+- [ ] Pico W board support (RP2040 + CYW43)
+- [ ] WiFi
+  - [ ] `wifi.connect(ssid, password)` - Connect to access point
+  - [ ] `wifi.disconnect()` - Disconnect from network
+  - [ ] `wifi.status()` - Connection status and IP info
+  - [ ] `wifi.scan()` - Scan for available networks
 - [ ] HTTP client
+  - [ ] `http.get(url, callback)` - Simple GET request
+  - [ ] `http.request(options, callback)` - Full HTTP client
 - [ ] WebSocket client
+  - [ ] `WebSocket` class for real-time communication
 - [ ] MQTT client
+  - [ ] `mqtt.connect(broker)` - Connect to MQTT broker
+  - [ ] `mqtt.subscribe(topic, callback)` - Subscribe to topics
+  - [ ] `mqtt.publish(topic, message)` - Publish messages
+- [ ] TCP/UDP sockets (lower-level networking)
+- [ ] Bluetooth (CYW43439 supports BLE)
+  - [ ] BLE peripheral mode
+  - [ ] BLE central mode (scanning/connecting)
 
 ---
 

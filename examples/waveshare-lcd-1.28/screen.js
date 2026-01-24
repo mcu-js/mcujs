@@ -121,7 +121,15 @@ function createScreen(options) {
     cmd(0x29);
     board.delay(20);
     
-    // Backlight on
+    // Clear screen BEFORE turning on backlight to avoid VRAM garbage flash
+    graphics.fill(buffer, 0x0000);
+    cmd(0x2A); dat(0x00); dat(0x00); dat(0x00); dat(width - 1);
+    cmd(0x2B); dat(0x00); dat(0x00); dat(0x00); dat(height - 1);
+    cmd(0x2C);
+    GPIO.set(pins.dc, 1);
+    SPI.writeBufferDMA(pins.spiBus, buffer, width * height * 2);
+    
+    // Now safe to turn on backlight
     GPIO.set(pins.bl, 1);
     
     initialized = true;

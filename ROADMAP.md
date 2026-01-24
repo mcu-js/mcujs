@@ -143,6 +143,150 @@ while (1) {
 - [ ] Variable inspection
 - [ ] Step execution
 
+### HID (Human Interface Device)
+
+USB HID support for keyboard and mouse emulation. The device appears as a standard keyboard/mouse to the host computer, enabling automation, macro keyboards, custom input devices, and accessibility tools.
+
+**Implementation Notes:**
+- Uses TinyUSB HID class (already bundled with Pico SDK)
+- Composite device: CDC (REPL) + MSC (filesystem) + HID (keyboard/mouse)
+- Standard HID report descriptors for maximum compatibility
+- No drivers required on host (works with Windows, Mac, Linux)
+
+#### Keyboard API
+
+```javascript
+const Keyboard = require('keyboard');
+
+// Type a string (handles shift automatically)
+Keyboard.print('Hello, World!');
+
+// Press and release a single key
+Keyboard.press('a');
+Keyboard.release('a');
+
+// Shortcut: press and release
+Keyboard.tap('a');
+
+// Modifier keys
+Keyboard.press('ctrl');
+Keyboard.tap('c');          // Ctrl+C
+Keyboard.release('ctrl');
+
+// Convenience method for key combinations
+Keyboard.combo('ctrl', 'alt', 'delete');
+Keyboard.combo('cmd', 'shift', '4');    // Mac screenshot
+
+// Special keys
+Keyboard.tap('enter');
+Keyboard.tap('tab');
+Keyboard.tap('escape');
+Keyboard.tap('backspace');
+Keyboard.tap('delete');
+Keyboard.tap('up');         // Arrow keys
+Keyboard.tap('down');
+Keyboard.tap('left');
+Keyboard.tap('right');
+Keyboard.tap('home');
+Keyboard.tap('end');
+Keyboard.tap('pageup');
+Keyboard.tap('pagedown');
+Keyboard.tap('f1');         // Function keys F1-F12
+Keyboard.tap('capslock');
+Keyboard.tap('printscreen');
+
+// Media keys (if supported by HID descriptor)
+Keyboard.tap('mute');
+Keyboard.tap('volumeup');
+Keyboard.tap('volumedown');
+Keyboard.tap('playpause');
+Keyboard.tap('nexttrack');
+Keyboard.tap('prevtrack');
+
+// Release all keys (safety)
+Keyboard.releaseAll();
+
+// Check if a key is currently pressed
+Keyboard.isPressed('shift');  // Returns boolean
+```
+
+#### Mouse API
+
+```javascript
+const Mouse = require('mouse');
+
+// Move mouse relative to current position
+Mouse.move(10, -5);         // x, y delta (pixels)
+
+// Click buttons
+Mouse.click('left');        // 'left', 'right', 'middle'
+Mouse.click('right');
+
+// Press and release separately (for drag operations)
+Mouse.press('left');
+Mouse.move(100, 0);         // Drag 100px right
+Mouse.release('left');
+
+// Double-click
+Mouse.doubleClick('left');
+
+// Scroll wheel
+Mouse.scroll(3);            // Scroll up 3 units
+Mouse.scroll(-3);           // Scroll down 3 units
+Mouse.scrollHorizontal(2);  // Horizontal scroll (if supported)
+
+// Release all buttons (safety)
+Mouse.releaseAll();
+
+// Check button state
+Mouse.isPressed('left');    // Returns boolean
+```
+
+#### Combined Example: Macro Keyboard
+
+```javascript
+const Keyboard = require('keyboard');
+const gpio = require('gpio');
+
+// Button on GPIO 15
+gpio.init(15, gpio.INPUT_PULLUP);
+
+// Poll for button press
+setInterval(() => {
+    if (gpio.get(15) === 0) {
+        // Button pressed - type a code snippet
+        Keyboard.print('console.log("Hello!");');
+        Keyboard.tap('enter');
+        
+        // Debounce
+        while (gpio.get(15) === 0) {}
+    }
+}, 10);
+```
+
+#### Combined Example: Mouse Jiggler
+
+```javascript
+const Mouse = require('mouse');
+
+// Move mouse slightly every 30 seconds to prevent screen lock
+setInterval(() => {
+    Mouse.move(1, 0);
+    Mouse.move(-1, 0);
+}, 30000);
+```
+
+#### Implementation Tasks
+
+- [ ] Add HID device class to TinyUSB descriptor (composite CDC+MSC+HID)
+- [ ] Implement keyboard HID report generation
+- [ ] Implement mouse HID report generation  
+- [ ] Create `keyboard` native module
+- [ ] Create `mouse` native module
+- [ ] Handle USB enumeration with HID
+- [ ] Test on Windows, Mac, Linux hosts
+- [ ] Document keyboard layout considerations (US QWERTY default)
+
 ### Networking (Pico W / Pico 2 W)
 - [x] Pico 2 W board support (LED via CYW43)
 - [ ] Pico W board support (RP2040 + CYW43)

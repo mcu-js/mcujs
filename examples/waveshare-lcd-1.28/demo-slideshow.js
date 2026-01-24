@@ -1,0 +1,414 @@
+// demo-slideshow.js - Slideshow demo with text, shapes, and colors
+// For Waveshare RP2040 Touch LCD 1.28
+
+console.log('=== Slideshow Demo ===');
+
+// 5x7 bitmap font data (ASCII 32-126)
+var FONT_W = 5, FONT_H = 7;
+var font = [
+  0x00,0x00,0x00,0x00,0x00, // Space
+  0x00,0x00,0x5F,0x00,0x00, // !
+  0x00,0x07,0x00,0x07,0x00, // "
+  0x14,0x7F,0x14,0x7F,0x14, // #
+  0x24,0x2A,0x7F,0x2A,0x12, // $
+  0x23,0x13,0x08,0x64,0x62, // %
+  0x36,0x49,0x55,0x22,0x50, // &
+  0x00,0x05,0x03,0x00,0x00, // '
+  0x00,0x1C,0x22,0x41,0x00, // (
+  0x00,0x41,0x22,0x1C,0x00, // )
+  0x08,0x2A,0x1C,0x2A,0x08, // *
+  0x08,0x08,0x3E,0x08,0x08, // +
+  0x00,0x50,0x30,0x00,0x00, // ,
+  0x08,0x08,0x08,0x08,0x08, // -
+  0x00,0x60,0x60,0x00,0x00, // .
+  0x20,0x10,0x08,0x04,0x02, // /
+  0x3E,0x51,0x49,0x45,0x3E, // 0
+  0x00,0x42,0x7F,0x40,0x00, // 1
+  0x42,0x61,0x51,0x49,0x46, // 2
+  0x21,0x41,0x45,0x4B,0x31, // 3
+  0x18,0x14,0x12,0x7F,0x10, // 4
+  0x27,0x45,0x45,0x45,0x39, // 5
+  0x3C,0x4A,0x49,0x49,0x30, // 6
+  0x01,0x71,0x09,0x05,0x03, // 7
+  0x36,0x49,0x49,0x49,0x36, // 8
+  0x06,0x49,0x49,0x29,0x1E, // 9
+  0x00,0x36,0x36,0x00,0x00, // :
+  0x00,0x56,0x36,0x00,0x00, // ;
+  0x00,0x08,0x14,0x22,0x41, // <
+  0x14,0x14,0x14,0x14,0x14, // =
+  0x41,0x22,0x14,0x08,0x00, // >
+  0x02,0x01,0x51,0x09,0x06, // ?
+  0x32,0x49,0x79,0x41,0x3E, // @
+  0x7E,0x11,0x11,0x11,0x7E, // A
+  0x7F,0x49,0x49,0x49,0x36, // B
+  0x3E,0x41,0x41,0x41,0x22, // C
+  0x7F,0x41,0x41,0x22,0x1C, // D
+  0x7F,0x49,0x49,0x49,0x41, // E
+  0x7F,0x09,0x09,0x01,0x01, // F
+  0x3E,0x41,0x41,0x51,0x32, // G
+  0x7F,0x08,0x08,0x08,0x7F, // H
+  0x00,0x41,0x7F,0x41,0x00, // I
+  0x20,0x40,0x41,0x3F,0x01, // J
+  0x7F,0x08,0x14,0x22,0x41, // K
+  0x7F,0x40,0x40,0x40,0x40, // L
+  0x7F,0x02,0x04,0x02,0x7F, // M
+  0x7F,0x04,0x08,0x10,0x7F, // N
+  0x3E,0x41,0x41,0x41,0x3E, // O
+  0x7F,0x09,0x09,0x09,0x06, // P
+  0x3E,0x41,0x51,0x21,0x5E, // Q
+  0x7F,0x09,0x19,0x29,0x46, // R
+  0x46,0x49,0x49,0x49,0x31, // S
+  0x01,0x01,0x7F,0x01,0x01, // T
+  0x3F,0x40,0x40,0x40,0x3F, // U
+  0x1F,0x20,0x40,0x20,0x1F, // V
+  0x7F,0x20,0x18,0x20,0x7F, // W
+  0x63,0x14,0x08,0x14,0x63, // X
+  0x03,0x04,0x78,0x04,0x03, // Y
+  0x61,0x51,0x49,0x45,0x43, // Z
+  0x00,0x00,0x7F,0x41,0x41, // [
+  0x02,0x04,0x08,0x10,0x20, // backslash
+  0x41,0x41,0x7F,0x00,0x00, // ]
+  0x04,0x02,0x01,0x02,0x04, // ^
+  0x40,0x40,0x40,0x40,0x40, // _
+  0x00,0x01,0x02,0x04,0x00, // `
+  0x20,0x54,0x54,0x54,0x78, // a
+  0x7F,0x48,0x44,0x44,0x38, // b
+  0x38,0x44,0x44,0x44,0x20, // c
+  0x38,0x44,0x44,0x48,0x7F, // d
+  0x38,0x54,0x54,0x54,0x18, // e
+  0x08,0x7E,0x09,0x01,0x02, // f
+  0x08,0x14,0x54,0x54,0x3C, // g
+  0x7F,0x08,0x04,0x04,0x78, // h
+  0x00,0x44,0x7D,0x40,0x00, // i
+  0x20,0x40,0x44,0x3D,0x00, // j
+  0x00,0x7F,0x10,0x28,0x44, // k
+  0x00,0x41,0x7F,0x40,0x00, // l
+  0x7C,0x04,0x18,0x04,0x78, // m
+  0x7C,0x08,0x04,0x04,0x78, // n
+  0x38,0x44,0x44,0x44,0x38, // o
+  0x7C,0x14,0x14,0x14,0x08, // p
+  0x08,0x14,0x14,0x18,0x7C, // q
+  0x7C,0x08,0x04,0x04,0x08, // r
+  0x48,0x54,0x54,0x54,0x20, // s
+  0x04,0x3F,0x44,0x40,0x20, // t
+  0x3C,0x40,0x40,0x20,0x7C, // u
+  0x1C,0x20,0x40,0x20,0x1C, // v
+  0x3C,0x40,0x30,0x40,0x3C, // w
+  0x44,0x28,0x10,0x28,0x44, // x
+  0x0C,0x50,0x50,0x50,0x3C, // y
+  0x44,0x64,0x54,0x4C,0x44, // z
+  0x00,0x08,0x36,0x41,0x00, // {
+  0x00,0x00,0x7F,0x00,0x00, // |
+  0x00,0x41,0x36,0x08,0x00, // }
+  0x08,0x04,0x08,0x10,0x08  // ~
+];
+
+// Screen setup
+var W = 240, H = 240;
+var pins = { spiBus: 1, sck: 10, mosi: 11, miso: 12, cs: 9, dc: 8, rst: 13, bl: 25 };
+var buf = graphics.createBuffer({ width: W, height: H });
+
+function cmd(c) { GPIO.set(pins.dc, 0); SPI.transfer(pins.spiBus, c); }
+function dat(d) { GPIO.set(pins.dc, 1); SPI.transfer(pins.spiBus, d); }
+
+function initScreen() {
+  GPIO.init(pins.cs, GPIO.OUTPUT);
+  GPIO.init(pins.dc, GPIO.OUTPUT);
+  GPIO.init(pins.rst, GPIO.OUTPUT);
+  GPIO.init(pins.bl, GPIO.OUTPUT);
+  GPIO.set(pins.cs, 1); GPIO.set(pins.bl, 0); GPIO.set(pins.rst, 1);
+  SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 40000000);
+  GPIO.set(pins.rst, 1); board.delay(100);
+  GPIO.set(pins.rst, 0); board.delay(100);
+  GPIO.set(pins.rst, 1); GPIO.set(pins.cs, 0); board.delay(100);
+  // Init sequence
+  cmd(0xEF);cmd(0xEB);dat(0x14);cmd(0xFE);cmd(0xEF);cmd(0xEB);dat(0x14);
+  cmd(0x84);dat(0x40);cmd(0x85);dat(0xFF);cmd(0x86);dat(0xFF);cmd(0x87);dat(0xFF);
+  cmd(0x88);dat(0x0A);cmd(0x89);dat(0x21);cmd(0x8A);dat(0x00);cmd(0x8B);dat(0x80);
+  cmd(0x8C);dat(0x01);cmd(0x8D);dat(0x01);cmd(0x8E);dat(0xFF);cmd(0x8F);dat(0xFF);
+  cmd(0xB6);dat(0x00);dat(0x20);cmd(0x36);dat(0x08);cmd(0x3A);dat(0x05);
+  cmd(0x90);dat(0x08);dat(0x08);dat(0x08);dat(0x08);cmd(0xBD);dat(0x06);cmd(0xBC);dat(0x00);
+  cmd(0xFF);dat(0x60);dat(0x01);dat(0x04);cmd(0xC3);dat(0x13);cmd(0xC4);dat(0x13);
+  cmd(0xC9);dat(0x22);cmd(0xBE);dat(0x11);cmd(0xE1);dat(0x10);dat(0x0E);
+  cmd(0xDF);dat(0x21);dat(0x0c);dat(0x02);
+  cmd(0xF0);dat(0x45);dat(0x09);dat(0x08);dat(0x08);dat(0x26);dat(0x2A);
+  cmd(0xF1);dat(0x43);dat(0x70);dat(0x72);dat(0x36);dat(0x37);dat(0x6F);
+  cmd(0xF2);dat(0x45);dat(0x09);dat(0x08);dat(0x08);dat(0x26);dat(0x2A);
+  cmd(0xF3);dat(0x43);dat(0x70);dat(0x72);dat(0x36);dat(0x37);dat(0x6F);
+  cmd(0xED);dat(0x1B);dat(0x0B);cmd(0xAE);dat(0x77);cmd(0xCD);dat(0x63);
+  cmd(0x70);dat(0x07);dat(0x07);dat(0x04);dat(0x0E);dat(0x0F);dat(0x09);dat(0x07);dat(0x08);dat(0x03);
+  cmd(0xE8);dat(0x34);
+  cmd(0x62);dat(0x18);dat(0x0D);dat(0x71);dat(0xED);dat(0x70);dat(0x70);dat(0x18);dat(0x0F);dat(0x71);dat(0xEF);dat(0x70);dat(0x70);
+  cmd(0x63);dat(0x18);dat(0x11);dat(0x71);dat(0xF1);dat(0x70);dat(0x70);dat(0x18);dat(0x13);dat(0x71);dat(0xF3);dat(0x70);dat(0x70);
+  cmd(0x64);dat(0x28);dat(0x29);dat(0xF1);dat(0x01);dat(0xF1);dat(0x00);dat(0x07);
+  cmd(0x66);dat(0x3C);dat(0x00);dat(0xCD);dat(0x67);dat(0x45);dat(0x45);dat(0x10);dat(0x00);dat(0x00);dat(0x00);
+  cmd(0x67);dat(0x00);dat(0x3C);dat(0x00);dat(0x00);dat(0x00);dat(0x01);dat(0x54);dat(0x10);dat(0x32);dat(0x98);
+  cmd(0x74);dat(0x10);dat(0x85);dat(0x80);dat(0x00);dat(0x00);dat(0x4E);dat(0x00);
+  cmd(0x98);dat(0x3e);dat(0x07);cmd(0x35);cmd(0x21);cmd(0x11);
+  board.delay(120);cmd(0x29);board.delay(20);
+  GPIO.set(pins.bl, 1);
+}
+
+function flush() {
+  cmd(0x2A);dat(0x00);dat(0x00);dat(0x00);dat(W-1);
+  cmd(0x2B);dat(0x00);dat(0x00);dat(0x00);dat(H-1);
+  cmd(0x2C);GPIO.set(pins.dc, 1);
+  SPI.writeBufferDMA(pins.spiBus, buf, W*H*2);
+}
+
+function rgb(r,g,b) { return graphics.color565(r,g,b); }
+function fill(c) { graphics.fill(buf, c); }
+function fillRect(x,y,w,h,c) { graphics.fillRect(buf, x, y, w, h, c); }
+function setPixel(x,y,c) { graphics.setPixel(buf, x, y, c); }
+function hline(x,y,w,c) { fillRect(x,y,w,1,c); }
+function vline(x,y,h,c) { fillRect(x,y,1,h,c); }
+
+function drawRect(x,y,w,h,c) {
+  hline(x,y,w,c); hline(x,y+h-1,w,c);
+  vline(x,y,h,c); vline(x+w-1,y,h,c);
+}
+
+function drawCircle(cx,cy,r,c) {
+  var x=r,y=0,e=0;
+  while(x>=y) {
+    setPixel(cx+x,cy+y,c);setPixel(cx+y,cy+x,c);
+    setPixel(cx-y,cy+x,c);setPixel(cx-x,cy+y,c);
+    setPixel(cx-x,cy-y,c);setPixel(cx-y,cy-x,c);
+    setPixel(cx+y,cy-x,c);setPixel(cx+x,cy-y,c);
+    y++;if(e<=0)e+=2*y+1;if(e>0){x--;e-=2*x+1;}
+  }
+}
+
+function fillCircle(cx,cy,r,c) {
+  var x=r,y=0,e=0;
+  while(x>=y) {
+    hline(cx-x,cy+y,2*x+1,c);hline(cx-x,cy-y,2*x+1,c);
+    hline(cx-y,cy+x,2*y+1,c);hline(cx-y,cy-x,2*y+1,c);
+    y++;if(e<=0)e+=2*y+1;if(e>0){x--;e-=2*x+1;}
+  }
+}
+
+function drawLine(x0,y0,x1,y1,c) {
+  var dx=Math.abs(x1-x0),dy=Math.abs(y1-y0);
+  var sx=x0<x1?1:-1,sy=y0<y1?1:-1,e=dx-dy;
+  while(true) {
+    setPixel(x0,y0,c);
+    if(x0===x1&&y0===y1)break;
+    var e2=2*e;
+    if(e2>-dy){e-=dy;x0+=sx;}
+    if(e2<dx){e+=dx;y0+=sy;}
+  }
+}
+
+// Draw a character at x,y with scale
+function drawChar(ch, x, y, c, scale) {
+  scale = scale || 1;
+  var code = ch.charCodeAt(0);
+  if (code < 32 || code > 126) code = 32;
+  var idx = (code - 32) * 5;
+  for (var col = 0; col < 5; col++) {
+    var bits = font[idx + col];
+    for (var row = 0; row < 7; row++) {
+      if (bits & (1 << row)) {
+        if (scale === 1) {
+          setPixel(x + col, y + row, c);
+        } else {
+          fillRect(x + col * scale, y + row * scale, scale, scale, c);
+        }
+      }
+    }
+  }
+}
+
+// Draw text string
+function drawText(str, x, y, c, scale) {
+  scale = scale || 1;
+  var spacing = (FONT_W + 1) * scale;
+  for (var i = 0; i < str.length; i++) {
+    drawChar(str.charAt(i), x + i * spacing, y, c, scale);
+  }
+}
+
+// Center text
+function centerText(str, y, c, scale) {
+  scale = scale || 1;
+  var tw = str.length * (FONT_W + 1) * scale;
+  drawText(str, Math.floor((W - tw) / 2), y, c, scale);
+}
+
+// Colors
+var BLACK = rgb(0,0,0);
+var WHITE = rgb(255,255,255);
+var RED = rgb(255,0,0);
+var GREEN = rgb(0,255,0);
+var BLUE = rgb(0,0,255);
+var CYAN = rgb(0,255,255);
+var MAGENTA = rgb(255,0,255);
+var YELLOW = rgb(255,255,0);
+var ORANGE = rgb(255,128,0);
+
+// Initialize
+initScreen();
+console.log('Screen ready');
+
+// Slide 1: Title
+function slide1() {
+  console.log('Slide 1: Title');
+  fill(rgb(0,0,64));
+  centerText('mcujs', 60, WHITE, 4);
+  centerText('JavaScript for', 120, CYAN, 2);
+  centerText('Microcontrollers', 145, CYAN, 2);
+  centerText('waveshare lcd 1.28', 200, YELLOW, 1);
+  flush();
+}
+
+// Slide 2: Rectangles
+function slide2() {
+  console.log('Slide 2: Rectangles');
+  fill(BLACK);
+  centerText('RECTANGULAR', 20, WHITE, 2);
+  var colors = [RED,ORANGE,YELLOW,GREEN,CYAN,BLUE,MAGENTA];
+  for (var i = 0; i < 7; i++) {
+    var o = 35 + i * 12;
+    drawRect(o, o, 240 - o*2, 240 - o*2, colors[i]);
+    drawRect(o+1, o+1, 240 - o*2 - 2, 240 - o*2 - 2, colors[i]);
+  }
+  flush();
+}
+
+// Slide 3: Circles
+function slide3() {
+  console.log('Slide 3: Circles');
+  fill(rgb(32,0,32));
+  centerText('CIRCLES', 20, WHITE, 2);
+  var colors = [CYAN,GREEN,YELLOW,ORANGE,RED,MAGENTA];
+  for (var i = 0; i < 6; i++) {
+    drawCircle(120, 135, 90 - i*14, colors[i]);
+    drawCircle(120, 135, 89 - i*14, colors[i]);
+  }
+  fillCircle(120, 135, 15, WHITE);
+  flush();
+}
+
+// Slide 4: Lines
+function slide4() {
+  console.log('Slide 4: Lines');
+  fill(rgb(0,16,32));
+  centerText('LINES', 20, WHITE, 2);
+  for (var a = 0; a < 360; a += 15) {
+    var rad = a * 3.14159 / 180;
+    var x = 120 + Math.floor(Math.cos(rad) * 85);
+    var y = 140 + Math.floor(Math.sin(rad) * 85);
+    var c = rgb(
+      Math.floor(128 + 127 * Math.cos(rad)),
+      Math.floor(128 + 127 * Math.cos(rad - 2.09)),
+      Math.floor(128 + 127 * Math.cos(rad - 4.19))
+    );
+    drawLine(120, 140, x, y, c);
+  }
+  fillCircle(120, 140, 12, WHITE);
+  flush();
+}
+
+// Slide 5: Filled Shapes
+function slide5() {
+  console.log('Slide 5: Filled Shapes');
+  fill(BLACK);
+  centerText('FILLED', 15, WHITE, 2);
+  fillCircle(70, 100, 40, RED);
+  fillCircle(170, 100, 40, GREEN);
+  fillCircle(70, 180, 40, BLUE);
+  fillCircle(170, 180, 40, YELLOW);
+  fillRect(100, 120, 40, 40, WHITE);
+  flush();
+}
+
+// Slide 6: Grid
+function slide6() {
+  console.log('Slide 6: Grid');
+  fill(rgb(16,16,32));
+  centerText('GRID', 15, CYAN, 2);
+  for (var x = 20; x < 220; x += 20) vline(x, 40, 180, rgb(0,64,128));
+  for (var y = 40; y < 220; y += 20) hline(20, y, 200, rgb(0,64,128));
+  for (var gx = 40; gx <= 200; gx += 40) {
+    for (var gy = 60; gy <= 200; gy += 40) {
+      fillCircle(gx, gy, 4, CYAN);
+    }
+  }
+  flush();
+}
+
+// Slide 7: Bullseye
+function slide7() {
+  console.log('Slide 7: Bullseye');
+  fill(WHITE);
+  centerText('BULLSEYE', 15, BLACK, 2);
+  for (var i = 0; i < 6; i++) {
+    fillCircle(120, 140, 85 - i*14, i % 2 === 0 ? RED : WHITE);
+  }
+  flush();
+}
+
+// Slide 8: Checkerboard
+function slide8() {
+  console.log('Slide 8: Checkerboard');
+  fill(BLACK);
+  centerText('CHECKER', 10, YELLOW, 2);
+  var sz = 25;
+  for (var r = 0; r < 7; r++) {
+    for (var c = 0; c < 8; c++) {
+      if ((r + c) % 2 === 0) {
+        fillRect(20 + c * sz, 40 + r * sz, sz, sz, WHITE);
+      }
+    }
+  }
+  flush();
+}
+
+// Slide 9: Text Sizes
+function slide9() {
+  console.log('Slide 9: Text');
+  fill(rgb(0,32,0));
+  drawText('Scale 1', 10, 20, WHITE, 1);
+  drawText('Scale 2', 10, 50, YELLOW, 2);
+  drawText('Scale 3', 10, 90, CYAN, 3);
+  drawText('BIG!', 10, 140, RED, 5);
+  flush();
+}
+
+// Slide 10: Credits
+function slide10() {
+  console.log('Slide 10: Credits');
+  fill(rgb(32,0,64));
+  centerText('mcujs', 50, WHITE, 3);
+  centerText('Graphics Demo', 100, CYAN, 2);
+  centerText('240x240 RGB565', 140, YELLOW, 1);
+  centerText('DMA Transfer', 160, YELLOW, 1);
+  centerText('5x7 Bitmap Font', 180, YELLOW, 1);
+  fillCircle(60, 210, 15, RED);
+  fillCircle(120, 210, 15, GREEN);
+  fillCircle(180, 210, 15, BLUE);
+  flush();
+}
+
+// Run slideshow
+var slides = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8, slide9, slide10];
+var idx = 0;
+
+function next() {
+  slides[idx]();
+  idx = (idx + 1) % slides.length;
+}
+
+// Show first slide
+next();
+
+// Auto-advance every 3 seconds
+console.log('Auto-advancing every 3 seconds...');
+var timer = setInterval(next, 3000);
+
+// Stop after 30 seconds
+setTimeout(function() {
+  clearInterval(timer);
+  console.log('Slideshow complete!');
+}, 30000);

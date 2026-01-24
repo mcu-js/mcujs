@@ -15,6 +15,7 @@ add_library(mcujs_bindings STATIC
     fs.c
     process.c
     require.c
+    graphics.c
 )
 
 target_include_directories(mcujs_bindings PUBLIC
@@ -43,4 +44,5 @@ target_link_libraries(mcujs_bindings PUBLIC
     hardware_adc
     hardware_timer
     hardware_pio
+    hardware_dma
 )

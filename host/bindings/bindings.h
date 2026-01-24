@@ -145,4 +145,15 @@ size_t js_get_string_arg(const jerry_value_t args[], jerry_length_t argc,
  */
 void js_require_clear_cache(void);
 
+/*
+ * Register graphics bindings
+ * graphics.createBuffer(), graphics.fill(), graphics.setPixel(), etc.
+ */
+void js_bind_graphics(void);
+
+/*
+ * Create graphics module object
+ */
+jerry_value_t js_create_graphics_module(void);
+
 #endif /* MCUJS_BINDINGS_H */

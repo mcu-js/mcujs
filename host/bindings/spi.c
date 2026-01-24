@@ -1,14 +1,16 @@
 /*
  * mcujs - SPI Bindings
  * 
- * Implements: SPI.init(), SPI.transfer()
+ * Implements: SPI.init(), SPI.transfer(), SPI.writeBufferDMA()
  */
 
 #include "bindings.h"
+#include "graphics.h"
 #include "jerryscript.h"
 
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
+#include "hardware/dma.h"
 
 /* External helpers from bindings.c */
 extern void js_set_function(jerry_value_t object, const char *name, 
@@ -17,8 +19,11 @@ extern void js_register_global(const char *name, jerry_value_t object);
 extern double js_get_number_arg(const jerry_value_t args[], jerry_length_t argc,
                                 jerry_length_t index, double default_value);
 
-/* Maximum SPI transfer size */
+/* Maximum SPI transfer size for non-DMA transfers */
 #define MAX_SPI_TRANSFER 256
+
+/* DMA channel for SPI TX (-1 = not claimed) */
+static int s_dma_tx_channel = -1;
 
 /* SPI instances */
 static spi_inst_t *get_spi_instance(int bus) {
@@ -137,6 +142,79 @@ static jerry_value_t spi_transfer_handler(const jerry_call_info_t *call_info_p,
 }
 
 /*
+ * SPI.writeBufferDMA(bus, bufferHandle, byteLength)
+ * Write graphics buffer data via DMA (blocking until complete)
+ * Uses the native graphics buffer directly for zero-copy transfer
+ */
+static jerry_value_t spi_write_buffer_dma_handler(const jerry_call_info_t *call_info_p,
+                                                   const jerry_value_t args[],
+                                                   const jerry_length_t argc) {
+    (void)call_info_p;
+    
+    if (argc < 3) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE, 
+            "SPI.writeBufferDMA requires bus, bufferHandle, byteLength");
+    }
+    
+    int bus = (int)js_get_number_arg(args, argc, 0, 0);
+    graphics_buffer_handle_t handle = (graphics_buffer_handle_t)jerry_value_as_number(args[1]);
+    uint32_t byte_length = (uint32_t)js_get_number_arg(args, argc, 2, 0);
+    
+    spi_inst_t *spi = get_spi_instance(bus);
+    if (spi == NULL) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid SPI bus");
+    }
+    
+    /* Get buffer data pointer */
+    uint16_t *data = graphics_get_buffer_data(handle);
+    if (data == NULL) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "Invalid graphics buffer handle");
+    }
+    
+    /* Validate byte length */
+    uint32_t buffer_bytes = graphics_get_buffer_byte_length(handle);
+    if (byte_length > buffer_bytes) {
+        byte_length = buffer_bytes;
+    }
+    
+    if (byte_length == 0) {
+        return jerry_undefined();
+    }
+    
+    /* Claim DMA channel if not already claimed */
+    if (s_dma_tx_channel < 0) {
+        s_dma_tx_channel = dma_claim_unused_channel(true);
+    }
+    
+    /* Configure DMA for SPI TX */
+    dma_channel_config c = dma_channel_get_default_config(s_dma_tx_channel);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_8);  /* 8-bit transfers */
+    channel_config_set_dreq(&c, spi_get_dreq(spi, true));   /* SPI TX DREQ */
+    channel_config_set_read_increment(&c, true);            /* Increment read addr */
+    channel_config_set_write_increment(&c, false);          /* Fixed write addr */
+    
+    /* Start DMA transfer */
+    dma_channel_configure(
+        s_dma_tx_channel,
+        &c,
+        &spi_get_hw(spi)->dr,   /* Write to SPI data register */
+        data,                    /* Read from buffer */
+        byte_length,             /* Transfer count */
+        true                     /* Start immediately */
+    );
+    
+    /* Wait for DMA to complete (blocking) */
+    dma_channel_wait_for_finish_blocking(s_dma_tx_channel);
+    
+    /* Wait for SPI to finish transmitting */
+    while (spi_is_busy(spi)) {
+        tight_loop_contents();
+    }
+    
+    return jerry_undefined();
+}
+
+/*
  * Create SPI module object
  */
 jerry_value_t js_create_spi_module(void) {
@@ -144,6 +222,7 @@ jerry_value_t js_create_spi_module(void) {
 
     js_set_function(spi, "init", spi_init_handler);
     js_set_function(spi, "transfer", spi_transfer_handler);
+    js_set_function(spi, "writeBufferDMA", spi_write_buffer_dma_handler);
 
     return spi;
 }

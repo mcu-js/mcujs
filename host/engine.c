@@ -211,9 +211,15 @@ void js_register_bindings(void) {
     js_bind_console();
     js_bind_timers();
     js_bind_board();
+    js_bind_gpio();
+    js_bind_pwm();
+    js_bind_i2c();
+    js_bind_spi();
+    js_bind_adc();
     js_bind_neopixel();
     js_bind_process();
     js_bind_require();
+    js_bind_graphics();
 }
 
 bool js_engine_process_timers(void) {

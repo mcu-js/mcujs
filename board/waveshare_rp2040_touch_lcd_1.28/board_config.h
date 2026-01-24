@@ -49,14 +49,14 @@
 #define MCUJS_SPI1_MISO_PIN      2
 #define MCUJS_SPI1_CS_PIN       9
 
-/* LCD pins (GC9A01A) */
+/* LCD pins (GC9A01A) - from Waveshare official DEV_Config.h */
 #define MCUJS_LCD_SPI_BUS       1
 #define MCUJS_LCD_SCK_PIN       10
 #define MCUJS_LCD_MOSI_PIN      11
-#define MCUJS_LCD_MISO_PIN      2
+#define MCUJS_LCD_MISO_PIN      12
 #define MCUJS_LCD_CS_PIN        9
 #define MCUJS_LCD_DC_PIN        8
-#define MCUJS_LCD_RST_PIN       12
+#define MCUJS_LCD_RST_PIN       13
 #define MCUJS_LCD_BL_PIN        25
 
 /* Touch controller pins */

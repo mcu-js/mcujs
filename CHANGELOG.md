@@ -9,6 +9,7 @@ All notable changes to mcujs will be documented in this file.
 - USB CDC serial REPL with multi-line input support
 - USB MSC mass storage for drag-and-drop file transfer
 - FAT12 filesystem on flash using remaining space after firmware
+- **Auto-format**: Filesystem automatically formats on first boot or if corruption is detected
 - Auto-run `/index.js` on boot
 - **BOOTSEL Safe Mode**: Hold BOOTSEL button during power-on to skip `index.js` auto-run (allows recovery from infinite loops)
 - **Boot Status Indicator**: LED or NeoPixel blinks on startup to show boot progress (3 blinks = success, rapid blinks = error)
@@ -61,15 +62,17 @@ Full `require()` implementation for modular code:
 - Tab completion for global objects and properties (includes REPL-defined globals)
 - Built-in commands:
   - `.help` - Show available commands
-- `.info` - Show board info (chip, memory, filesystem, build)
-- `.ls` - List files on the device with sizes
-- `.cat FILE` - Display file contents
-- `.rm FILE` - Delete a file
-- `.run FILE` - Execute a JavaScript file
-- `.multiline [FILE]` - Multi-line input (end with `.end`)
-- `.uf2` - Reboot into UF2 mode (prompted)
-- `.uf2!` - Reboot into UF2 mode immediately
-- `.usbreset` - Reset USB connection (reboot)
+  - `.info` - Show board info (chip, memory, filesystem, build)
+  - `.ls` - List files on the device with sizes
+  - `.cat FILE` - Display file contents
+  - `.rm FILE` - Delete a file
+  - `.run FILE` - Execute a JavaScript file
+  - `.multiline [FILE]` - Multi-line input (end with `.end`)
+  - `.format` - Format filesystem (prompted, 3s countdown)
+  - `.format!` - Format filesystem immediately
+  - `.uf2` - Reboot into UF2 mode (prompted)
+  - `.uf2!` - Reboot into UF2 mode immediately
+  - `.usbreset` - Reset USB connection (reboot)
 
 
 ### Build System

@@ -778,6 +778,8 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  .rm FILE  - Remove a file\r\n");
         usb_cdc_puts("  .run FILE   - Execute a JavaScript file\r\n");
         usb_cdc_puts("  .multiline [FILE] - Multi-line input (end with .end)\r\n");
+        usb_cdc_puts("  .format     - Format filesystem (prompted)\r\n");
+        usb_cdc_puts("  .format!    - Format filesystem immediately\r\n");
         usb_cdc_puts("  .uf2        - Reboot into UF2 mode (prompted)\r\n");
         usb_cdc_puts("  .uf2!       - Reboot into UF2 mode immediately\r\n");
         usb_cdc_puts("  .usbreset   - Reset USB connection (reboot)\r\n");
@@ -877,6 +879,30 @@ static void repl_handle_command(const char* cmd) {
             char error_buf[128];
             js_engine_get_error(error_buf, sizeof(error_buf));
             repl_print_error(error_buf);
+        }
+    }
+    else if (strcmp(cmd, "format") == 0) {
+        usb_cdc_puts("WARNING: This will erase all files!\r\n");
+        usb_cdc_puts("Formatting in 3s. Press any key to cancel.\r\n");
+        if (repl_wait_for_keypress(3000)) {
+            usb_cdc_puts("Format cancelled.\r\n");
+            return;
+        }
+        usb_cdc_puts("Formatting filesystem...\r\n");
+        fs_result_t result = fs_format();
+        if (result == FS_OK) {
+            usb_cdc_puts("Filesystem formatted successfully.\r\n");
+        } else {
+            usb_cdc_puts("Format failed!\r\n");
+        }
+    }
+    else if (strcmp(cmd, "format!") == 0) {
+        usb_cdc_puts("Formatting filesystem...\r\n");
+        fs_result_t result = fs_format();
+        if (result == FS_OK) {
+            usb_cdc_puts("Filesystem formatted successfully.\r\n");
+        } else {
+            usb_cdc_puts("Format failed!\r\n");
         }
     }
     else if (strcmp(cmd, "uf2") == 0) {

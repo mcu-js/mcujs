@@ -11,9 +11,11 @@
 #include "fs.h"
 #include "ff.h"
 #include "../usb/usb_msc.h"
+#include "../usb/usb_cdc.h"
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /* External disk I/O functions for USB MSC (defined in diskio.c) */
 extern uint32_t diskio_get_sector_count(void);
@@ -85,6 +87,61 @@ static fs_result_t fresult_to_fs(FRESULT fr) {
 }
 
 /*
+ * Check if mount error should trigger auto-format
+ */
+static bool should_auto_format(FRESULT fr) {
+    switch (fr) {
+        case FR_NO_FILESYSTEM:   /* No valid FAT volume */
+        case FR_DISK_ERR:        /* Low-level disk I/O error */
+        case FR_INT_ERR:         /* Internal FatFs error */
+        case FR_NOT_ENABLED:     /* Workspace not registered */
+        case FR_INVALID_OBJECT:  /* Invalid file/directory object */
+            return true;
+        default:
+            return false;
+    }
+}
+
+/*
+ * Validate filesystem by attempting to read root directory
+ * Returns true if filesystem is usable
+ */
+static bool validate_filesystem(void) {
+    DIR dir;
+    FRESULT fr = f_opendir(&dir, "/");
+    if (fr != FR_OK) {
+        return false;
+    }
+    f_closedir(&dir);
+    return true;
+}
+
+/*
+ * Internal format function - performs the actual formatting
+ * Note: f_setlabel requires filesystem to be mounted, so caller must
+ * mount after calling this and then set the label.
+ */
+static fs_result_t do_format(void) {
+    MKFS_PARM mkfs_opt = {
+        .fmt = FM_FAT,      /* FAT12/16 (auto-select based on size) */
+        .n_fat = 2,         /* 2 FATs for redundancy */
+        .align = 1,         /* Sector alignment */
+        .n_root = 512,      /* Root directory entries */
+        .au_size = 0        /* Auto cluster size */
+    };
+    
+    /* Work buffer for f_mkfs (needs >= 512 bytes) */
+    static BYTE mkfs_work[FF_MAX_SS];
+    
+    FRESULT fr = f_mkfs("", &mkfs_opt, mkfs_work, sizeof(mkfs_work));
+    if (fr != FR_OK) {
+        return fresult_to_fs(fr);
+    }
+    
+    return FS_OK;
+}
+
+/*
  * Initialize filesystem
  */
 fs_result_t fs_init(void) {
@@ -98,30 +155,38 @@ fs_result_t fs_init(void) {
     /* Mount the filesystem */
     FRESULT fr = f_mount(&s_fatfs, "", 1);  /* 1 = mount immediately */
     
-    /* Format if no filesystem or filesystem is corrupted */
-    if (fr == FR_NO_FILESYSTEM || fr == FR_DISK_ERR || fr == FR_INT_ERR) {
-        /* No valid filesystem or corrupted - format it */
-        MKFS_PARM mkfs_opt = {
-            .fmt = FM_FAT,      /* FAT12/16 (auto-select based on size) */
-            .n_fat = 2,         /* 2 FATs for redundancy */
-            .align = 1,         /* Sector alignment */
-            .n_root = 512,      /* Root directory entries */
-            .au_size = 0        /* Auto cluster size */
-        };
-        
-        /* Work buffer for f_mkfs (needs >= 512 bytes) */
-        static BYTE mkfs_work[FF_MAX_SS];
-        
-        fr = f_mkfs("", &mkfs_opt, mkfs_work, sizeof(mkfs_work));
-        if (fr != FR_OK) {
-            return fresult_to_fs(fr);
+    /* Check if we need to auto-format */
+    bool needs_format = false;
+    
+    if (should_auto_format(fr)) {
+        needs_format = true;
+    } else if (fr == FR_OK) {
+        /* Mount succeeded - validate the filesystem is actually usable */
+        if (!validate_filesystem()) {
+            needs_format = true;
         }
+    }
+    
+    if (needs_format) {
+        usb_cdc_puts("Formatting filesystem...\r\n");
         
-        /* Set volume label */
-        f_setlabel("MCUJS");
+        fs_result_t fmt_result = do_format();
+        if (fmt_result != FS_OK) {
+            usb_cdc_puts("Format failed!\r\n");
+            return fmt_result;
+        }
         
         /* Mount again after formatting */
         fr = f_mount(&s_fatfs, "", 1);
+        if (fr != FR_OK) {
+            usb_cdc_puts("Mount after format failed!\r\n");
+            return fresult_to_fs(fr);
+        }
+        
+        /* Set volume label (must be done after mount) */
+        f_setlabel("MCUJS");
+        
+        usb_cdc_puts("Filesystem ready\r\n");
     }
     
     if (fr != FR_OK) {
@@ -129,6 +194,48 @@ fs_result_t fs_init(void) {
     }
     
     s_initialized = true;
+    return FS_OK;
+}
+
+/*
+ * Format filesystem (public API)
+ * Formats the filesystem, destroying all data
+ */
+fs_result_t fs_format(void) {
+    /* Close any open files first */
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (s_fil_used[i]) {
+            f_close(&s_fil_pool[i]);
+            s_fil_used[i] = false;
+        }
+    }
+    
+    /* Unmount first */
+    f_mount(NULL, "", 0);
+    s_initialized = false;
+    
+    /* Perform format */
+    fs_result_t result = do_format();
+    if (result != FS_OK) {
+        return result;
+    }
+    
+    /* Remount */
+    FRESULT fr = f_mount(&s_fatfs, "", 1);
+    if (fr != FR_OK) {
+        return fresult_to_fs(fr);
+    }
+    
+    /* Set volume label (must be done after mount) */
+    f_setlabel("MCUJS");
+    
+    /* Reinitialize file pool */
+    memset(s_fil_used, 0, sizeof(s_fil_used));
+    s_initialized = true;
+    
+    /* Notify USB host that media changed */
+    usb_msc_media_changed();
+    
     return FS_OK;
 }
 

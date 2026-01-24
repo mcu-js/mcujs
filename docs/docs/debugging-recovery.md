@@ -29,6 +29,17 @@ If you see repeating rapid blinks, try reflashing the firmware.
 - Use `.uf2` to reboot into [UF2](./glossary.md#uf2) mode (prompted)
 - Use `.uf2!` to reboot immediately
 
+## Filesystem recovery
+
+The filesystem auto-formats on first boot or if corruption is detected. If you need to manually reset the filesystem:
+
+- Use `.format` for a prompted format (3-second countdown, press any key to cancel)
+- Use `.format!` for immediate format without confirmation
+
+**Warning:** Formatting erases all files on the device.
+
+The filesystem size is automatically calculated based on the board's flash size minus the firmware and a small EEPROM reservation.
+
 ## REPL tips
 
 - Use the [REPL](./glossary.md#repl) for quick checks without editing files

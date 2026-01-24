@@ -17,6 +17,8 @@ This section covers how you interact with the runtime day to day: the [REPL](./g
 | `.rm FILE` | Delete a file |
 | `.run FILE` | Execute a JavaScript file |
 | `.multiline [FILE]` | Multi-line input (end with `.end`) |
+| `.format` | Format filesystem (prompted, 3s countdown) |
+| `.format!` | Format filesystem immediately |
 | `.uf2` | Reboot into [UF2](./glossary.md#uf2) mode (prompted) |
 | `.uf2!` | Reboot into [UF2](./glossary.md#uf2) mode immediately |
 | `.usbreset` | Reset [USB](./glossary.md#usb) connection (reboot) |

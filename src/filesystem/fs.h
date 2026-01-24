@@ -54,6 +54,12 @@ typedef struct {
 fs_result_t fs_init(void);
 
 /*
+ * Format filesystem
+ * Destroys all data and creates a fresh FAT filesystem
+ */
+fs_result_t fs_format(void);
+
+/*
  * Sync filesystem to flash
  */
 fs_result_t fs_sync(void);

@@ -21,3 +21,87 @@
   - Copies the UF2 to the mounted volume.
   - Waits for CDC to reappear and runs REPL tests.
 - Keep tooling minimal and cross-platform. Node/Bun-based harnesses are preferred over Python.
+
+## Device Detection and Mounting
+
+### Identifying Devices
+
+When multiple boards are connected, identify them by connecting to each serial port and running the `.info` command. The `Board:` line in the output shows which board is on that port.
+
+### Block Device Detection
+
+Check device state and labels:
+
+```bash
+# List block devices with labels
+lsblk -o NAME,LABEL,SIZE,FSTYPE
+
+# UF2 mode shows as: RPI-RP2 (128M, no fstype)
+# Runtime mode shows as: MCUJS (~1.4-3.5M depending on flash size, vfat)
+```
+
+### Mounting Volumes
+
+Use `udisksctl` for non-root mounting:
+
+```bash
+# Mount a volume (auto-detects mount point)
+udisksctl mount -b /dev/sda1
+
+# Unmount before entering UF2 mode or formatting
+udisksctl unmount -b /dev/sda1
+
+# Mount points appear at /run/media/$USER/<LABEL>
+```
+
+### Entering UF2 Mode
+
+```bash
+# Via REPL command (requires serial connection)
+python3 -c "
+import serial, time
+ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
+ser.write(b'\r.uf2!\r')
+ser.close()
+"
+
+# Wait for RPI-RP2 volume to appear
+sleep 3
+lsblk -o NAME,LABEL | grep RPI-RP2
+```
+
+### Flashing Firmware
+
+```bash
+# Mount UF2 volume and copy firmware
+udisksctl mount -b /dev/sda1
+cp build/mcujs-0.1.0-<board>.uf2 /run/media/$USER/RPI-RP2/
+sync
+
+# Device auto-reboots after UF2 copy - wait for CDC to reappear
+sleep 3
+ls /dev/ttyACM*
+```
+
+### Filesystem Commands
+
+The runtime provides REPL commands for filesystem management:
+
+- `.ls` - List files
+- `.cat FILE` - Display file contents
+- `.rm FILE` - Delete a file
+- `.format` - Format filesystem (prompted, 3s countdown)
+- `.format!` - Format filesystem immediately
+
+The filesystem auto-formats on first boot or if corruption is detected.
+
+### Expected Filesystem Sizes
+
+Filesystem size = Flash size - Firmware (~550KB) - EEPROM reservation (4KB):
+
+| Board | Flash | Expected FS |
+|-------|-------|-------------|
+| pico | 2MB | ~1.4MB |
+| pico2 | 4MB | ~3.4MB |
+| waveshare_rp2040_zero | 2MB | ~1.4MB |
+| waveshare_rp2040_touch_lcd_1.28 | 4MB | ~3.4MB |

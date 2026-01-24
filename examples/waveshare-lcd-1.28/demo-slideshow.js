@@ -145,14 +145,19 @@ function initScreen() {
   cmd(0x67);dat(0x00);dat(0x3C);dat(0x00);dat(0x00);dat(0x00);dat(0x01);dat(0x54);dat(0x10);dat(0x32);dat(0x98);
   cmd(0x74);dat(0x10);dat(0x85);dat(0x80);dat(0x00);dat(0x00);dat(0x4E);dat(0x00);
   cmd(0x98);dat(0x3e);dat(0x07);cmd(0x35);cmd(0x21);cmd(0x11);
-  board.delay(120);cmd(0x29);board.delay(20);
-  // Clear screen BEFORE turning on backlight to avoid showing VRAM garbage
-  graphics.fill(buf, 0x0000);  // Fill with black
+  board.delay(120);
+  
+  // Clear display RAM BEFORE Display ON to avoid garbage flash
+  graphics.fill(buf, 0x0000);
   cmd(0x2A);dat(0x00);dat(0x00);dat(0x00);dat(W-1);
   cmd(0x2B);dat(0x00);dat(0x00);dat(0x00);dat(H-1);
   cmd(0x2C);GPIO.set(pins.dc, 1);
   SPI.writeBufferDMA(pins.spiBus, buf, W*H*2);
-  GPIO.set(pins.bl, 1);  // Now safe to turn on backlight
+  
+  // NOW turn on display and backlight
+  cmd(0x29);
+  board.delay(20);
+  GPIO.set(pins.bl, 1);
 }
 
 function flush() {

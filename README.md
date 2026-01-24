@@ -315,6 +315,7 @@ make -j$(nproc)
 | Raspberry Pi Pico | RP2040 | 2MB | Supported |
 | Raspberry Pi Pico 2 | RP2350 | 4MB | Supported |
 | Waveshare RP2040-Zero | RP2040 | 2MB | Supported |
+| Waveshare RP2040 Touch LCD 1.28 | RP2040 | 4MB | Supported |
 | Waveshare RP2040/RP2350 | Various | Various | Planned |
 | Adafruit Feather RP2040/RP2350 | Various | Various | Planned |
 
@@ -329,7 +330,9 @@ mcujs/
 ├── javascript/          # JerryScript engine (built from source)
 ├── board/               # Board-specific configurations
 │   ├── pico/            # Raspberry Pi Pico
-│   └── pico2/           # Raspberry Pi Pico 2
+│   ├── pico2/           # Raspberry Pi Pico 2
+│   ├── waveshare_rp2040_zero/ # Waveshare RP2040-Zero
+│   └── waveshare_rp2040_touch_lcd_1.28/ # Waveshare RP2040 Touch LCD 1.28
 ├── src/                 # Core firmware
 │   ├── usb/             # USB CDC + MSC composite device
 │   └── filesystem/      # FAT12 filesystem with subdirectory support

@@ -29,9 +29,10 @@ show_help() {
     echo "Usage: ./build.sh [board] [options]"
     echo ""
     echo "Boards:"
-    echo "  pico                 Build for Raspberry Pi Pico (RP2040)"
-    echo "  pico2                Build for Raspberry Pi Pico 2 (RP2350)"
-    echo "  waveshare_rp2040_zero Build for Waveshare RP2040-Zero (RP2040)"
+    echo "  pico                          Build for Raspberry Pi Pico (RP2040)"
+    echo "  pico2                         Build for Raspberry Pi Pico 2 (RP2350)"
+    echo "  waveshare_rp2040_zero          Build for Waveshare RP2040-Zero (RP2040)"
+    echo "  waveshare_rp2040_touch_lcd_1.28 Build for Waveshare RP2040 Touch LCD 1.28 (RP2040)"
     echo "  all                  Build for all supported boards (default)"
     echo ""
     echo "Options:"
@@ -54,7 +55,7 @@ USE_DOCKER=1
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        pico|pico2|waveshare_rp2040_zero|all)
+        pico|pico2|waveshare_rp2040_zero|waveshare_rp2040_touch_lcd_1.28|all)
             BOARD="$1"
             shift
             ;;
@@ -150,6 +151,7 @@ else
             build_board "pico"
             build_board "pico2"
             build_board "waveshare_rp2040_zero"
+            build_board "waveshare_rp2040_touch_lcd_1.28"
             ;;
         *)
             build_board "${BOARD}"

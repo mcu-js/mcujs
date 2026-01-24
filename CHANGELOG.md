@@ -18,9 +18,10 @@ All notable changes to mcujs will be documented in this file.
 - `GPIO` - Digital input/output with pull-up/pull-down support
 - `PWM` - Pulse width modulation
 - `I2C` - I2C bus communication
-- `SPI` - SPI bus communication
+- `SPI` - SPI bus communication with DMA support (`SPI.writeBufferDMA()`)
 - `ADC` - Analog-to-digital converter
 - `NeoPixel` - WS2812B addressable LED support with configurable wire order (RGB/GRB)
+- `graphics` - RGB565 framebuffer for displays (fill, rect, pixel, line, circle, text)
 - `board` object - LED control, NeoPixel helper, system info, unique ID, memory stats
 - `mcujs:module` - Built-in module registry
 
@@ -74,6 +75,12 @@ Full `require()` implementation for modular code:
   - `.uf2!` - Reboot into UF2 mode immediately
   - `.usbreset` - Reset USB connection (reboot)
 
+
+### Board Support
+- Raspberry Pi Pico (RP2040, 2MB flash)
+- Raspberry Pi Pico 2 (RP2350, 4MB flash)
+- Waveshare RP2040-Zero (RP2040, 2MB flash, NeoPixel on GPIO 16)
+- Waveshare RP2040 Touch LCD 1.28" (RP2040, 4MB flash, round display, touch, IMU)
 
 ### Build System
 - Docker-based build for reproducibility

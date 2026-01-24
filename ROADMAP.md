@@ -100,12 +100,16 @@ while (1) {
 - [ ] `ADC` configurable Vref / calibration
 - [ ] `UART` - Serial communication
 - [ ] `PIO` - Programmable I/O (RP2040/RP2350 unique feature)
-- [ ] `DMA` - Direct memory access for high-speed transfers
+- [x] `SPI.writeBufferDMA()` - DMA transfers for high-speed SPI (display updates)
+- [ ] `DMA` - General-purpose direct memory access
 - [ ] `RTC` - Real-time clock (external module support)
 - [ ] `WS2812` - NeoPixel LED support (via PIO)
+- [x] `graphics` module - RGB565 framebuffer with fill, rect, pixel, line, circle primitives
 
 ### Board Support
-- [ ] Waveshare RP2040/RP2350 boards
+- [x] Waveshare RP2040-Zero (NeoPixel on GPIO 16)
+- [x] Waveshare RP2040 Touch LCD 1.28" (GC9A01A display, CST816S touch, QMI8658 IMU)
+- [ ] Waveshare RP2350 boards
 - [ ] Adafruit Feather RP2040/RP2350
 - [ ] Pimoroni boards
 - [ ] Generic RP2040/RP2350 board config

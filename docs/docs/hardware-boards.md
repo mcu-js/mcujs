@@ -28,23 +28,44 @@ Start here to see which boards are ready today and what is coming next.
 | --- | --- |
 | LCD SPI1 SCK | 10 |
 | LCD SPI1 MOSI | 11 |
+| LCD SPI1 MISO | 12 |
 | LCD CS | 9 |
 | LCD DC | 8 |
-| LCD RST | 12 |
+| LCD RST | 13 |
 | LCD BL | 25 |
 | Touch/IMU I2C1 SDA | 6 |
 | Touch/IMU I2C1 SCL | 7 |
+| Touch INT | 21 |
+| Touch RST | 22 |
+| IMU INT1 | 23 |
+| IMU INT2 | 24 |
+| Battery ADC | 29 |
 
-Quickstart: copy both `examples/waveshare-lcd-1.28/index.js` and
-`examples/waveshare-lcd-1.28/gc9a01a.js` to the device root, then run:
+**Quickstart:** Copy files from `examples/waveshare-lcd-1.28/` to the device:
 
 ```js
+// Display example
 const { GC9A01A } = require('./gc9a01a');
-
 const display = GC9A01A();
 display.init();
 display.fill(display.color565(8, 12, 18));
+
+// Touch example
+const { CST816S } = require('./cst816s');
+const touch = CST816S();
+touch.init();
+const t = touch.read();
+if (t.touching) console.log(t.x, t.y);
+
+// IMU example
+const { QMI8658 } = require('./qmi8658');
+const imu = QMI8658();
+imu.init();
+const data = imu.read();
+console.log('Accel:', data.accel);
 ```
+
+**Available demos:** `demo-slideshow.js`, `demo-fps.js`, `demo-touch-draw.js`, `demo-imu.js`
 
 ## Key terms
 

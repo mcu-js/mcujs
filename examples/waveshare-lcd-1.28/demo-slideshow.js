@@ -380,10 +380,10 @@ function slide8() {
 function slide9() {
   console.log('Slide 9: Text');
   fill(rgb(0,32,0));
-  drawText('Scale 1', 10, 20, WHITE, 1);
-  drawText('Scale 2', 10, 50, YELLOW, 2);
-  drawText('Scale 3', 10, 90, CYAN, 3);
-  drawText('BIG!', 10, 140, RED, 5);
+  centerText('Scale 1', 45, WHITE, 1);
+  centerText('Scale 2', 65, YELLOW, 2);
+  centerText('Scale 3', 100, CYAN, 3);
+  centerText('BIG!', 145, RED, 5);
   flush();
 }
 

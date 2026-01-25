@@ -167,6 +167,10 @@ static const media_key_mapping_t media_key_map[] = {
     {"brightnessdown", USB_HID_CONSUMER_BRIGHTNESS_DEC},
     {"brightdown", USB_HID_CONSUMER_BRIGHTNESS_DEC},
     
+    /* Power */
+    {"power", USB_HID_CONSUMER_POWER},
+    {"sleep", USB_HID_CONSUMER_SLEEP},
+    
     {NULL, 0}  /* End marker */
 };
 

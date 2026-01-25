@@ -78,6 +78,8 @@ bool usb_hid_mouse_is_pressed(uint8_t button);
 #define USB_HID_CONSUMER_VOLUME_DECREMENT   0x00EA
 #define USB_HID_CONSUMER_BRIGHTNESS_INC     0x006F
 #define USB_HID_CONSUMER_BRIGHTNESS_DEC     0x0070
+#define USB_HID_CONSUMER_POWER              0x0030
+#define USB_HID_CONSUMER_SLEEP              0x0032
 
 /* Send a consumer control command (media key) */
 bool usb_hid_consumer_press(uint16_t usage_code);

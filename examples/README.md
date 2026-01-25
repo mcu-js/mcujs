@@ -59,6 +59,32 @@ Load application settings from JSON configuration files.
 
 **Hardware:** None (uses onboard LED on GPIO 25)
 
+### waveshare-lcd-1.28/
+Examples for Waveshare RP2040 Touch LCD 1.28" (240x240 round GC9A01A display).
+
+**Files:**
+- `gc9a01a.js` - Low-level display driver
+- `screen.js` - High-level drawing API
+- `demo-fps.js` - FPS benchmark with bouncing ball
+- `demo-slideshow.js` - Slideshow with shapes, text, colors
+- `demo-touch-draw.js` - Touch-enabled drawing demo
+- `demo-imu.js` - IMU visualization
+
+**Hardware:** Waveshare RP2040 Touch LCD 1.28" board
+
+### waveshare-lcd-1.47/
+Examples for Waveshare RP2350-LCD-1.47-A (320x172 ST7789V3 display).
+
+**Files:**
+- `st7789v3.js` - Low-level display driver
+- `screen.js` - High-level drawing API
+- `demo-fps.js` - FPS benchmark with bouncing balls
+- `demo-slideshow.js` - Slideshow with shapes, text, colors
+- `demo-shapes.js` - Animated shapes demo
+- `demo-rainbow.js` - Rainbow/color effects demo
+
+**Hardware:** Waveshare RP2350-LCD-1.47-A board
+
 ## Pin Reference
 
 | Function | Default Pin |

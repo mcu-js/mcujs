@@ -78,6 +78,9 @@ void js_bind_process(void) {
     /* FatFs version (R0.16) */
     js_set_string(versions, "fatfs", "0.16");
     
+    /* picojpeg version */
+    js_set_string(versions, "picojpeg", "1.1");
+    
     js_set_property(process, "versions", versions);
     jerry_value_free(versions);
     

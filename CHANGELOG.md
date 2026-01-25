@@ -22,6 +22,11 @@ All notable changes to mcujs will be documented in this file.
 - `ADC` - Analog-to-digital converter
 - `NeoPixel` - WS2812B addressable LED support with configurable wire order (RGB/GRB)
 - `graphics` - RGB565 framebuffer for displays (fill, rect, pixel, line, circle, text)
+- `image` - JPEG and BMP image decoding to graphics buffers
+  - `image.drawJPEG(handle, path, {x, y})` - Load and decode JPEG from filesystem
+  - `image.drawBMP(handle, path, {x, y})` - Load and decode BMP from filesystem
+  - Supports: Baseline JPEG, 16/24/32-bit uncompressed BMP
+  - Max file size: 16KB (RP2040), 192KB (RP2350)
 - `board` object - LED control, NeoPixel helper, system info, unique ID, memory stats
 - `mcujs:module` - Built-in module registry
 
@@ -87,3 +92,10 @@ Full `require()` implementation for modular code:
 - Docker-based build for reproducibility
 - Alpine Linux image (~1.3GB)
 - Support for Raspberry Pi Pico (RP2040) and Pico 2 (RP2350)
+
+### Third-Party Libraries
+- **JerryScript** v3.0.0 - JavaScript engine
+- **FatFs** R0.16 - FAT filesystem (Elm Chan)
+- **picojpeg** v1.1 - JPEG decoder (Rich Geldreich, Public Domain)
+- **TinyUSB** - USB stack (via Pico SDK)
+- BMP decoder - Custom implementation (16/24/32-bit uncompressed)

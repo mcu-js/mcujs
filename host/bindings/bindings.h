@@ -156,4 +156,9 @@ void js_bind_graphics(void);
  */
 jerry_value_t js_create_graphics_module(void);
 
+/*
+ * Create image module object
+ */
+jerry_value_t js_create_image_module(void);
+
 #endif /* MCUJS_BINDINGS_H */

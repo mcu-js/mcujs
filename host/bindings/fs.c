@@ -107,8 +107,8 @@ static jerry_value_t fs_read_file_sync(const jerry_call_info_t *call_info_p,
     
     buffer[bytes_read] = '\0';
     
-    /* Return as string */
-    jerry_value_t str = jerry_string((const jerry_char_t *)buffer, bytes_read, JERRY_ENCODING_UTF8);
+    /* Return as string - use CESU8 encoding to preserve binary data */
+    jerry_value_t str = jerry_string((const jerry_char_t *)buffer, bytes_read, JERRY_ENCODING_CESU8);
     free(buffer);
     
     return str;

@@ -16,6 +16,8 @@ add_library(mcujs_bindings STATIC
     process.c
     require.c
     graphics.c
+    image.c
+    ${CMAKE_SOURCE_DIR}/lib/picojpeg/picojpeg.c
 )
 
 target_include_directories(mcujs_bindings PUBLIC
@@ -28,6 +30,7 @@ target_include_directories(mcujs_bindings PUBLIC
     ${CMAKE_SOURCE_DIR}/board/${BOARD}
     ${CMAKE_SOURCE_DIR}/javascript
     ${CMAKE_SOURCE_DIR}/javascript/jerryscript-core
+    ${CMAKE_SOURCE_DIR}/lib/picojpeg
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 

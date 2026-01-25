@@ -376,6 +376,7 @@ static const char *s_builtin_module_names[] = {
     "spi",
     "adc",
     "neopixel",
+    "image",
     "mcujs:module",
     "node:module",
     NULL
@@ -417,6 +418,7 @@ static const builtin_module_t s_builtin_modules[] = {
     {"spi", js_create_spi_module},
     {"adc", js_create_adc_module},
     {"neopixel", js_create_neopixel_module},
+    {"image", js_create_image_module},
     {"mcujs:module", create_module_module},
     {NULL, NULL}
 };

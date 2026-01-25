@@ -13,7 +13,7 @@
 - Default workflow: `build.sh <board>` then flash the UF2 and run REPL tests.
 - The runtime can enter UF2 mode via `.uf2!` or `board.enterUf2()` over serial.
 - When automating, confirm device state:
-  - UF2 mode if the `RPI-RP2` volume is mounted.
+  - UF2 mode if the `RPI-RP2` (RP2040) or `RP2350` (RP2350) volume is mounted.
   - Runtime mode if a CDC serial device (e.g. `/dev/ttyACM*`) is present and responds to the REPL prompt.
 - Prefer an automated loop that:
   - Builds firmware.
@@ -36,8 +36,8 @@ Check device state and labels:
 # List block devices with labels
 lsblk -o NAME,LABEL,SIZE,FSTYPE
 
-# UF2 mode shows as: RPI-RP2 (128M, no fstype)
-# Runtime mode shows as: MCUJS (~1.4-3.5M depending on flash size, vfat)
+# UF2 mode shows as: RPI-RP2 (RP2040) or RP2350 (RP2350) - 128M, vfat
+# Runtime mode shows as: MCUJS (~1.4-15.4M depending on flash size, vfat)
 ```
 
 ### Mounting Volumes
@@ -65,9 +65,9 @@ ser.write(b'\r.uf2!\r')
 ser.close()
 "
 
-# Wait for RPI-RP2 volume to appear
+# Wait for UF2 volume to appear (RPI-RP2 for RP2040, RP2350 for RP2350)
 sleep 3
-lsblk -o NAME,LABEL | grep RPI-RP2
+lsblk -o NAME,LABEL | grep -E "RPI-RP2|RP2350"
 ```
 
 ### Flashing Firmware
@@ -105,3 +105,4 @@ Filesystem size = Flash size - Firmware (~550KB) - EEPROM reservation (4KB):
 | pico2 | 4MB | ~3.4MB |
 | waveshare_rp2040_zero | 2MB | ~1.4MB |
 | waveshare_rp2040_touch_lcd_1.28 | 4MB | ~3.4MB |
+| waveshare_rp2350_lcd_1.47_a | 16MB | ~15.4MB |

@@ -110,8 +110,9 @@ while (1) {
 - [x] Waveshare RP2040-Zero (NeoPixel on GPIO 16)
 - [x] Waveshare RP2040 Touch LCD 1.28" (GC9A01A display, CST816S touch, QMI8658 IMU)
 - [x] Raspberry Pi Pico 2 W (CYW43 WiFi/BLE chip, LED on CYW43)
+- [x] Waveshare RP2350-LCD-1.47-A (ST7789V3 display 320x172, 16MB flash, NeoPixel)
 - [ ] Raspberry Pi Pico W (CYW43 WiFi/BLE chip)
-- [ ] Waveshare RP2350 boards
+- [ ] Additional Waveshare RP2350 boards
 - [ ] Adafruit Feather RP2040/RP2350
 - [ ] Pimoroni boards
 - [ ] Generic RP2040/RP2350 board config

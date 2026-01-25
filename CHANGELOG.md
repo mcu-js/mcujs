@@ -81,6 +81,7 @@ Full `require()` implementation for modular code:
 - Raspberry Pi Pico 2 (RP2350, 4MB flash)
 - Waveshare RP2040-Zero (RP2040, 2MB flash, NeoPixel on GPIO 16)
 - Waveshare RP2040 Touch LCD 1.28" (RP2040, 4MB flash, round display, touch, IMU)
+- Waveshare RP2350-LCD-1.47-A (RP2350, 16MB flash, ST7789V3 320x172 display, NeoPixel)
 
 ### Build System
 - Docker-based build for reproducibility

@@ -34,6 +34,7 @@ show_help() {
     echo "  pico2_w                       Build for Raspberry Pi Pico 2 W (RP2350 + WiFi)"
     echo "  waveshare_rp2040_zero          Build for Waveshare RP2040-Zero (RP2040)"
     echo "  waveshare_rp2040_touch_lcd_1.28 Build for Waveshare RP2040 Touch LCD 1.28 (RP2040)"
+    echo "  waveshare_rp2350_lcd_1.47_a    Build for Waveshare RP2350-LCD-1.47-A (RP2350)"
     echo "  all                  Build for all supported boards (default)"
     echo ""
     echo "Options:"
@@ -56,7 +57,7 @@ USE_DOCKER=1
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        pico|pico2|pico2_w|waveshare_rp2040_zero|waveshare_rp2040_touch_lcd_1.28|all)
+        pico|pico2|pico2_w|waveshare_rp2040_zero|waveshare_rp2040_touch_lcd_1.28|waveshare_rp2350_lcd_1.47_a|all)
             BOARD="$1"
             shift
             ;;
@@ -154,6 +155,7 @@ else
             build_board "pico2_w"
             build_board "waveshare_rp2040_zero"
             build_board "waveshare_rp2040_touch_lcd_1.28"
+            build_board "waveshare_rp2350_lcd_1.47_a"
             ;;
         *)
             build_board "${BOARD}"

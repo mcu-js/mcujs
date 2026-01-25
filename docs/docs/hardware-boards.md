@@ -14,6 +14,7 @@ Start here to see which boards are ready today and what is coming next.
 | Raspberry Pi Pico 2 | RP2350 | 4MB | Supported |
 | Waveshare RP2040-Zero | RP2040 | 2MB | Supported |
 | Waveshare RP2040 Touch LCD 1.28 | RP2040 | 4MB | Supported |
+| Waveshare RP2350-LCD-1.47-A | RP2350 | 16MB | Supported |
 
 ## Pin notes
 
@@ -67,6 +68,34 @@ console.log('Accel:', data.accel);
 
 **Available demos:** `demo-slideshow.js`, `demo-fps.js`, `demo-touch-draw.js`, `demo-imu.js`
 
+### Waveshare RP2350-LCD-1.47-A
+
+| Function | GPIO |
+| --- | --- |
+| LCD SPI0 SCK | 18 |
+| LCD SPI0 MOSI | 19 |
+| LCD CS | 17 |
+| LCD DC | 16 |
+| LCD RST | 20 |
+| LCD BL | 21 |
+| SD Card SPI1 SCK | 10 |
+| SD Card SPI1 MOSI | 11 |
+| SD Card SPI1 MISO | 12 |
+| SD Card CS | 15 |
+| NeoPixel (WS2812B) | 22 |
+
+**Quickstart:** Copy files from `examples/waveshare-lcd-1.47/` to the device:
+
+```js
+// Display example (320x172 horizontal, ST7789V3)
+var s = require('./screen.js').createScreen();
+s.init();
+s.clear();
+s.fillRect(0, 0, 320, 86, s.RED);
+s.fillRect(0, 86, 320, 86, s.BLUE);
+s.flush();
+```
+
 ## Key terms
 
 - [GPIO](./glossary.md#gpio)
@@ -79,4 +108,5 @@ console.log('Accel:', data.accel);
 ## Planned boards
 
 - Adafruit Feather RP2040/RP2350
+- Additional Waveshare RP2350 boards
 - Generic RP2040/RP2350 configs

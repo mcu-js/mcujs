@@ -21,6 +21,7 @@ These modules are available with `require()` out of the box. Acronyms are explai
 - `spi` for fast serial devices ([SPI](./glossary.md#spi))
 - `adc` for analog inputs ([ADC](./glossary.md#adc))
 - `neopixel` for WS2812 LEDs ([NeoPixel](./glossary.md#neopixel))
+- `keyboard` for USB HID keyboard emulation
 
 ## Example usage
 
@@ -57,6 +58,62 @@ Array-of-objects always stay RGB; array-of-arrays follows the order.
 - Combine `gpio` and `pwm` for LED fades
 
 If you are looking for timers or console logging, those are in [Runtime JavaScript](./runtime-javascript.md).
+
+## USB HID Keyboard
+
+The `keyboard` module lets the Pico act as a USB keyboard. No drivers needed on the host.
+
+```javascript
+const K = require('keyboard');
+
+// Type text (handles shift for uppercase and symbols)
+K.print('Hello, World!');
+
+// Single key tap
+K.tap('enter');
+
+// Modifier combos
+K.press('super');    // Hold Super/Win/Cmd key
+K.tap('space');      // Tap space while Super is held
+K.release('super');  // Release Super
+
+// Safety: release all keys
+K.releaseAll();
+
+// Check key state
+K.isPressed('shift');  // returns true/false
+```
+
+### Supported keys
+
+- **Letters:** `a`-`z` (case insensitive)
+- **Numbers:** `0`-`9`
+- **Function keys:** `f1`-`f12`
+- **Modifiers:** `ctrl`, `shift`, `alt`, `super` (also `gui`, `cmd`, `win`, `meta`)
+- **Right modifiers:** `rctrl`, `rshift`, `ralt`, `rgui`
+- **Navigation:** `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`
+- **Special:** `enter`, `tab`, `space`, `backspace`, `delete`, `escape`, `insert`
+- **Locks:** `capslock`, `numlock`, `scrolllock`
+- **Other:** `printscreen`, `pause`
+- **Punctuation:** `-`, `=`, `[`, `]`, `\`, `;`, `'`, `` ` ``, `,`, `.`, `/`
+
+### Example: Macro button
+
+```javascript
+const K = require('keyboard');
+const GPIO = require('gpio');
+
+// Button on GPIO 15
+GPIO.init(15, GPIO.INPUT_PULLUP);
+
+setInterval(() => {
+    if (GPIO.get(15) === 0) {
+        K.print('console.log("Hello!");');
+        K.tap('enter');
+        while (GPIO.get(15) === 0) {} // debounce
+    }
+}, 10);
+```
 
 ## Key terms
 

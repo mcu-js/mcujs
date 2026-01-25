@@ -27,6 +27,13 @@ All notable changes to mcujs will be documented in this file.
   - `image.drawBMP(handle, path, {x, y})` - Load and decode BMP from filesystem
   - Supports: Baseline JPEG, 16/24/32-bit uncompressed BMP
   - Max file size: 16KB (RP2040), 192KB (RP2350)
+- `keyboard` - USB HID keyboard emulation
+  - `keyboard.print(text)` - Type a string (handles shift for uppercase/symbols)
+  - `keyboard.tap(key)` - Press and release a key
+  - `keyboard.press(key)` / `keyboard.release(key)` - Hold/release for combos
+  - `keyboard.releaseAll()` - Release all keys (safety)
+  - `keyboard.isPressed(key)` - Check if a key is pressed
+  - Supported keys: letters, numbers, F1-F12, modifiers (ctrl, shift, alt, super/gui/cmd/win), arrows, enter, tab, space, backspace, delete, escape, home, end, pageup, pagedown, printscreen, and more
 - `board` object - LED control, NeoPixel helper, system info, unique ID, memory stats
 - `mcujs:module` - Built-in module registry
 

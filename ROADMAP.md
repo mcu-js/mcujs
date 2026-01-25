@@ -279,14 +279,14 @@ setInterval(() => {
 
 #### Implementation Tasks
 
-- [ ] Add HID device class to TinyUSB descriptor (composite CDC+MSC+HID)
-- [ ] Implement keyboard HID report generation
+- [x] Add HID device class to TinyUSB descriptor (composite CDC+MSC+HID)
+- [x] Implement keyboard HID report generation
 - [ ] Implement mouse HID report generation  
-- [ ] Create `keyboard` native module
+- [x] Create `keyboard` native module
 - [ ] Create `mouse` native module
-- [ ] Handle USB enumeration with HID
+- [x] Handle USB enumeration with HID
 - [ ] Test on Windows, Mac, Linux hosts
-- [ ] Document keyboard layout considerations (US QWERTY default)
+- [x] Document keyboard layout considerations (US QWERTY default)
 
 ### Networking (Pico W / Pico 2 W)
 - [x] Pico 2 W board support (LED via CYW43)

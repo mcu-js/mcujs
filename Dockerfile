@@ -23,6 +23,20 @@ RUN git clone --depth 1 --branch 2.2.0 https://github.com/raspberrypi/pico-sdk.g
 ENV JERRYSCRIPT_PATH=/opt/jerryscript
 RUN git clone --depth 1 --branch v3.0.0 https://github.com/pando-project/jerryscript.git ${JERRYSCRIPT_PATH}
 
+# Download FatFs R0.16
+ENV FATFS_PATH=/opt/fatfs
+RUN mkdir -p ${FATFS_PATH} \
+    && wget -q http://elm-chan.org/fsw/ff/arc/ff16.zip -O /tmp/ff16.zip \
+    && unzip -q /tmp/ff16.zip -d ${FATFS_PATH} \
+    && rm /tmp/ff16.zip \
+    && rm ${FATFS_PATH}/source/ffconf.h  # Remove default config, projects must provide their own
+
+# Download picojpeg v1.1
+ENV PICOJPEG_PATH=/opt/picojpeg
+RUN mkdir -p ${PICOJPEG_PATH} \
+    && wget -q https://raw.githubusercontent.com/richgel999/picojpeg/master/picojpeg.c -O ${PICOJPEG_PATH}/picojpeg.c \
+    && wget -q https://raw.githubusercontent.com/richgel999/picojpeg/master/picojpeg.h -O ${PICOJPEG_PATH}/picojpeg.h
+
 # Set working directory
 WORKDIR /workspace
 

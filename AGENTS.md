@@ -106,3 +106,37 @@ Filesystem size = Flash size - Firmware (~550KB) - EEPROM reservation (4KB):
 | waveshare_rp2040_zero | 2MB | ~1.4MB |
 | waveshare_rp2040_touch_lcd_1.28 | 4MB | ~3.4MB |
 | waveshare_rp2350_lcd_1.47_a | 16MB | ~15.4MB |
+
+## Dependency Management
+
+All third-party libraries are provided via the Docker build environment, NOT vendored in the repository. This keeps the repo focused on mcujs code and ensures consistent builds.
+
+### Current Dependencies (in Docker)
+
+| Library | Version | Path in Docker | Purpose |
+|---------|---------|----------------|---------|
+| Pico SDK | 2.2.0 | `/opt/pico-sdk` | Hardware abstraction, TinyUSB |
+| JerryScript | 3.0.0 | `/opt/jerryscript` | JavaScript engine |
+| FatFs | R0.16 | `/opt/fatfs` | FAT filesystem |
+| picojpeg | 1.1 | `/opt/picojpeg` | JPEG decoding |
+
+TinyUSB is included as part of the Pico SDK.
+
+### Adding New Dependencies
+
+When adding a new third-party library:
+
+1. **Add to Dockerfile** - Download/clone the library to `/opt/<library>`
+2. **Set environment variable** - `ENV <LIBRARY>_PATH=/opt/<library>`
+3. **Update CMakeLists.txt** - Reference via `$ENV{<LIBRARY>_PATH}`
+4. **Update CHANGELOG.md** - Add to Third-Party Libraries section
+5. **Update process.versions** - Add version in `host/bindings/process.c`
+6. **Rebuild Docker image** - `docker build -t mcujs-builder .`
+
+### Why Not Vendor Libraries?
+
+- Keeps repo small and focused on mcujs code
+- Single source of truth for dependency versions (Dockerfile)
+- Consistent with how Pico SDK and JerryScript are handled
+- Easier to audit third-party code (separate from project code)
+- Docker image caches dependencies, fast rebuilds

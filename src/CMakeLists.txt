@@ -12,9 +12,9 @@ add_library(mcujs_core STATIC
     filesystem/diskio.c
     filesystem/flash_ops.c
     
-    # FatFs library (ChaN's FAT filesystem)
-    ${CMAKE_SOURCE_DIR}/lib/fatfs/source/ff.c
-    ${CMAKE_SOURCE_DIR}/lib/fatfs/source/ffunicode.c
+    # FatFs library (ChaN's FAT filesystem) - from Docker environment
+    $ENV{FATFS_PATH}/source/ff.c
+    $ENV{FATFS_PATH}/source/ffunicode.c
     
     # Core functionality
     board.c
@@ -23,17 +23,18 @@ add_library(mcujs_core STATIC
 )
 
 target_include_directories(mcujs_core PUBLIC
+    # Our ffconf.h MUST come before FatFs source to override default config
+    ${CMAKE_CURRENT_SOURCE_DIR}/filesystem
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/usb
-    ${CMAKE_CURRENT_SOURCE_DIR}/filesystem
     ${CMAKE_SOURCE_DIR}/host
     ${CMAKE_SOURCE_DIR}/host/bindings
     ${CMAKE_SOURCE_DIR}/javascript
     ${CMAKE_SOURCE_DIR}/javascript/jerryscript-core
     ${CMAKE_SOURCE_DIR}/board
     ${CMAKE_SOURCE_DIR}/board/${BOARD}
-    # FatFs library headers
-    ${CMAKE_SOURCE_DIR}/lib/fatfs/source
+    # FatFs library headers - from Docker environment (AFTER our filesystem dir)
+    $ENV{FATFS_PATH}/source
 )
 
 target_link_libraries(mcujs_core PUBLIC

@@ -13,6 +13,7 @@
 /* Report IDs must match descriptor */
 #define REPORT_ID_KEYBOARD 1
 #define REPORT_ID_MOUSE    2
+#define REPORT_ID_CONSUMER 3
 
 /* Current keyboard state */
 static uint8_t keyboard_modifier = 0;
@@ -218,6 +219,43 @@ bool usb_hid_mouse_release(uint8_t button) {
 
 bool usb_hid_mouse_is_pressed(uint8_t button) {
     return (mouse_buttons & button) != 0;
+}
+
+/*--------------------------------------------------------------------
+ * Consumer Control (Media Keys) Functions
+ *--------------------------------------------------------------------*/
+
+/* Send a consumer control report */
+static bool send_consumer_report(uint16_t usage_code) {
+    if (!wait_hid_ready(10000)) {
+        return false;
+    }
+    bool result = tud_hid_report(REPORT_ID_CONSUMER, &usage_code, sizeof(usage_code));
+    /* Give USB stack time to send the report */
+    for (int i = 0; i < 1000; i++) {
+        tud_task();
+    }
+    return result;
+}
+
+bool usb_hid_consumer_press(uint16_t usage_code) {
+    return send_consumer_report(usage_code);
+}
+
+bool usb_hid_consumer_release(void) {
+    return send_consumer_report(0);
+}
+
+bool usb_hid_consumer_tap(uint16_t usage_code) {
+    bool result = usb_hid_consumer_press(usage_code);
+    if (result) {
+        /* Small delay for host to register */
+        for (int i = 0; i < 500; i++) {
+            tud_task();
+        }
+        result = usb_hid_consumer_release();
+    }
+    return result;
 }
 
 #endif /* CFG_TUD_HID */

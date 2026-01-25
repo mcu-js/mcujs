@@ -19,12 +19,15 @@
 /* Report IDs for composite HID */
 #define REPORT_ID_KEYBOARD 1
 #define REPORT_ID_MOUSE    2
+#define REPORT_ID_CONSUMER 3
 
 static uint8_t const desc_hid_report[] = {
     /* Keyboard */
     TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD)),
     /* Mouse */
     TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE)),
+    /* Consumer Control (media keys) */
+    TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(REPORT_ID_CONSUMER)),
 };
 
 /* Invoked when received GET HID REPORT DESCRIPTOR */

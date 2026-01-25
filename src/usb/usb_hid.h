@@ -64,6 +64,30 @@ bool usb_hid_mouse_release(uint8_t button);
 /* Check if a mouse button is pressed */
 bool usb_hid_mouse_is_pressed(uint8_t button);
 
+/*--------------------------------------------------------------------
+ * Consumer Control (Media Keys) Functions
+ *--------------------------------------------------------------------*/
+
+/* Consumer control usage codes (from TinyUSB hid.h) */
+#define USB_HID_CONSUMER_PLAY_PAUSE         0x00CD
+#define USB_HID_CONSUMER_SCAN_NEXT          0x00B5
+#define USB_HID_CONSUMER_SCAN_PREVIOUS      0x00B6
+#define USB_HID_CONSUMER_STOP               0x00B7
+#define USB_HID_CONSUMER_MUTE               0x00E2
+#define USB_HID_CONSUMER_VOLUME_INCREMENT   0x00E9
+#define USB_HID_CONSUMER_VOLUME_DECREMENT   0x00EA
+#define USB_HID_CONSUMER_BRIGHTNESS_INC     0x006F
+#define USB_HID_CONSUMER_BRIGHTNESS_DEC     0x0070
+
+/* Send a consumer control command (media key) */
+bool usb_hid_consumer_press(uint16_t usage_code);
+
+/* Release consumer control (send zero) */
+bool usb_hid_consumer_release(void);
+
+/* Tap a consumer key (press and release) */
+bool usb_hid_consumer_tap(uint16_t usage_code);
+
 #endif /* CFG_TUD_HID */
 
 #endif /* USB_HID_H */

@@ -114,6 +114,8 @@ static const key_mapping_t key_map[] = {
     {"printscreen", HID_KEY_PRINT_SCREEN, false},
     {"pause", HID_KEY_PAUSE, false},
     
+    /* Note: Media keys are handled separately via consumer control */
+    
     /* Punctuation (unshifted) */
     {"-", HID_KEY_MINUS, false},
     {"=", HID_KEY_EQUAL, false},
@@ -129,6 +131,66 @@ static const key_mapping_t key_map[] = {
     
     {NULL, 0, false}  /* End marker */
 };
+
+/*--------------------------------------------------------------------
+ * Media Key (Consumer Control) Mapping
+ *--------------------------------------------------------------------*/
+
+typedef struct {
+    const char *name;
+    uint16_t usage_code;
+} media_key_mapping_t;
+
+/* Map media key names to HID consumer usage codes */
+static const media_key_mapping_t media_key_map[] = {
+    /* Playback */
+    {"playpause", USB_HID_CONSUMER_PLAY_PAUSE},
+    {"play", USB_HID_CONSUMER_PLAY_PAUSE},
+    {"pause", USB_HID_CONSUMER_PLAY_PAUSE},  /* Note: overrides regular pause key for tap */
+    {"nexttrack", USB_HID_CONSUMER_SCAN_NEXT},
+    {"next", USB_HID_CONSUMER_SCAN_NEXT},
+    {"prevtrack", USB_HID_CONSUMER_SCAN_PREVIOUS},
+    {"prev", USB_HID_CONSUMER_SCAN_PREVIOUS},
+    {"previous", USB_HID_CONSUMER_SCAN_PREVIOUS},
+    {"stop", USB_HID_CONSUMER_STOP},
+    
+    /* Volume */
+    {"mute", USB_HID_CONSUMER_MUTE},
+    {"volumeup", USB_HID_CONSUMER_VOLUME_INCREMENT},
+    {"volup", USB_HID_CONSUMER_VOLUME_INCREMENT},
+    {"volumedown", USB_HID_CONSUMER_VOLUME_DECREMENT},
+    {"voldown", USB_HID_CONSUMER_VOLUME_DECREMENT},
+    
+    /* Brightness */
+    {"brightnessup", USB_HID_CONSUMER_BRIGHTNESS_INC},
+    {"brightup", USB_HID_CONSUMER_BRIGHTNESS_INC},
+    {"brightnessdown", USB_HID_CONSUMER_BRIGHTNESS_DEC},
+    {"brightdown", USB_HID_CONSUMER_BRIGHTNESS_DEC},
+    
+    {NULL, 0}  /* End marker */
+};
+
+/* Look up media key name, returns true if found */
+static bool lookup_media_key(const char *name, uint16_t *usage_code) {
+    /* Convert to lowercase for comparison */
+    char lower[32];
+    size_t len = strlen(name);
+    if (len >= sizeof(lower)) len = sizeof(lower) - 1;
+    for (size_t i = 0; i < len; i++) {
+        lower[i] = tolower((unsigned char)name[i]);
+    }
+    lower[len] = '\0';
+    
+    /* Search table */
+    for (const media_key_mapping_t *m = media_key_map; m->name != NULL; m++) {
+        if (strcmp(lower, m->name) == 0) {
+            *usage_code = m->usage_code;
+            return true;
+        }
+    }
+    
+    return false;
+}
 
 /* Convert character to keycode (for print function) */
 static bool char_to_keycode(char c, uint8_t *keycode, bool *needs_shift) {
@@ -307,6 +369,14 @@ static jerry_value_t keyboard_tap_handler(
                                                sizeof(key_name) - 1);
     key_name[len] = '\0';
     
+    /* Check for media keys first */
+    uint16_t media_code;
+    if (lookup_media_key(key_name, &media_code)) {
+        usb_hid_consumer_tap(media_code);
+        return jerry_undefined();
+    }
+    
+    /* Regular keyboard key */
     uint8_t keycode;
     if (!lookup_key(key_name, &keycode)) {
         return jerry_throw_sz(JERRY_ERROR_COMMON, "Unknown key");

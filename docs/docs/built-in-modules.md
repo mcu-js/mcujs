@@ -96,6 +96,8 @@ K.isPressed('shift');  // returns true/false
 - **Locks:** `capslock`, `numlock`, `scrolllock`
 - **Other:** `printscreen`, `pause`
 - **Punctuation:** `-`, `=`, `[`, `]`, `\`, `;`, `'`, `` ` ``, `,`, `.`, `/`
+- **Media:** `mute`, `volumeup`, `volumedown`, `playpause`, `nexttrack`, `prevtrack`, `stop`
+- **Brightness:** `brightnessup`, `brightnessdown`
 
 ### Example: Macro button
 

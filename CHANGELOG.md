@@ -34,6 +34,7 @@ All notable changes to mcujs will be documented in this file.
   - `keyboard.releaseAll()` - Release all keys (safety)
   - `keyboard.isPressed(key)` - Check if a key is pressed
   - Supported keys: letters, numbers, F1-F12, modifiers (ctrl, shift, alt, super/gui/cmd/win), arrows, enter, tab, space, backspace, delete, escape, home, end, pageup, pagedown, printscreen, and more
+  - Media keys: `mute`, `volumeup`, `volumedown`, `playpause`, `nexttrack`, `prevtrack`, `stop`, `brightnessup`, `brightnessdown`
 - `board` object - LED control, NeoPixel helper, system info, unique ID, memory stats
 - `mcujs:module` - Built-in module registry
 

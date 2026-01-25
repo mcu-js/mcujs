@@ -6,6 +6,7 @@ add_library(mcujs_core STATIC
     usb/usb_cdc.c
     usb/usb_descriptors.c
     usb/usb_msc.c
+    usb/usb_hid.c
     
     # Filesystem (FatFs + flash driver)
     filesystem/fs.c

@@ -17,6 +17,7 @@ add_library(mcujs_bindings STATIC
     require.c
     graphics.c
     image.c
+    keyboard.c
     $ENV{PICOJPEG_PATH}/picojpeg.c
 )
 
@@ -48,6 +49,7 @@ target_link_libraries(mcujs_bindings PUBLIC
     hardware_timer
     hardware_pio
     hardware_dma
+    tinyusb_device
 )
 
 # Add CYW43 driver for WiFi boards (Pico W, Pico 2 W)

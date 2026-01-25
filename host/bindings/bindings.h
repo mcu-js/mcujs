@@ -161,4 +161,9 @@ jerry_value_t js_create_graphics_module(void);
  */
 jerry_value_t js_create_image_module(void);
 
+/*
+ * Create keyboard module object (USB HID keyboard)
+ */
+jerry_value_t js_create_keyboard_module(void);
+
 #endif /* MCUJS_BINDINGS_H */

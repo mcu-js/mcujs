@@ -1,7 +1,7 @@
 /*
  * mcujs - USB Descriptors
  * 
- * USB CDC + MSC composite device descriptors
+ * USB CDC + MSC + HID composite device descriptors
  * Based on TinyUSB composite device example
  */
 
@@ -10,6 +10,30 @@
 #include "board_config.h"
 #include <string.h>
 #include <stdio.h>
+
+/*--------------------------------------------------------------------
+ * HID Report Descriptor - Keyboard + Mouse Composite
+ *--------------------------------------------------------------------*/
+#if CFG_TUD_HID
+
+/* Report IDs for composite HID */
+#define REPORT_ID_KEYBOARD 1
+#define REPORT_ID_MOUSE    2
+
+static uint8_t const desc_hid_report[] = {
+    /* Keyboard */
+    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD)),
+    /* Mouse */
+    TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE)),
+};
+
+/* Invoked when received GET HID REPORT DESCRIPTOR */
+uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) {
+    (void)instance;
+    return desc_hid_report;
+}
+
+#endif /* CFG_TUD_HID */
 
 /*--------------------------------------------------------------------
  * Device Descriptors
@@ -58,6 +82,9 @@ enum {
 #if CFG_TUD_MSC
     ITF_NUM_MSC,
 #endif
+#if CFG_TUD_HID
+    ITF_NUM_HID,
+#endif
     ITF_NUM_TOTAL
 };
 
@@ -67,12 +94,12 @@ enum {
 #define EPNUM_CDC_IN      0x82  /* EP 2 IN - CDC data */
 #define EPNUM_MSC_OUT     0x03  /* EP 3 OUT - MSC data */
 #define EPNUM_MSC_IN      0x83  /* EP 3 IN - MSC data */
+#define EPNUM_HID_IN      0x84  /* EP 4 IN - HID data */
 
-#if CFG_TUD_MSC
-#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN)
-#else
-#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN)
-#endif
+/* Calculate total config descriptor length */
+#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + \
+                           (CFG_TUD_MSC ? TUD_MSC_DESC_LEN : 0) + \
+                           (CFG_TUD_HID ? TUD_HID_DESC_LEN : 0))
 
 static uint8_t const desc_configuration[] = {
     /* Config descriptor: config number, interface count, string index, total length, attribute, power in mA */
@@ -84,6 +111,11 @@ static uint8_t const desc_configuration[] = {
 #if CFG_TUD_MSC
     /* MSC descriptor: interface number, string index, EP out, EP in, EP size */
     TUD_MSC_DESCRIPTOR(ITF_NUM_MSC, 5, EPNUM_MSC_OUT, EPNUM_MSC_IN, 64),
+#endif
+
+#if CFG_TUD_HID
+    /* HID descriptor: interface number, string index, protocol, report desc len, EP in, EP size, polling interval */
+    TUD_HID_DESCRIPTOR(ITF_NUM_HID, 6, HID_ITF_PROTOCOL_NONE, sizeof(desc_hid_report), EPNUM_HID_IN, CFG_TUD_HID_EP_BUFSIZE, 10),
 #endif
 };
 
@@ -104,6 +136,7 @@ enum {
     STRID_SERIAL,
     STRID_CDC_INTERFACE,
     STRID_MSC_INTERFACE,
+    STRID_HID_INTERFACE,
 };
 
 /* Strings array */
@@ -114,6 +147,7 @@ static char const *string_desc_arr[] = {
     NULL,                         /* 3: Serial number (generated at runtime) */
     "mcujs Serial Console",       /* 4: CDC Interface */
     "mcujs Flash Storage",        /* 5: MSC Interface */
+    "mcujs Keyboard/Mouse",       /* 6: HID Interface */
 };
 
 /* Buffer for string descriptor */

@@ -61,8 +61,11 @@ extern "C" {
 #define CFG_TUD_MSC 1
 #define CFG_TUD_MSC_EP_BUFSIZE 512
 
+/* HID - Human Interface Device (Keyboard/Mouse) */
+#define CFG_TUD_HID 1
+#define CFG_TUD_HID_EP_BUFSIZE 16
+
 /* Unused classes */
-#define CFG_TUD_HID 0
 #define CFG_TUD_MIDI 0
 #define CFG_TUD_VENDOR 0
 

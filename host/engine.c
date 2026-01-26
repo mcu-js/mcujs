@@ -15,7 +15,9 @@
 
 /* Engine state */
 static bool s_initialized = false;
-static char s_error_message[256];
+static char s_error_message[512];  /* Increased for stack traces */
+static char s_backtrace[384];      /* Captured at throw time */
+static size_t s_backtrace_len = 0;
 
 /*
  * Convert JerryScript value to string
@@ -44,7 +46,106 @@ static size_t value_to_string(jerry_value_t value, char *buf, size_t buf_len) {
 }
 
 /*
- * Store error message from exception value
+ * Backtrace callback to build stack trace string
+ */
+typedef struct {
+    char *buf;
+    size_t buf_len;
+    size_t offset;
+    int frame_count;
+} backtrace_context_t;
+
+static bool backtrace_callback(jerry_frame_t *frame_p, void *user_p) {
+    backtrace_context_t *ctx = (backtrace_context_t *)user_p;
+    
+    /* Limit stack depth */
+    if (ctx->frame_count >= 5) {
+        return false;  /* Stop iteration */
+    }
+    
+    /* Get frame type */
+    jerry_frame_type_t frame_type = jerry_frame_type(frame_p);
+    if (frame_type != JERRY_BACKTRACE_FRAME_JS) {
+        return true;  /* Skip non-JS frames */
+    }
+    
+    /* Get location info */
+    const jerry_frame_location_t *location = jerry_frame_location(frame_p);
+    
+    /* Get function name if available */
+    const jerry_value_t *callee = jerry_frame_callee(frame_p);
+    char func_name[32] = "<anonymous>";
+    
+    if (callee != NULL && jerry_value_is_function(*callee)) {
+        jerry_value_t name_prop = jerry_string_sz("name");
+        jerry_value_t name_val = jerry_object_get(*callee, name_prop);
+        jerry_value_free(name_prop);
+        
+        if (jerry_value_is_string(name_val)) {
+            jerry_size_t len = jerry_string_size(name_val, JERRY_ENCODING_UTF8);
+            if (len > 0 && len < sizeof(func_name)) {
+                jerry_string_to_buffer(name_val, JERRY_ENCODING_UTF8, 
+                                       (jerry_char_t *)func_name, len);
+                func_name[len] = '\0';
+            }
+        }
+        jerry_value_free(name_val);
+    }
+    
+    /* Format frame info */
+    int written;
+    if (location != NULL && jerry_value_is_string(location->source_name)) {
+        /* Get source name */
+        char source[64] = "<input>";
+        jerry_size_t src_len = jerry_string_size(location->source_name, JERRY_ENCODING_UTF8);
+        if (src_len > 0 && src_len < sizeof(source)) {
+            jerry_string_to_buffer(location->source_name, JERRY_ENCODING_UTF8,
+                                   (jerry_char_t *)source, src_len);
+            source[src_len] = '\0';
+        }
+        
+        written = snprintf(ctx->buf + ctx->offset, ctx->buf_len - ctx->offset,
+                          "\r\n    at %s (%s:%u:%u)",
+                          func_name, source,
+                          (unsigned)location->line, (unsigned)location->column);
+    } else if (location != NULL) {
+        written = snprintf(ctx->buf + ctx->offset, ctx->buf_len - ctx->offset,
+                          "\r\n    at %s (line %u)",
+                          func_name, (unsigned)location->line);
+    } else {
+        written = snprintf(ctx->buf + ctx->offset, ctx->buf_len - ctx->offset,
+                          "\r\n    at %s", func_name);
+    }
+    
+    if (written > 0 && ctx->offset + written < ctx->buf_len) {
+        ctx->offset += written;
+    }
+    
+    ctx->frame_count++;
+    return true;  /* Continue iteration */
+}
+
+/*
+ * VM throw callback - captures backtrace at throw time when stack is still intact
+ */
+static void throw_callback(const jerry_value_t exception_value, void *user_p) {
+    (void)exception_value;
+    (void)user_p;
+    
+    /* Capture backtrace into static buffer */
+    backtrace_context_t ctx = {
+        .buf = s_backtrace,
+        .buf_len = sizeof(s_backtrace),
+        .offset = 0,
+        .frame_count = 0
+    };
+    
+    jerry_backtrace_capture(backtrace_callback, &ctx);
+    s_backtrace_len = ctx.offset;
+}
+
+/*
+ * Store error message from exception value, append captured backtrace
  */
 static void store_error(jerry_value_t error_value) {
     jerry_value_t error_obj = jerry_exception_value(error_value, false);
@@ -54,15 +155,25 @@ static void store_error(jerry_value_t error_value) {
     jerry_value_t msg_value = jerry_object_get(error_obj, msg_prop);
     jerry_value_free(msg_prop);
     
+    size_t msg_len = 0;
     if (!jerry_value_is_exception(msg_value) && jerry_value_is_string(msg_value)) {
-        value_to_string(msg_value, s_error_message, sizeof(s_error_message));
+        msg_len = value_to_string(msg_value, s_error_message, sizeof(s_error_message));
     } else {
         /* Fall back to converting entire error object */
-        value_to_string(error_obj, s_error_message, sizeof(s_error_message));
+        msg_len = value_to_string(error_obj, s_error_message, sizeof(s_error_message));
     }
     
     jerry_value_free(msg_value);
     jerry_value_free(error_obj);
+    
+    /* Append captured backtrace if available */
+    if (s_backtrace_len > 0 && msg_len + s_backtrace_len < sizeof(s_error_message)) {
+        memcpy(s_error_message + msg_len, s_backtrace, s_backtrace_len);
+        s_error_message[msg_len + s_backtrace_len] = '\0';
+    }
+    
+    /* Clear captured backtrace for next error */
+    s_backtrace_len = 0;
 }
 
 js_result_t js_engine_init(void) {
@@ -72,9 +183,14 @@ js_result_t js_engine_init(void) {
     
     /* Clear error state */
     s_error_message[0] = '\0';
+    s_backtrace[0] = '\0';
+    s_backtrace_len = 0;
     
     /* Initialize JerryScript */
     jerry_init(JERRY_INIT_EMPTY);
+    
+    /* Register throw callback to capture backtraces at throw time */
+    jerry_on_throw(throw_callback, NULL);
     
     /* Register native bindings */
     js_register_bindings();
@@ -98,6 +214,12 @@ void js_engine_cleanup(void) {
 
 js_result_t js_engine_exec(const char *code, size_t code_len, 
                            char *result_buf, size_t result_buf_len) {
+    return js_engine_exec_named(code, code_len, "<input>", result_buf, result_buf_len);
+}
+
+js_result_t js_engine_exec_named(const char *code, size_t code_len,
+                                  const char *source_name,
+                                  char *result_buf, size_t result_buf_len) {
     if (!s_initialized) {
         snprintf(s_error_message, sizeof(s_error_message), "Engine not initialized");
         return JS_ERROR_INIT;
@@ -107,8 +229,16 @@ js_result_t js_engine_exec(const char *code, size_t code_len,
         return JS_OK;
     }
     
+    /* Set up parse options with source name */
+    jerry_parse_options_t parse_options;
+    memset(&parse_options, 0, sizeof(parse_options));
+    parse_options.options = JERRY_PARSE_HAS_SOURCE_NAME;
+    parse_options.source_name = jerry_string_sz(source_name ? source_name : "<input>");
+    
     /* Parse and execute */
-    jerry_value_t parsed = jerry_parse((const jerry_char_t *)code, code_len, NULL);
+    jerry_value_t parsed = jerry_parse((const jerry_char_t *)code, code_len, &parse_options);
+    
+    jerry_value_free(parse_options.source_name);
     
     if (jerry_value_is_exception(parsed)) {
         store_error(parsed);
@@ -155,8 +285,8 @@ js_result_t js_engine_exec_file(const char *filename) {
         return read_result;
     }
     
-    /* Execute the code */
-    js_result_t exec_result = js_engine_exec(content, content_len, NULL, 0);
+    /* Execute the code with filename for stack traces */
+    js_result_t exec_result = js_engine_exec_named(content, content_len, filename, NULL, 0);
     
     /* Free file content */
     js_module_free_file(content);

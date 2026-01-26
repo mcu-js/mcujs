@@ -97,7 +97,7 @@ bool boot_run_file(const char* filename) {
     js_result_t result = js_engine_exec_file(filename);
     
     if (result != JS_OK) {
-        char error_buf[128];
+        char error_buf[512];  /* Larger buffer for stack traces */
         size_t len = js_engine_get_error(error_buf, sizeof(error_buf));
         if (len > 0) {
             boot_error(error_buf);

@@ -70,7 +70,7 @@ while (1) {
 - [x] Multi-line paste support
 
 ### Error Handling
-- [ ] Stack traces with line numbers
+- [x] Stack traces with line numbers
 - [ ] Source map support for debugging
 - [ ] Better error messages for common mistakes
 - [ ] Catch and report uncaught promise rejections

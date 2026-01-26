@@ -83,6 +83,7 @@ Full `require()` implementation for modular code:
 - Command history with Up/Down arrow keys (8 entries stored)
 - Line editing with Left/Right arrows, Home/End, Backspace anywhere
 - Tab completion for global objects and properties (includes REPL-defined globals)
+- **Stack traces**: Errors show function names, source file, and line/column numbers
 - Built-in commands:
   - `.help` - Show available commands
   - `.info` - Show board info (chip, memory, filesystem, build)

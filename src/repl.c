@@ -499,7 +499,7 @@ static void repl_process_line(void) {
             repl_print_result(result_buf);
         }
     } else {
-        char error_buf[128];
+        char error_buf[512];  /* Larger buffer for stack traces */
         js_engine_get_error(error_buf, sizeof(error_buf));
         repl_print_error(error_buf);
     }
@@ -753,7 +753,7 @@ static void repl_paste_finish(void) {
                 repl_print_result(result_buf);
             }
         } else {
-            char error_buf[128];
+            char error_buf[512];  /* Larger buffer for stack traces */
             js_engine_get_error(error_buf, sizeof(error_buf));
             repl_print_error(error_buf);
         }
@@ -876,7 +876,7 @@ static void repl_handle_command(const char* cmd) {
         fs_invalidate();  /* Refresh to see USB changes */
         js_result_t result = js_engine_exec_file(filename);
         if (result != JS_OK) {
-            char error_buf[128];
+            char error_buf[512];  /* Larger buffer for stack traces */
             js_engine_get_error(error_buf, sizeof(error_buf));
             repl_print_error(error_buf);
         }

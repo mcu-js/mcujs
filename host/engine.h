@@ -52,6 +52,21 @@ js_result_t js_engine_exec(const char *code, size_t code_len,
                            char *result_buf, size_t result_buf_len);
 
 /*
+ * Execute JavaScript code with a source name (for stack traces)
+ * 
+ * @param code: JavaScript source code
+ * @param code_len: Length of code string
+ * @param source_name: Name of source (e.g., filename) for error messages
+ * @param result_buf: Buffer to store string result (can be NULL)
+ * @param result_buf_len: Size of result buffer
+ * 
+ * Returns: JS_OK on success, error code otherwise
+ */
+js_result_t js_engine_exec_named(const char *code, size_t code_len,
+                                  const char *source_name,
+                                  char *result_buf, size_t result_buf_len);
+
+/*
  * Execute JavaScript code from a file
  * 
  * @param filename: Path to JavaScript file

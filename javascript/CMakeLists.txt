@@ -55,7 +55,7 @@ if(JERRY_AMALGAM)
         JERRY_SYSTEM_ALLOCATOR=0
         JERRY_VALGRIND=0
         JERRY_VM_HALT=0
-        JERRY_VM_THROW=0
+        JERRY_VM_THROW=1
     )
     
     target_link_libraries(mcujs_jerry PUBLIC
@@ -78,6 +78,7 @@ else()
         set(JERRY_PARSER ON CACHE BOOL "" FORCE)
         set(JERRY_SNAPSHOT_EXEC OFF CACHE BOOL "" FORCE)
         set(JERRY_SNAPSHOT_SAVE OFF CACHE BOOL "" FORCE)
+        set(JERRY_VM_THROW ON CACHE BOOL "" FORCE)
         
         add_subdirectory(${JERRYSCRIPT_PATH} ${CMAKE_CURRENT_BINARY_DIR}/jerryscript EXCLUDE_FROM_ALL)
         

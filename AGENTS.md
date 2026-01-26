@@ -146,3 +146,72 @@ When adding a new third-party library:
 - Consistent with how Pico SDK and JerryScript are handled
 - Easier to audit third-party code (separate from project code)
 - Docker image caches dependencies, fast rebuilds
+
+## Writing Example Code
+
+### Animation and Game Loops
+
+**NEVER use `while(true)` loops** - they block the REPL and require a device reset.
+
+Instead, use `setInterval` and `setTimeout`:
+
+```javascript
+// Good: Non-blocking animation loop
+var running = true;
+
+function animate() {
+  // Draw frame
+  screen.clear();
+  screen.fillCircle(x, y, 10, screen.RED);
+  screen.flush();
+  
+  // Update state
+  x += vx;
+  y += vy;
+}
+
+var interval = setInterval(animate, 16);  // ~60 FPS
+
+// Stop after 30 seconds
+setTimeout(function() {
+  clearInterval(interval);
+  console.log('Demo complete!');
+}, 30000);
+```
+
+```javascript
+// Bad: Blocks REPL, requires reset to stop
+while (true) {
+  animate();
+  board.delay(16);
+}
+```
+
+### Demo File Conventions
+
+- Demos should run for a fixed duration (15-60 seconds) then exit cleanly
+- Print "Demo complete!" when finished
+- Use `console.log()` to show progress and instructions
+- Include comments explaining what the demo does
+
+### Testing Examples Before Committing
+
+Always test example code on the actual device before committing:
+
+1. Copy files to device filesystem:
+   ```bash
+   cp examples/board-name/*.js /run/media/$USER/MCUJS/lib/board-name/
+   sync
+   ```
+
+2. Reset device to clear require cache:
+   ```bash
+   python3 -c "
+   import serial
+   ser = serial.Serial('/dev/ttyACM0', 115200, timeout=2)
+   ser.write(b'board.reset()\r')
+   ser.close()
+   "
+   ```
+
+3. Run the demo via REPL and verify it works correctly

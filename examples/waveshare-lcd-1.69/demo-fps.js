@@ -1,7 +1,7 @@
 // demo-fps.js - FPS Benchmark for Waveshare RP2350-Touch-LCD-1.69
 // Measures frame rate with bouncing balls animation
 
-var screen = require('./lib/waveshare-lcd-1.69/screen.js').createScreen();
+var screen = require('./screen.js').createScreen();
 
 screen.init();
 

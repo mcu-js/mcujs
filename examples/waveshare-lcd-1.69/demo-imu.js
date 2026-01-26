@@ -1,8 +1,8 @@
 // demo-imu.js - IMU Bubble Level Demo for Waveshare RP2350-Touch-LCD-1.69
 // Shows a bubble that moves based on device tilt
 
-var screen = require('./lib/waveshare-lcd-1.69/screen.js').createScreen();
-var imu = require('./lib/waveshare-lcd-1.69/qmi8658.js').createIMUDriver();
+var screen = require('./screen.js').createScreen();
+var imu = require('./qmi8658.js').createIMUDriver();
 
 screen.init();
 imu.init();

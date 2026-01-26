@@ -1,8 +1,8 @@
 // demo-touch.js - Touch Drawing Demo for Waveshare RP2350-Touch-LCD-1.69
 // Draw on the screen with your finger
 
-var screen = require('./lib/waveshare-lcd-1.69/screen.js').createScreen();
-var touch = require('./lib/waveshare-lcd-1.69/cst816s.js').createTouchDriver();
+var screen = require('./screen.js').createScreen();
+var touch = require('./cst816s.js').createTouchDriver();
 
 screen.init();
 touch.init();

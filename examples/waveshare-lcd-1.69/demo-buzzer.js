@@ -1,7 +1,7 @@
 // demo-buzzer.js - Buzzer Demo for Waveshare RP2350-Touch-LCD-1.69
 // Plays all the melodies
 
-var buzzer = require('./lib/waveshare-lcd-1.69/buzzer.js');
+var buzzer = require('./buzzer.js');
 
 console.log('Buzzer Demo');
 console.log('Playing all 6 melodies...');

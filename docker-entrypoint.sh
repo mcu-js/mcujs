@@ -56,16 +56,17 @@ case "${BOARDS}" in
         build_board "pico2"
         build_board "pico2_w"
         build_board "waveshare_rp2040_zero"
+        build_board "waveshare_rp2040_pizero"
         build_board "waveshare_rp2040_touch_lcd_1.28"
         build_board "waveshare_rp2350_lcd_1.47_a"
         build_board "waveshare_rp2350_touch_lcd_1.69"
         ;;
-    "pico"|"pico2"|"pico2_w"|"waveshare_rp2040_zero"|"waveshare_rp2040_touch_lcd_1.28"|"waveshare_rp2350_lcd_1.47_a"|"waveshare_rp2350_touch_lcd_1.69")
+    "pico"|"pico2"|"pico2_w"|"waveshare_rp2040_zero"|"waveshare_rp2040_pizero"|"waveshare_rp2040_touch_lcd_1.28"|"waveshare_rp2350_lcd_1.47_a"|"waveshare_rp2350_touch_lcd_1.69")
         build_board "${BOARDS}"
         ;;
     *)
         log_error "Unknown board: ${BOARDS}"
-        log_info "Available boards: pico, pico2, pico2_w, waveshare_rp2040_zero, waveshare_rp2040_touch_lcd_1.28, waveshare_rp2350_lcd_1.47_a, waveshare_rp2350_touch_lcd_1.69, all"
+        log_info "Available boards: pico, pico2, pico2_w, waveshare_rp2040_zero, waveshare_rp2040_pizero, waveshare_rp2040_touch_lcd_1.28, waveshare_rp2350_lcd_1.47_a, waveshare_rp2350_touch_lcd_1.69, all"
         exit 1
         ;;
 esac

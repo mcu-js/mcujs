@@ -766,6 +766,7 @@ void js_register_bindings(void) {
     js_bind_process();
     js_bind_require();
     js_bind_graphics();
+    js_bind_screen();
 }
 
 bool js_engine_process_timers(void) {

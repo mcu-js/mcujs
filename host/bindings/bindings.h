@@ -171,4 +171,15 @@ jerry_value_t js_create_keyboard_module(void);
  */
 jerry_value_t js_create_mouse_module(void);
 
+/*
+ * Register screen bindings (unified display API)
+ * screen.init(), screen.fill(), screen.fillRect(), screen.show(), etc.
+ */
+void js_bind_screen(void);
+
+/*
+ * Create screen module object
+ */
+jerry_value_t js_create_screen_module(void);
+
 #endif /* MCUJS_BINDINGS_H */

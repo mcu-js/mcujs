@@ -19,6 +19,114 @@ static char s_error_message[512];  /* Increased for stack traces */
 static char s_backtrace[384];      /* Captured at throw time */
 static size_t s_backtrace_len = 0;
 
+/* Suggestion state - captured when looking for "did you mean?" */
+static char s_suggestion[64];
+static bool s_has_suggestion = false;
+
+/* REPL-defined global identifiers (for tab completion and suggestions) */
+#define REPL_GLOBAL_MAX 64
+#define REPL_GLOBAL_NAME_MAX 32
+static char s_repl_globals[REPL_GLOBAL_MAX][REPL_GLOBAL_NAME_MAX];
+static uint8_t s_repl_global_count = 0;
+
+/*
+ * Compute Levenshtein edit distance between two strings.
+ * Uses O(min(m,n)) space by only keeping two rows.
+ * Returns distance, or max_dist+1 if distance exceeds max_dist (early exit).
+ */
+static int levenshtein_distance(const char *s1, const char *s2, int max_dist) {
+    int len1 = strlen(s1);
+    int len2 = strlen(s2);
+    
+    /* Quick length-based pruning */
+    int len_diff = len1 > len2 ? len1 - len2 : len2 - len1;
+    if (len_diff > max_dist) {
+        return max_dist + 1;
+    }
+    
+    /* Ensure s1 is the shorter string for space efficiency */
+    if (len1 > len2) {
+        const char *tmp = s1; s1 = s2; s2 = tmp;
+        int t = len1; len1 = len2; len2 = t;
+    }
+    
+    /* Use static buffer - limit string length to avoid overflow */
+    if (len1 > 63) return max_dist + 1;
+    
+    int prev[64], curr[64];
+    
+    /* Initialize first row */
+    for (int j = 0; j <= len1; j++) {
+        prev[j] = j;
+    }
+    
+    /* Fill in the rest */
+    for (int i = 1; i <= len2; i++) {
+        curr[0] = i;
+        int min_in_row = i;
+        
+        for (int j = 1; j <= len1; j++) {
+            int cost = (s1[j-1] == s2[i-1]) ? 0 : 1;
+            
+            /* Minimum of insert, delete, replace */
+            int insert_cost = curr[j-1] + 1;
+            int delete_cost = prev[j] + 1;
+            int replace_cost = prev[j-1] + cost;
+            
+            curr[j] = insert_cost;
+            if (delete_cost < curr[j]) curr[j] = delete_cost;
+            if (replace_cost < curr[j]) curr[j] = replace_cost;
+            
+            if (curr[j] < min_in_row) min_in_row = curr[j];
+        }
+        
+        /* Early exit if minimum in row exceeds max_dist */
+        if (min_in_row > max_dist) {
+            return max_dist + 1;
+        }
+        
+        /* Swap rows */
+        for (int j = 0; j <= len1; j++) {
+            prev[j] = curr[j];
+        }
+    }
+    
+    return prev[len1];
+}
+
+/*
+ * Context for finding best suggestion
+ */
+typedef struct {
+    const char *target;     /* The misspelled name */
+    char *best_match;       /* Buffer for best match */
+    size_t best_match_len;  /* Size of buffer */
+    int best_distance;      /* Distance of best match */
+    int max_distance;       /* Maximum acceptable distance */
+} suggestion_ctx_t;
+
+/*
+ * Callback to check each candidate against target
+ */
+static bool suggestion_callback(const char *name, void *user_data) {
+    suggestion_ctx_t *ctx = (suggestion_ctx_t *)user_data;
+    
+    /* Skip if name is same as target */
+    if (strcmp(name, ctx->target) == 0) {
+        return true;
+    }
+    
+    int dist = levenshtein_distance(ctx->target, name, ctx->max_distance);
+    
+    if (dist < ctx->best_distance) {
+        ctx->best_distance = dist;
+        strncpy(ctx->best_match, name, ctx->best_match_len - 1);
+        ctx->best_match[ctx->best_match_len - 1] = '\0';
+    }
+    
+    return true;  /* Continue iteration */
+}
+
 /*
  * Convert JerryScript value to string
  */
@@ -126,11 +234,167 @@ static bool backtrace_callback(jerry_frame_t *frame_p, void *user_p) {
 }
 
 /*
- * VM throw callback - captures backtrace at throw time when stack is still intact
+ * Find a suggestion for an undefined identifier by searching globals
+ */
+static void find_global_suggestion(const char *name) {
+    s_has_suggestion = false;
+    s_suggestion[0] = '\0';
+    
+    if (name == NULL || name[0] == '\0') {
+        return;
+    }
+    
+    /* Calculate max distance based on name length */
+    int name_len = strlen(name);
+    int max_dist = (name_len <= 3) ? 1 : (name_len <= 6) ? 2 : 3;
+    
+    suggestion_ctx_t ctx = {
+        .target = name,
+        .best_match = s_suggestion,
+        .best_match_len = sizeof(s_suggestion),
+        .best_distance = max_dist + 1,
+        .max_distance = max_dist
+    };
+    
+    /* Search global object properties */
+    jerry_value_t global = jerry_current_realm();
+    jerry_value_t keys = jerry_object_keys(global);
+    
+    if (!jerry_value_is_exception(keys)) {
+        uint32_t length = jerry_array_length(keys);
+        
+        for (uint32_t i = 0; i < length; i++) {
+            jerry_value_t key = jerry_object_get_index(keys, i);
+            if (jerry_value_is_string(key)) {
+                char key_buf[64];
+                jerry_size_t key_len = jerry_string_size(key, JERRY_ENCODING_UTF8);
+                if (key_len < sizeof(key_buf)) {
+                    jerry_string_to_buffer(key, JERRY_ENCODING_UTF8,
+                                          (jerry_char_t *)key_buf, sizeof(key_buf));
+                    key_buf[key_len] = '\0';
+                    suggestion_callback(key_buf, &ctx);
+                }
+            }
+            jerry_value_free(key);
+        }
+        jerry_value_free(keys);
+    }
+    jerry_value_free(global);
+    
+    /* Also search REPL-defined globals */
+    for (uint8_t i = 0; i < s_repl_global_count; i++) {
+        suggestion_callback(s_repl_globals[i], &ctx);
+    }
+    
+    if (ctx.best_distance <= max_dist) {
+        s_has_suggestion = true;
+    }
+}
+
+/*
+ * Find a suggestion for an undefined property on an object
+ */
+static void find_property_suggestion(jerry_value_t obj, const char *name) {
+    s_has_suggestion = false;
+    s_suggestion[0] = '\0';
+    
+    if (name == NULL || name[0] == '\0') {
+        return;
+    }
+    
+    int name_len = strlen(name);
+    int max_dist = (name_len <= 3) ? 1 : (name_len <= 6) ? 2 : 3;
+    
+    suggestion_ctx_t ctx = {
+        .target = name,
+        .best_match = s_suggestion,
+        .best_match_len = sizeof(s_suggestion),
+        .best_distance = max_dist + 1,
+        .max_distance = max_dist
+    };
+    
+    jerry_value_t keys = jerry_object_keys(obj);
+    
+    if (!jerry_value_is_exception(keys)) {
+        uint32_t length = jerry_array_length(keys);
+        
+        for (uint32_t i = 0; i < length; i++) {
+            jerry_value_t key = jerry_object_get_index(keys, i);
+            if (jerry_value_is_string(key)) {
+                char key_buf[64];
+                jerry_size_t key_len = jerry_string_size(key, JERRY_ENCODING_UTF8);
+                if (key_len < sizeof(key_buf)) {
+                    jerry_string_to_buffer(key, JERRY_ENCODING_UTF8,
+                                          (jerry_char_t *)key_buf, sizeof(key_buf));
+                    key_buf[key_len] = '\0';
+                    suggestion_callback(key_buf, &ctx);
+                }
+            }
+            jerry_value_free(key);
+        }
+        jerry_value_free(keys);
+    }
+    
+    if (ctx.best_distance <= max_dist) {
+        s_has_suggestion = true;
+    }
+}
+
+/*
+ * Extract identifier from error message patterns
+ * Returns true if found, with name copied to buffer
+ */
+static bool extract_undefined_name(const char *msg, char *name, size_t name_len) {
+    /* Pattern: "X is not defined" */
+    const char *suffix = " is not defined";
+    const char *pos = strstr(msg, suffix);
+    if (pos != NULL && pos > msg) {
+        size_t len = pos - msg;
+        if (len < name_len) {
+            memcpy(name, msg, len);
+            name[len] = '\0';
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool extract_not_function_name(const char *msg, char *obj_name, size_t obj_len,
+                                       char *prop_name, size_t prop_len) {
+    /* Pattern: "X.Y is not a function" or "X is not a function" */
+    const char *suffix = " is not a function";
+    const char *pos = strstr(msg, suffix);
+    if (pos != NULL && pos > msg) {
+        size_t len = pos - msg;
+        char temp[128];
+        if (len < sizeof(temp)) {
+            memcpy(temp, msg, len);
+            temp[len] = '\0';
+            
+            /* Look for dot */
+            char *dot = strrchr(temp, '.');
+            if (dot != NULL) {
+                *dot = '\0';
+                strncpy(obj_name, temp, obj_len - 1);
+                obj_name[obj_len - 1] = '\0';
+                strncpy(prop_name, dot + 1, prop_len - 1);
+                prop_name[prop_len - 1] = '\0';
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/*
+ * VM throw callback - captures backtrace and finds suggestions at throw time
  */
 static void throw_callback(const jerry_value_t exception_value, void *user_p) {
-    (void)exception_value;
     (void)user_p;
+    
+    /* Clear previous suggestion */
+    s_has_suggestion = false;
+    s_suggestion[0] = '\0';
     
     /* Capture backtrace into static buffer */
     backtrace_context_t ctx = {
@@ -142,10 +406,55 @@ static void throw_callback(const jerry_value_t exception_value, void *user_p) {
     
     jerry_backtrace_capture(backtrace_callback, &ctx);
     s_backtrace_len = ctx.offset;
+    
+    /* Try to get error message and find suggestions */
+    jerry_value_t error_obj = jerry_exception_value(exception_value, false);
+    jerry_value_t msg_prop = jerry_string_sz("message");
+    jerry_value_t msg_value = jerry_object_get(error_obj, msg_prop);
+    jerry_value_free(msg_prop);
+    
+    if (!jerry_value_is_exception(msg_value) && jerry_value_is_string(msg_value)) {
+        char msg[256];
+        jerry_size_t msg_len = jerry_string_size(msg_value, JERRY_ENCODING_UTF8);
+        if (msg_len < sizeof(msg)) {
+            jerry_string_to_buffer(msg_value, JERRY_ENCODING_UTF8,
+                                  (jerry_char_t *)msg, sizeof(msg));
+            msg[msg_len] = '\0';
+            
+            /* Check for "X is not defined" (ReferenceError) */
+            char name[64];
+            if (extract_undefined_name(msg, name, sizeof(name))) {
+                find_global_suggestion(name);
+            }
+            /* Check for "X.Y is not a function" (TypeError) */
+            else {
+                char obj_name[64], prop_name[64];
+                if (extract_not_function_name(msg, obj_name, sizeof(obj_name),
+                                              prop_name, sizeof(prop_name))) {
+                    /* Try to get the object and search its properties */
+                    jerry_value_t parsed = jerry_parse((const jerry_char_t *)obj_name,
+                                                       strlen(obj_name), NULL);
+                    if (!jerry_value_is_exception(parsed)) {
+                        jerry_value_t obj = jerry_run(parsed);
+                        jerry_value_free(parsed);
+                        if (!jerry_value_is_exception(obj)) {
+                            find_property_suggestion(obj, prop_name);
+                            jerry_value_free(obj);
+                        }
+                    } else {
+                        jerry_value_free(parsed);
+                    }
+                }
+            }
+        }
+    }
+    
+    jerry_value_free(msg_value);
+    jerry_value_free(error_obj);
 }
 
 /*
- * Store error message from exception value, append captured backtrace
+ * Store error message from exception value, append suggestion and backtrace
  */
 static void store_error(jerry_value_t error_value) {
     jerry_value_t error_obj = jerry_exception_value(error_value, false);
@@ -165,6 +474,16 @@ static void store_error(jerry_value_t error_value) {
     
     jerry_value_free(msg_value);
     jerry_value_free(error_obj);
+    
+    /* Append "Did you mean?" suggestion if available */
+    if (s_has_suggestion && s_suggestion[0] != '\0') {
+        int written = snprintf(s_error_message + msg_len, sizeof(s_error_message) - msg_len,
+                              ". Did you mean '%s'?", s_suggestion);
+        if (written > 0) {
+            msg_len += written;
+        }
+        s_has_suggestion = false;
+    }
     
     /* Append captured backtrace if available */
     if (s_backtrace_len > 0 && msg_len + s_backtrace_len < sizeof(s_error_message)) {
@@ -355,12 +674,6 @@ void js_register_bindings(void) {
 bool js_engine_process_timers(void) {
     return js_timers_process();
 }
-
-#define REPL_GLOBAL_MAX 64
-#define REPL_GLOBAL_NAME_MAX 32
-
-static char s_repl_globals[REPL_GLOBAL_MAX][REPL_GLOBAL_NAME_MAX];
-static uint8_t s_repl_global_count = 0;
 
 void js_engine_register_global_identifier(const char *name) {
     if (name == NULL || name[0] == '\0') {

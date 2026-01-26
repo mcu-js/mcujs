@@ -71,8 +71,8 @@ while (1) {
 
 ### Error Handling
 - [x] Stack traces with line numbers
+- [x] "Did you mean?" suggestions for typos (variables, modules)
 - [ ] Source map support for debugging
-- [ ] Better error messages for common mistakes
 - [ ] Catch and report uncaught promise rejections
 
 ### Filesystem

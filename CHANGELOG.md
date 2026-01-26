@@ -84,6 +84,9 @@ Full `require()` implementation for modular code:
 - Line editing with Left/Right arrows, Home/End, Backspace anywhere
 - Tab completion for global objects and properties (includes REPL-defined globals)
 - **Stack traces**: Errors show function names, source file, and line/column numbers
+- **"Did you mean?" suggestions**: Typos in variable names and module names show helpful suggestions
+  - `consoel` → "Did you mean 'console'?"
+  - `require('gipo')` → "Did you mean 'gpio'?"
 - Built-in commands:
   - `.help` - Show available commands
   - `.info` - Show board info (chip, memory, filesystem, build)

@@ -29,11 +29,49 @@
 #include <string.h>
 #include <stdlib.h>
 
+/*
+ * Compute Levenshtein edit distance (simplified, for short strings)
+ */
+static int levenshtein(const char *s1, const char *s2, int max_dist) {
+    int len1 = strlen(s1);
+    int len2 = strlen(s2);
+    
+    int len_diff = len1 > len2 ? len1 - len2 : len2 - len1;
+    if (len_diff > max_dist) return max_dist + 1;
+    
+    if (len1 > len2) {
+        const char *tmp = s1; s1 = s2; s2 = tmp;
+        int t = len1; len1 = len2; len2 = t;
+    }
+    
+    if (len1 > 31) return max_dist + 1;
+    
+    int prev[32], curr[32];
+    for (int j = 0; j <= len1; j++) prev[j] = j;
+    
+    for (int i = 1; i <= len2; i++) {
+        curr[0] = i;
+        for (int j = 1; j <= len1; j++) {
+            int cost = (s1[j-1] == s2[i-1]) ? 0 : 1;
+            int ins = curr[j-1] + 1;
+            int del = prev[j] + 1;
+            int rep = prev[j-1] + cost;
+            curr[j] = ins < del ? ins : del;
+            if (rep < curr[j]) curr[j] = rep;
+        }
+        for (int j = 0; j <= len1; j++) prev[j] = curr[j];
+    }
+    return prev[len1];
+}
+
 /* Maximum path length for modules */
 #define MAX_MODULE_PATH 128
 
 /* Maximum number of cached modules */
 #define MAX_MODULES 16
+
+/* Forward declaration for module suggestions */
+static const char *s_builtin_module_names[];
 
 /* Module cache entry */
 typedef struct {
@@ -190,8 +228,39 @@ static jerry_value_t load_module(const char *resolved_path) {
     
     js_result_t result = js_module_read_file(resolved_path, &content, &content_len);
     if (result != JS_OK) {
-        char error_msg[128];
-        snprintf(error_msg, sizeof(error_msg), "Cannot find module '%s'", resolved_path);
+        /* Try to find a similar module name to suggest */
+        char error_msg[192];
+        const char *basename = strrchr(resolved_path, '/');
+        basename = basename ? basename + 1 : resolved_path;
+        
+        /* Remove .js extension for comparison */
+        char name_without_ext[64];
+        strncpy(name_without_ext, basename, sizeof(name_without_ext) - 1);
+        name_without_ext[sizeof(name_without_ext) - 1] = '\0';
+        char *dot = strrchr(name_without_ext, '.');
+        if (dot && strcmp(dot, ".js") == 0) *dot = '\0';
+        
+        /* Search builtin modules for similar names */
+        int best_dist = 3;  /* Max distance to suggest */
+        const char *suggestion = NULL;
+        
+        for (int i = 0; s_builtin_module_names[i] != NULL; i++) {
+            /* Skip special module names with colons */
+            if (strchr(s_builtin_module_names[i], ':') != NULL) continue;
+            
+            int dist = levenshtein(name_without_ext, s_builtin_module_names[i], best_dist);
+            if (dist < best_dist) {
+                best_dist = dist;
+                suggestion = s_builtin_module_names[i];
+            }
+        }
+        
+        if (suggestion != NULL) {
+            snprintf(error_msg, sizeof(error_msg), 
+                    "Cannot find module '%s'. Did you mean '%s'?", resolved_path, suggestion);
+        } else {
+            snprintf(error_msg, sizeof(error_msg), "Cannot find module '%s'", resolved_path);
+        }
         return jerry_throw_sz(JERRY_ERROR_COMMON, error_msg);
     }
     

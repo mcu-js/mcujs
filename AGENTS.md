@@ -8,6 +8,12 @@
 - The firmware targets Raspberry Pi Pico boards today, but should remain extensible to other MCUs with UF2 boot support.
 - Favor composable, modular code so core systems can be replaced or extended without large rewrites.
 
+## Serial Output Conventions
+
+- **Always use `\r\n` for line endings** in any text sent over USB CDC serial (REPL output, error messages, etc.)
+- Serial terminals expect carriage return + newline (`\r\n`) for proper line breaks
+- Using just `\n` will cause lines to appear incorrectly indented or stair-stepped in terminal output
+
 ## Development Cycle (Flash + Test Loop)
 
 - Default workflow: `build.sh <board>` then flash the UF2 and run REPL tests.

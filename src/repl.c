@@ -495,7 +495,7 @@ static void repl_process_line(void) {
     
     if (result == JS_OK) {
         repl_register_identifiers(repl_state.line_buffer, repl_state.line_len);
-        if (result_buf[0] != '\0' && strcmp(result_buf, "undefined") != 0) {
+        if (result_buf[0] != '\0') {
             repl_print_result(result_buf);
         }
     } else {

@@ -16,6 +16,7 @@
 #include "pico/unique_id.h"
 #include "hardware/watchdog.h"
 #include "hardware/gpio.h"
+#include "hardware/clocks.h"
 
 #if MCUJS_HAS_CYW43
 #include "pico/cyw43_arch.h"
@@ -362,7 +363,7 @@ void js_bind_board(void) {
     js_set_string(board, "chip", MCUJS_BOARD_CHIP);
     js_set_number(board, "flashSize", (double)MCUJS_FLASH_SIZE);
     js_set_number(board, "ramSize", (double)MCUJS_RAM_SIZE);
-    js_set_number(board, "cpuFreq", (double)MCUJS_CPU_FREQ_HZ);
+    js_set_number(board, "cpuFreq", (double)clock_get_hz(clk_sys));
     js_set_number(board, "ledPin", MCUJS_LED_PIN == 255 ? -1 : (double)MCUJS_LED_PIN);
 
 #if MCUJS_HAS_NEOPIXEL

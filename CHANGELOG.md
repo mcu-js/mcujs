@@ -21,6 +21,16 @@ All notable changes to mcujs will be documented in this file.
 - `SPI` - SPI bus communication with DMA support (`SPI.writeBufferDMA()`)
 - `ADC` - Analog-to-digital converter
 - `NeoPixel` - WS2812B addressable LED support with configurable wire order (RGB/GRB)
+- `screen` - Unified display API for DVI, LCD, OLED displays
+  - `screen.init(driver)` - Initialize with display driver
+  - `screen.fill(color)` - Fill screen with color
+  - `screen.fillRect(x, y, w, h, color)` - Draw filled rectangle
+  - `screen.fillCircle(cx, cy, r, color)` - Draw filled circle
+  - `screen.drawLine(x0, y0, x1, y1, color)` - Draw line
+  - `screen.drawText(x, y, text, color, size)` - Draw text (5x7 font)
+  - `screen.show()` - Flush framebuffer to display
+  - Preset colors: `BLACK`, `WHITE`, `RED`, `GREEN`, `BLUE`, `CYAN`, `MAGENTA`, `YELLOW`, `ORANGE`, `GRAY`
+- `DVI` - Native DVI/HDMI output for RP2040-PiZero (640x480@60Hz via 160x120 framebuffer)
 - `graphics` - RGB565 framebuffer for displays (fill, rect, pixel, line, circle, text)
 - `image` - JPEG and BMP image decoding to graphics buffers
   - `image.drawJPEG(handle, path, {x, y})` - Load and decode JPEG from filesystem
@@ -109,6 +119,7 @@ Full `require()` implementation for modular code:
 - Raspberry Pi Pico (RP2040, 2MB flash)
 - Raspberry Pi Pico 2 (RP2350, 4MB flash)
 - Waveshare RP2040-Zero (RP2040, 2MB flash, NeoPixel on GPIO 16)
+- Waveshare RP2040-PiZero (RP2040, 16MB flash, DVI/HDMI output, MicroSD slot)
 - Waveshare RP2040 Touch LCD 1.28" (RP2040, 4MB flash, round display, touch, IMU)
 - Waveshare RP2350-LCD-1.47-A (RP2350, 16MB flash, ST7789V3 320x172 display, NeoPixel)
 
@@ -121,5 +132,6 @@ Full `require()` implementation for modular code:
 - **JerryScript** v3.0.0 - JavaScript engine
 - **FatFs** R0.16 - FAT filesystem (Elm Chan)
 - **picojpeg** v1.1 - JPEG decoder (Rich Geldreich, Public Domain)
+- **PicoDVI** - DVI/HDMI output library (Luke Wren, BSD-3-Clause)
 - **TinyUSB** - USB stack (via Pico SDK)
 - BMP decoder - Custom implementation (16/24/32-bit uncompressed)

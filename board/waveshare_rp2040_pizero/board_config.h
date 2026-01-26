@@ -31,8 +31,8 @@
 #define MCUJS_FLASH_SIZE        FLASH_SIZE_16MB
 #define MCUJS_RAM_SIZE          (264 * 1024)
 
-/* Clock configuration */
-#define MCUJS_CPU_FREQ_HZ       (125 * 1000 * 1000)  /* 125 MHz default */
+/* Clock configuration - DVI requires 252 MHz for TMDS encoding */
+#define MCUJS_CPU_FREQ_HZ       (252 * 1000 * 1000)  /* 252 MHz for DVI */
 
 /* Pin configuration */
 #define MCUJS_LED_PIN           255     /* No onboard LED */
@@ -93,28 +93,33 @@
  * ============================================================================
  * DVI Output Configuration (directly drives HDMI display)
  * 
- * NOTE: DVI support requires PicoDVI library and is planned for Phase 2.
- * These pins are directly wired to the HDMI connector on the board.
- * 
  * The RP2040-PiZero uses bit-banged DVI via PIO state machines.
- * Pin assignments are based on the PicoDVI pico_sock_cfg configuration.
+ * Pin assignments match the PicoDVI waveshare_rp2040_pizero configuration.
+ * 
+ * PicoDVI uses differential pair emulation - each TMDS lane uses 2 GPIO pins:
+ * - Positive pin (P) drives the signal
+ * - Negative pin (N) = P + 1, drives inverted signal
  * ============================================================================
  */
 
-/* DVI TMDS Data Lanes (active low accent marking - directly on GPIO pins) */
-#define MCUJS_DVI_D0_P_PIN      12      /* TMDS Data 0 positive (Blue + HSync/VSync) */
-#define MCUJS_DVI_D0_N_PIN      13      /* TMDS Data 0 negative */
-#define MCUJS_DVI_D1_P_PIN      14      /* TMDS Data 1 positive (Green) */
-#define MCUJS_DVI_D1_N_PIN      15      /* TMDS Data 1 negative */
-#define MCUJS_DVI_D2_P_PIN      16      /* TMDS Data 2 positive (Red) */
-#define MCUJS_DVI_D2_N_PIN      17      /* TMDS Data 2 negative */
+/* DVI TMDS Data Lanes (PicoDVI style - positive pin, negative is +1) 
+ * These match the waveshare_rp2040_pizero config in PicoDVI:
+ * pins_tmds = {26, 24, 22} for D0/Blue, D1/Green, D2/Red
+ */
+#define MCUJS_DVI_D0_PIN        26      /* TMDS Data 0 (Blue + HSync/VSync), uses GPIO 26/27 */
+#define MCUJS_DVI_D1_PIN        24      /* TMDS Data 1 (Green), uses GPIO 24/25 */
+#define MCUJS_DVI_D2_PIN        22      /* TMDS Data 2 (Red), uses GPIO 22/23 */
 
-/* DVI TMDS Clock Lane */
-#define MCUJS_DVI_CLK_P_PIN     18      /* TMDS Clock positive */
-#define MCUJS_DVI_CLK_N_PIN     19      /* TMDS Clock negative */
+/* DVI TMDS Clock Lane 
+ * pins_clk = 28, uses GPIO 28/29 
+ */
+#define MCUJS_DVI_CLK_PIN       28      /* TMDS Clock, uses GPIO 28/29 */
 
-/* DVI feature flag (disabled until Phase 2 implementation) */
-#define MCUJS_HAS_DVI           0
+/* PIO instance for DVI (PicoDVI uses pio0 by default) */
+#define MCUJS_DVI_PIO           pio0
+
+/* DVI feature flag */
+#define MCUJS_HAS_DVI           1
 
 /*
  * ============================================================================

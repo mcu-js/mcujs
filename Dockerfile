@@ -37,6 +37,10 @@ RUN mkdir -p ${PICOJPEG_PATH} \
     && wget -q https://raw.githubusercontent.com/richgel999/picojpeg/master/picojpeg.c -O ${PICOJPEG_PATH}/picojpeg.c \
     && wget -q https://raw.githubusercontent.com/richgel999/picojpeg/master/picojpeg.h -O ${PICOJPEG_PATH}/picojpeg.h
 
+# Clone PicoDVI for DVI/HDMI output support
+ENV PICODVI_PATH=/opt/picodvi
+RUN git clone --depth 1 https://github.com/Wren6991/PicoDVI.git ${PICODVI_PATH}
+
 # Set working directory
 WORKDIR /workspace
 

@@ -182,4 +182,16 @@ void js_bind_screen(void);
  */
 jerry_value_t js_create_screen_module(void);
 
+/*
+ * Register DVI bindings (native DVI output via PicoDVI)
+ * DVI.init(), DVI.start(), DVI.show(), DVI.stop()
+ * Only available on boards with DVI support (MCUJS_HAS_DVI=1)
+ */
+void js_bind_dvi(void);
+
+/*
+ * Create DVI module object
+ */
+jerry_value_t js_create_dvi_module(void);
+
 #endif /* MCUJS_BINDINGS_H */

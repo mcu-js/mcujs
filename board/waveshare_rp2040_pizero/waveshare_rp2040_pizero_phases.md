@@ -50,93 +50,113 @@ Reference: https://www.waveshare.com/wiki/RP2040-PiZero
 
 ## Phase 2: DVI Display Output
 
-**Status:** Planned
+**Status:** Complete
 
 ### Goals
 - Native DVI/HDMI output support
 - Hardware-accelerated TMDS encoding via PIO
-- JavaScript API for graphics rendering
+- JavaScript API for graphics rendering via unified Screen API
 
-### Technical Requirements
+### Technical Implementation
 
-#### PIO Resources
-- 3 PIO state machines (same PIO instance)
-- 6 DMA channels (2 per TMDS lane)
-- ~60% CPU on one core for TMDS encoding
+#### Architecture (PicoDVI sprite_bounce pattern)
+The key to flicker-free output is the **scanline rendering pattern**:
 
-#### Pin Mapping (from board_config.h)
 ```
-TMDS Data 0:  GPIO 12/13 (Blue + Sync)
-TMDS Data 1:  GPIO 14/15 (Green)
-TMDS Data 2:  GPIO 16/17 (Red)
-TMDS Clock:   GPIO 18/19
+Core 0 (JavaScript)     Core 1 (TMDS encode)      DMA IRQ
+      |                       |                      |
+ framebuffer                  |                      |
+      |                       |                      |
+      v                       v                      v
+ render_scanlines() --> q_colour_valid --> dvi_scanbuf_main_16bpp --> q_tmds_valid --> display
 ```
 
-#### Memory Constraints
-| Resolution | Color Depth | RAM Required | Feasibility |
-|------------|-------------|--------------|-------------|
-| 320x240 | RGB565 | 153KB | Good fit |
-| 320x240 | RGB332 | 76KB | Best balance |
-| 400x300 | RGB565 | 240KB | Tight |
-| 640x480 | RGB565 | 614KB | Exceeds RAM - needs scanline rendering |
+- **Core 0**: JavaScript runtime, renders to framebuffer, feeds scanlines to Core 1
+- **Core 1**: Runs `dvi_scanbuf_main_16bpp()` - TMDS encodes scanlines
+- **DMA IRQ**: Outputs encoded TMDS data synchronized with display timing
 
-### Implementation Plan
+The scanline queue provides natural synchronization - Core 0 can only add scanlines as fast as Core 1 consumes them, which is tied to the display refresh rate.
 
-1. **Add PicoDVI dependency to Docker**
-   ```dockerfile
-   # In Dockerfile
-   RUN git clone https://github.com/Wren6991/PicoDVI.git /opt/picodvi
-   ENV PICODVI_PATH=/opt/picodvi
-   ```
+#### Clock Configuration
+- System clock: **252 MHz** (required for 640x480@60Hz timing)
+- Set in `main.c` BEFORE USB initialization to avoid breaking CDC
 
-2. **Create native DVI binding**
-   - `host/bindings/dvi.c` - Core DVI driver
-   - `host/bindings/dvi.h` - Public header
-   - Integrate PicoDVI's `libdvi` for TMDS encoding
+#### Memory Layout
+| Component | Size | Notes |
+|-----------|------|-------|
+| Framebuffer A | 38KB | 160x120 @ RGB565 |
+| Framebuffer B | 38KB | Double buffering |
+| Scanline buffers | 2.5KB | 4 x 320 pixels |
+| TMDS buffers | ~24KB | Allocated by PicoDVI |
 
-3. **JavaScript API**
-   ```javascript
-   var DVI = require('dvi');
-   
-   // Initialize display
-   DVI.init({
-     width: 320,
-     height: 240,
-     colorDepth: 16  // RGB565
-   });
-   
-   // Drawing operations
-   DVI.clear(0x0000);
-   DVI.setPixel(x, y, color);
-   DVI.fillRect(x, y, w, h, color);
-   DVI.drawLine(x1, y1, x2, y2, color);
-   
-   // Flush framebuffer to display
-   DVI.flush();
-   
-   // For advanced users: scanline callback for 640x480
-   DVI.onScanline(function(y) {
-     return generateLineData(y);
-   });
-   ```
+#### Pin Mapping (Waveshare RP2040-PiZero)
+```
+TMDS Clock:   GPIO 28/29
+TMDS Blue:    GPIO 26/27 (includes sync)
+TMDS Green:   GPIO 24/25
+TMDS Red:     GPIO 22/23
+```
 
-4. **Update board_config.h**
-   - Set `MCUJS_HAS_DVI 1`
-   - Verify pin mappings match hardware
+### JavaScript API
 
-### Supported Video Modes
-- 640x480 @ 60Hz (VGA) - Primary target
-- 800x480 @ 60Hz (WVGA) - Stretch goal
-- 720p30 - Requires overclocking to 372 MHz
+The DVI module integrates with the unified **Screen API**:
 
-### Files to Create/Modify
-- [ ] `Dockerfile` - Add PicoDVI
-- [ ] `host/bindings/dvi.c`
-- [ ] `host/bindings/dvi.h`
-- [ ] `host/bindings/CMakeLists.txt`
-- [ ] `host/bindings/bindings.h`
-- [ ] `host/engine.c`
-- [ ] `board/waveshare_rp2040_pizero/board_config.h` - Enable DVI flag
+```javascript
+// Initialize with DVI driver
+var dvi = require('drivers/dvi');
+screen.init(dvi);
+
+// Drawing operations (160x120 framebuffer, 4x scaled to 640x480)
+screen.fill(screen.BLACK);
+screen.fillRect(40, 30, 80, 60, screen.WHITE);
+screen.fillCircle(80, 60, 20, screen.RED);
+screen.drawText(10, 10, "Hello!", screen.GREEN, 2);
+
+// Flush to display
+screen.show();
+
+// Animation example (flicker-free!)
+var x = 0, dir = 2;
+setInterval(function() {
+  screen.fill(0x0000);
+  screen.fillRect(x, 40, 30, 40, screen.RED);
+  screen.show();
+  x += dir;
+  if (x > 130 || x < 0) dir = -dir;
+}, 33);  // ~30 FPS
+```
+
+Low-level DVI access is also available:
+```javascript
+DVI.init();        // Initialize (160x120 default)
+DVI.start();       // Launch Core 1, begin output
+DVI.fill(0xF800);  // Fill with red (RGB565)
+DVI.stop();        // Stop output
+```
+
+### Output Specifications
+| Property | Value |
+|----------|-------|
+| Resolution | 640x480 @ 60Hz |
+| Framebuffer | 160x120 (4x scaled) |
+| Color depth | RGB565 (16-bit) |
+| Refresh | 60 Hz |
+
+### Files Created/Modified
+- [x] `Dockerfile` - Added PicoDVI library
+- [x] `host/bindings/dvi.c` - DVI driver with scanline rendering
+- [x] `host/bindings/mcujs_dvi.h` - DVI module header
+- [x] `drivers/dvi.js` - JavaScript driver for Screen API
+- [x] `board/waveshare_rp2040_pizero/board_config.h` - `MCUJS_HAS_DVI=1`
+- [x] `board/waveshare_rp2040_pizero/board_config.cmake` - PicoDVI integration
+- [x] `src/main.c` - 252 MHz clock setup before USB init
+
+### Key Lessons Learned
+
+1. **Double buffering alone doesn't prevent flicker** - The buffer swap must be synchronized with display timing
+2. **Use PicoDVI's scanline queue pattern** - `q_colour_valid` provides natural timing synchronization
+3. **Core 1 should only do TMDS encoding** - Let `dvi_scanbuf_main_16bpp()` handle the tight timing
+4. **Clock must be set before USB init** - Changing clock after USB breaks CDC communication
 
 ---
 

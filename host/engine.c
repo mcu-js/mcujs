@@ -767,6 +767,11 @@ void js_register_bindings(void) {
     js_bind_require();
     js_bind_graphics();
     js_bind_screen();
+    
+    /* Register DVI module if available */
+#ifdef MCUJS_HAS_DVI
+    js_bind_dvi();
+#endif
 }
 
 bool js_engine_process_timers(void) {

@@ -5,6 +5,9 @@ set(MCUJS_BOARD_NAME "waveshare_rp2040_pizero")
 set(MCUJS_CHIP "RP2040")
 set(MCUJS_FLASH_SIZE 16777216)  # 16MB
 
+# Enable DVI support (this board has HDMI output via PicoDVI)
+set(MCUJS_HAS_DVI TRUE CACHE BOOL "Enable DVI output support")
+
 # Set Pico SDK board
 set(PICO_BOARD pico CACHE STRING "Board type")
 
@@ -15,6 +18,7 @@ set(PICO_PLATFORM rp2040 CACHE STRING "Platform")
 add_compile_definitions(
     MCUJS_BOARD_WAVESHARE_RP2040_PIZERO=1
     PICO_FLASH_SIZE_BYTES=${MCUJS_FLASH_SIZE}
+    MCUJS_HAS_DVI=1
 )
 
-message(STATUS "Configuring for Waveshare RP2040-PiZero (RP2040, 16MB Flash)")
+message(STATUS "Configuring for Waveshare RP2040-PiZero (RP2040, 16MB Flash, DVI enabled)")

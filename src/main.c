@@ -26,6 +26,12 @@
 #include "pico/cyw43_arch.h"
 #endif
 
+#if MCUJS_HAS_DVI
+#include "hardware/vreg.h"
+#include "hardware/clocks.h"
+#include "mcujs_dvi.h"
+#endif
+
 /* Version info (from CMake) */
 #ifndef MCUJS_VERSION
 #define MCUJS_VERSION "0.1.0"
@@ -44,6 +50,15 @@ static void boot_status_on(void);
 static void boot_status_off(void);
 
 int main(void) {
+#if MCUJS_HAS_DVI
+    /* DVI requires 252 MHz system clock - set this BEFORE USB init
+     * This must happen early to ensure USB is configured for the correct clock
+     */
+    vreg_set_voltage(VREG_VOLTAGE_1_20);
+    sleep_ms(10);
+    set_sys_clock_khz(252000, true);  /* 252 MHz for DVI 640x480@60Hz */
+#endif
+
     /* Initialize basic Pico SDK (clocks, etc.) but NOT stdio */
     stdio_init_all();
     
@@ -173,6 +188,11 @@ static void main_loop(void) {
         
         /* Process JS timers */
         js_engine_process_timers();
+        
+#if MCUJS_HAS_DVI
+        /* Feed scanlines to DVI encoder (backup to timer) */
+        mcujs_dvi_task();
+#endif
         
         /* Yield to allow other processing */
         tight_loop_contents();

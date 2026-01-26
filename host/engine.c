@@ -313,7 +313,8 @@ static void find_property_suggestion(jerry_value_t obj, const char *name) {
         .max_distance = max_dist
     };
     
-    jerry_value_t keys = jerry_object_keys(obj);
+    /* Use JERRY_PROPERTY_FILTER_ALL to include non-enumerable properties (like Math.floor) */
+    jerry_value_t keys = jerry_object_property_names(obj, JERRY_PROPERTY_FILTER_ALL);
     
     if (!jerry_value_is_exception(keys)) {
         uint32_t length = jerry_array_length(keys);
@@ -808,4 +809,109 @@ int js_engine_get_completions(const char *partial, js_completion_callback_t call
     }
     
     return match_count;
+}
+
+/*
+ * Try to find a suggestion for a method call TypeError
+ * Parses source code to find "obj.method(" patterns and suggest similar methods
+ */
+bool js_engine_suggest_method(const char *source, char *suggestion, size_t suggestion_len) {
+    if (!s_initialized || source == NULL || suggestion == NULL || suggestion_len == 0) {
+        return false;
+    }
+    
+    suggestion[0] = '\0';
+    
+    /* Find pattern: identifier.identifier( 
+     * We look for the last occurrence of this pattern */
+    const char *best_obj_start = NULL;
+    const char *best_obj_end = NULL;
+    const char *best_prop_start = NULL;
+    const char *best_prop_end = NULL;
+    
+    const char *p = source;
+    while (*p) {
+        /* Skip whitespace */
+        while (*p && isspace(*p)) p++;
+        
+        /* Look for identifier */
+        if (isalpha(*p) || *p == '_' || *p == '$') {
+            const char *id_start = p;
+            while (*p && (isalnum(*p) || *p == '_' || *p == '$')) p++;
+            const char *id_end = p;
+            
+            /* Check for dot */
+            while (*p && isspace(*p)) p++;
+            if (*p == '.') {
+                p++;
+                while (*p && isspace(*p)) p++;
+                
+                /* Look for property name */
+                if (isalpha(*p) || *p == '_' || *p == '$') {
+                    const char *prop_start = p;
+                    while (*p && (isalnum(*p) || *p == '_' || *p == '$')) p++;
+                    const char *prop_end = p;
+                    
+                    /* Check for opening paren (function call) */
+                    while (*p && isspace(*p)) p++;
+                    if (*p == '(') {
+                        /* Found a method call pattern */
+                        best_obj_start = id_start;
+                        best_obj_end = id_end;
+                        best_prop_start = prop_start;
+                        best_prop_end = prop_end;
+                    }
+                }
+            }
+        } else {
+            p++;
+        }
+    }
+    
+    if (best_obj_start == NULL || best_prop_start == NULL) {
+        return false;
+    }
+    
+    /* Extract object name and property name */
+    size_t obj_len = best_obj_end - best_obj_start;
+    size_t prop_len = best_prop_end - best_prop_start;
+    
+    if (obj_len >= 64 || prop_len >= 64) {
+        return false;
+    }
+    
+    char obj_name[64];
+    char prop_name[64];
+    memcpy(obj_name, best_obj_start, obj_len);
+    obj_name[obj_len] = '\0';
+    memcpy(prop_name, best_prop_start, prop_len);
+    prop_name[prop_len] = '\0';
+    
+    /* Try to get the object */
+    jerry_value_t parsed = jerry_parse((const jerry_char_t *)obj_name, obj_len, NULL);
+    if (jerry_value_is_exception(parsed)) {
+        jerry_value_free(parsed);
+        return false;
+    }
+    
+    jerry_value_t obj = jerry_run(parsed);
+    jerry_value_free(parsed);
+    
+    if (jerry_value_is_exception(obj)) {
+        jerry_value_free(obj);
+        return false;
+    }
+    
+    /* Find similar property name */
+    find_property_suggestion(obj, prop_name);
+    jerry_value_free(obj);
+    
+    if (s_has_suggestion && s_suggestion[0] != '\0') {
+        /* Format as "obj.suggestion" */
+        snprintf(suggestion, suggestion_len, "%s.%s", obj_name, s_suggestion);
+        s_has_suggestion = false;
+        return true;
+    }
+    
+    return false;
 }

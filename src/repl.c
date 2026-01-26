@@ -501,7 +501,37 @@ static void repl_process_line(void) {
     } else {
         char error_buf[512];  /* Larger buffer for stack traces */
         js_engine_get_error(error_buf, sizeof(error_buf));
-        repl_print_error(error_buf);
+        
+        /* Check for "Expected a function" and try to suggest a method */
+        if (strstr(error_buf, "Expected a function") != NULL) {
+            char suggestion[128];
+            if (js_engine_suggest_method(repl_state.line_buffer, suggestion, sizeof(suggestion))) {
+                /* Find where to insert suggestion (before stack trace) */
+                char *newline = strstr(error_buf, "\r\n");
+                if (newline != NULL) {
+                    /* Insert suggestion before stack trace */
+                    char enhanced[512];
+                    size_t prefix_len = newline - error_buf;
+                    memcpy(enhanced, error_buf, prefix_len);
+                    int added = snprintf(enhanced + prefix_len, sizeof(enhanced) - prefix_len,
+                                        ". Did you mean '%s'?%s", suggestion, newline);
+                    if (added > 0) {
+                        repl_print_error(enhanced);
+                    } else {
+                        repl_print_error(error_buf);
+                    }
+                } else {
+                    /* No stack trace, append suggestion */
+                    char enhanced[512];
+                    snprintf(enhanced, sizeof(enhanced), "%s. Did you mean '%s'?", error_buf, suggestion);
+                    repl_print_error(enhanced);
+                }
+            } else {
+                repl_print_error(error_buf);
+            }
+        } else {
+            repl_print_error(error_buf);
+        }
     }
     
     repl_reset();

@@ -143,4 +143,17 @@ int js_engine_get_completions(const char *partial, js_completion_callback_t call
  */
 void js_engine_register_global_identifier(const char *name);
 
+/*
+ * Try to find a suggestion for a method call TypeError
+ * Parses the source code to find property access patterns like "obj.method()"
+ * and suggests similar method names.
+ * 
+ * @param source: The source code that caused the error
+ * @param suggestion: Buffer to store the suggestion (e.g., "console.log")
+ * @param suggestion_len: Size of suggestion buffer
+ * 
+ * Returns: true if a suggestion was found
+ */
+bool js_engine_suggest_method(const char *source, char *suggestion, size_t suggestion_len);
+
 #endif /* MCUJS_ENGINE_H */

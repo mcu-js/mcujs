@@ -89,6 +89,7 @@ Full `require()` implementation for modular code:
   - `console.logg()` → "Did you mean 'console.log'?"
   - `Math.flor()` → "Did you mean 'Math.floor'?"
   - `require('gipo')` → "Did you mean 'gpio'?"
+- **Pretty-printed output**: Objects and arrays display as formatted JSON instead of `[object Object]`
 - Built-in commands:
   - `.help` - Show available commands
   - `.info` - Show board info (chip, memory, filesystem, build)

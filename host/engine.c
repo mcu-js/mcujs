@@ -128,7 +128,7 @@ static bool suggestion_callback(const char *name, void *user_data) {
 }
 
 /*
- * Convert JerryScript value to string
+ * Convert JerryScript value to string (simple - used for error messages)
  */
 static size_t value_to_string(jerry_value_t value, char *buf, size_t buf_len) {
     if (buf == NULL || buf_len == 0) {
@@ -151,6 +151,108 @@ static size_t value_to_string(jerry_value_t value, char *buf, size_t buf_len) {
     
     jerry_value_free(str_value);
     return str_size;
+}
+
+/*
+ * Pretty-print a value for REPL output
+ * Uses JSON.stringify for objects/arrays, quotes strings, handles primitives
+ */
+static size_t value_to_display_string(jerry_value_t value, char *buf, size_t buf_len) {
+    if (buf == NULL || buf_len == 0) {
+        return 0;
+    }
+    
+    /* Handle primitives directly */
+    if (jerry_value_is_undefined(value)) {
+        return snprintf(buf, buf_len, "undefined");
+    }
+    if (jerry_value_is_null(value)) {
+        return snprintf(buf, buf_len, "null");
+    }
+    if (jerry_value_is_boolean(value)) {
+        return snprintf(buf, buf_len, "%s", jerry_value_is_true(value) ? "true" : "false");
+    }
+    if (jerry_value_is_number(value)) {
+        double num = jerry_value_as_number(value);
+        /* Check for integer vs float */
+        if (num == (double)(int)num && num >= -2147483648.0 && num <= 2147483647.0) {
+            return snprintf(buf, buf_len, "%d", (int)num);
+        } else {
+            return snprintf(buf, buf_len, "%g", num);
+        }
+    }
+    if (jerry_value_is_string(value)) {
+        /* Quote strings in REPL output */
+        jerry_size_t str_size = jerry_string_size(value, JERRY_ENCODING_UTF8);
+        if (str_size + 3 >= buf_len) {
+            str_size = buf_len - 3;
+        }
+        buf[0] = '\'';
+        jerry_string_to_buffer(value, JERRY_ENCODING_UTF8, (jerry_char_t *)(buf + 1), str_size);
+        buf[str_size + 1] = '\'';
+        buf[str_size + 2] = '\0';
+        return str_size + 2;
+    }
+    if (jerry_value_is_function(value)) {
+        return snprintf(buf, buf_len, "[Function]");
+    }
+    if (jerry_value_is_symbol(value)) {
+        return snprintf(buf, buf_len, "[Symbol]");
+    }
+    
+    /* For objects and arrays, try JSON.stringify */
+    if (jerry_value_is_object(value)) {
+        /* Get JSON.stringify from global */
+        jerry_value_t global = jerry_current_realm();
+        jerry_value_t json_key = jerry_string_sz("JSON");
+        jerry_value_t json_obj = jerry_object_get(global, json_key);
+        jerry_value_free(json_key);
+        jerry_value_free(global);
+        
+        if (!jerry_value_is_exception(json_obj) && jerry_value_is_object(json_obj)) {
+            jerry_value_t stringify_key = jerry_string_sz("stringify");
+            jerry_value_t stringify_func = jerry_object_get(json_obj, stringify_key);
+            jerry_value_free(stringify_key);
+            
+            if (!jerry_value_is_exception(stringify_func) && jerry_value_is_function(stringify_func)) {
+                /* Call JSON.stringify(value, null, 2) for pretty printing */
+                jerry_value_t args[3];
+                args[0] = value;
+                args[1] = jerry_null();
+                args[2] = jerry_number(2);
+                
+                jerry_value_t result = jerry_call(stringify_func, jerry_undefined(), args, 3);
+                
+                jerry_value_free(args[1]);
+                jerry_value_free(args[2]);
+                jerry_value_free(stringify_func);
+                jerry_value_free(json_obj);
+                
+                if (!jerry_value_is_exception(result) && jerry_value_is_string(result)) {
+                    jerry_size_t str_size = jerry_string_size(result, JERRY_ENCODING_UTF8);
+                    if (str_size >= buf_len) {
+                        str_size = buf_len - 1;
+                    }
+                    jerry_string_to_buffer(result, JERRY_ENCODING_UTF8, (jerry_char_t *)buf, str_size);
+                    buf[str_size] = '\0';
+                    jerry_value_free(result);
+                    return str_size;
+                }
+                jerry_value_free(result);
+            } else {
+                jerry_value_free(stringify_func);
+                jerry_value_free(json_obj);
+            }
+        } else {
+            jerry_value_free(json_obj);
+        }
+        
+        /* JSON.stringify failed (circular ref, etc) - fall back to [object Object] */
+        return snprintf(buf, buf_len, "[object Object]");
+    }
+    
+    /* Fallback: use toString */
+    return value_to_string(value, buf, buf_len);
 }
 
 /*
@@ -575,15 +677,9 @@ js_result_t js_engine_exec_named(const char *code, size_t code_len,
         return JS_ERROR_EXEC;
     }
     
-    /* Convert result to string if buffer provided */
+    /* Convert result to pretty-printed string if buffer provided */
     if (result_buf != NULL && result_buf_len > 0) {
-        if (jerry_value_is_undefined(result)) {
-            snprintf(result_buf, result_buf_len, "undefined");
-        } else if (jerry_value_is_null(result)) {
-            snprintf(result_buf, result_buf_len, "null");
-        } else {
-            value_to_string(result, result_buf, result_buf_len);
-        }
+        value_to_display_string(result, result_buf, result_buf_len);
     }
     
     jerry_value_free(result);

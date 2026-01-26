@@ -22,6 +22,7 @@ These modules are available with `require()` out of the box. Acronyms are explai
 - `adc` for analog inputs ([ADC](./glossary.md#adc))
 - `neopixel` for WS2812 LEDs ([NeoPixel](./glossary.md#neopixel))
 - `keyboard` for USB HID keyboard emulation
+- `mouse` for USB HID mouse emulation
 
 ## Example usage
 
@@ -115,6 +116,54 @@ setInterval(() => {
         while (GPIO.get(15) === 0) {} // debounce
     }
 }, 10);
+```
+
+## USB HID Mouse
+
+The `mouse` module lets the Pico act as a USB mouse.
+
+```javascript
+const M = require('mouse');
+
+// Move cursor (relative, pixels)
+M.move(100, 0);   // right
+M.move(-50, 50);  // left and down
+
+// Click buttons
+M.click();           // left click (default)
+M.click('right');    // right click
+M.doubleClick();     // double left click
+
+// Drag operation
+M.press('left');
+M.move(200, 0);      // drag right
+M.release('left');
+
+// Scroll
+M.scroll(5);         // scroll up
+M.scroll(-5);        // scroll down
+M.scrollH(3);        // scroll right (horizontal)
+
+// Release all buttons
+M.releaseAll();
+```
+
+### Buttons
+
+- `left` (or `l`) - Left mouse button (default)
+- `right` (or `r`) - Right mouse button
+- `middle` (or `m`) - Middle mouse button
+
+### Example: Mouse jiggler
+
+```javascript
+const M = require('mouse');
+
+// Prevent screen lock by moving mouse every 30 seconds
+setInterval(() => {
+    M.move(1, 0);
+    M.move(-1, 0);
+}, 30000);
 ```
 
 ## Key terms

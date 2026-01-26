@@ -176,45 +176,44 @@ bool usb_hid_keyboard_is_pressed(uint8_t keycode) {
  * Mouse Functions
  *--------------------------------------------------------------------*/
 
+/* Send mouse report and wait for it to complete */
+static bool send_mouse_report(int8_t x, int8_t y, int8_t wheel, int8_t pan) {
+    if (!wait_hid_ready(10000)) {
+        return false;
+    }
+    bool result = tud_hid_mouse_report(REPORT_ID_MOUSE, mouse_buttons, x, y, wheel, pan);
+    /* Give USB stack time to send the report */
+    for (int i = 0; i < 1000; i++) {
+        tud_task();
+    }
+    return result;
+}
+
 bool usb_hid_mouse_ready(void) {
     return tud_hid_ready();
 }
 
 void usb_hid_mouse_release_all(void) {
     mouse_buttons = 0;
-    if (tud_hid_ready()) {
-        tud_hid_mouse_report(REPORT_ID_MOUSE, 0, 0, 0, 0, 0);
-    }
+    send_mouse_report(0, 0, 0, 0);
 }
 
 bool usb_hid_mouse_move(int8_t x, int8_t y) {
-    if (tud_hid_ready()) {
-        return tud_hid_mouse_report(REPORT_ID_MOUSE, mouse_buttons, x, y, 0, 0);
-    }
-    return false;
+    return send_mouse_report(x, y, 0, 0);
 }
 
 bool usb_hid_mouse_scroll(int8_t vertical, int8_t horizontal) {
-    if (tud_hid_ready()) {
-        return tud_hid_mouse_report(REPORT_ID_MOUSE, mouse_buttons, 0, 0, vertical, horizontal);
-    }
-    return false;
+    return send_mouse_report(0, 0, vertical, horizontal);
 }
 
 bool usb_hid_mouse_press(uint8_t button) {
     mouse_buttons |= button;
-    if (tud_hid_ready()) {
-        return tud_hid_mouse_report(REPORT_ID_MOUSE, mouse_buttons, 0, 0, 0, 0);
-    }
-    return false;
+    return send_mouse_report(0, 0, 0, 0);
 }
 
 bool usb_hid_mouse_release(uint8_t button) {
     mouse_buttons &= ~button;
-    if (tud_hid_ready()) {
-        return tud_hid_mouse_report(REPORT_ID_MOUSE, mouse_buttons, 0, 0, 0, 0);
-    }
-    return false;
+    return send_mouse_report(0, 0, 0, 0);
 }
 
 bool usb_hid_mouse_is_pressed(uint8_t button) {

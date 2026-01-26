@@ -281,9 +281,9 @@ setInterval(() => {
 
 - [x] Add HID device class to TinyUSB descriptor (composite CDC+MSC+HID)
 - [x] Implement keyboard HID report generation
-- [ ] Implement mouse HID report generation  
+- [x] Implement mouse HID report generation  
 - [x] Create `keyboard` native module
-- [ ] Create `mouse` native module
+- [x] Create `mouse` native module
 - [x] Handle USB enumeration with HID
 - [ ] Test on Windows, Mac, Linux hosts
 - [x] Document keyboard layout considerations (US QWERTY default)

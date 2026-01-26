@@ -18,6 +18,7 @@ add_library(mcujs_bindings STATIC
     graphics.c
     image.c
     keyboard.c
+    mouse.c
     $ENV{PICOJPEG_PATH}/picojpeg.c
 )
 

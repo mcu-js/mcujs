@@ -35,6 +35,15 @@ All notable changes to mcujs will be documented in this file.
   - `keyboard.isPressed(key)` - Check if a key is pressed
   - Supported keys: letters, numbers, F1-F12, modifiers (ctrl, shift, alt, super/gui/cmd/win), arrows, enter, tab, space, backspace, delete, escape, home, end, pageup, pagedown, printscreen, and more
   - Media keys: `mute`, `volumeup`, `volumedown`, `playpause`, `nexttrack`, `prevtrack`, `stop`, `brightnessup`, `brightnessdown`
+- `mouse` - USB HID mouse emulation
+  - `mouse.move(x, y)` - Move cursor relative to current position
+  - `mouse.click(button)` - Click a button (default: left)
+  - `mouse.doubleClick(button)` - Double-click
+  - `mouse.press(button)` / `mouse.release(button)` - Hold/release for drag
+  - `mouse.scroll(amount)` - Vertical scroll
+  - `mouse.scrollH(amount)` - Horizontal scroll
+  - `mouse.releaseAll()` - Release all buttons
+  - Buttons: `left`, `right`, `middle`
 - `board` object - LED control, NeoPixel helper, system info, unique ID, memory stats
 - `mcujs:module` - Built-in module registry
 

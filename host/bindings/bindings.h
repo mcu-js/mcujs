@@ -166,4 +166,9 @@ jerry_value_t js_create_image_module(void);
  */
 jerry_value_t js_create_keyboard_module(void);
 
+/*
+ * Create mouse module object (USB HID mouse)
+ */
+jerry_value_t js_create_mouse_module(void);
+
 #endif /* MCUJS_BINDINGS_H */

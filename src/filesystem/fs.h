@@ -40,9 +40,9 @@ typedef struct {
     bool is_open;
 } fs_file_t;
 
-/* Directory entry */
+/* Directory entry - name buffer matches FF_LFN_BUF (64) + null terminator */
 typedef struct {
-    char name[256];
+    char name[65];
     uint32_t size;
     bool is_dir;
 } fs_entry_t;

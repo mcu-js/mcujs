@@ -13,6 +13,15 @@ sidebar_position: 7
 - Core modules: [Built-in Modules](./built-in-modules.md)
 - Hardware modules: [Built-in Modules](./built-in-modules.md)
 
+## Display and Image APIs
+
+These display helpers are globals or built-in modules, depending on the board:
+
+- `screen` (global): `screen.getBufferHandle()`, `screen.getByteOrder()`
+- `graphics` (global): `graphics.getPointer(handle)`
+- `image` (module): `byteOrder` option for `decodeJPEG`, `decodeBMP`, `drawJPEG`, `drawBMP`
+- `DVI` (global on DVI boards): `DVI.getDrawBuffer()`, `DVI.swapAndShow()`
+
 ## Notes
 
 Refer to the [REPL](./glossary.md#repl) `.help` output or the runtime source for details while the API docs expand.

@@ -88,6 +88,19 @@ bool mcujs_dvi_is_running(void);
 const mcujs_dvi_state_t* mcujs_dvi_get_state(void);
 
 /*
+ * Get the draw buffer for direct rendering
+ * Returns NULL if DVI is not initialized/started
+ * The returned buffer is width*height RGB565 pixels
+ */
+uint16_t* mcujs_dvi_get_draw_buffer(void);
+
+/*
+ * Swap and display the draw buffer
+ * Use this after rendering directly to the draw buffer
+ */
+bool mcujs_dvi_swap_and_show(void);
+
+/*
  * Process DVI rendering - must be called regularly from main loop
  * Feeds scanlines from framebuffer to DVI encoder
  */

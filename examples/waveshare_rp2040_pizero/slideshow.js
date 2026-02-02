@@ -4,25 +4,35 @@
  * Run time: 30 seconds
  */
 
-var dvi = {
-  width: DVI.width, height: DVI.height, byteOrder: 'native',
-  init: function() { DVI.init(); DVI.start(); },
-  show: function(p, l) { DVI.show(p, l); }
-};
-screen.init(dvi);
-console.log('Slideshow Demo');
-
-var W = screen.getWidth();
-var H = screen.getHeight();
-
-function rgb(r, g, b) {
-  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
-}
-
-var BLACK = 0, WHITE = 0xFFFF;
-var RED = rgb(255,0,0), GREEN = rgb(0,255,0), BLUE = rgb(0,0,255);
-var CYAN = rgb(0,255,255), MAGENTA = rgb(255,0,255), YELLOW = rgb(255,255,0);
-var ORANGE = rgb(255,128,0);
+function startSlideshow() {
+  if (!DVI.isRunning()) {
+    DVI.init();
+    DVI.start();
+  }
+  
+  var dvi = {
+    width: DVI.width, height: DVI.height, byteOrder: 'native',
+    init: function() {},
+    show: function() {
+      DVI.swapAndShow();
+      this.buffer = DVI.getDrawBuffer();
+    }
+  };
+  dvi.buffer = DVI.getDrawBuffer();
+  screen.init(dvi);
+  console.log('Slideshow Demo');
+  
+  var W = screen.getWidth();
+  var H = screen.getHeight();
+  
+  function rgb(r, g, b) {
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+  }
+  
+  var BLACK = 0, WHITE = 0xFFFF;
+  var RED = rgb(255,0,0), GREEN = rgb(0,255,0), BLUE = rgb(0,0,255);
+  var CYAN = rgb(0,255,255), MAGENTA = rgb(255,0,255), YELLOW = rgb(255,255,0);
+  var ORANGE = rgb(255,128,0);
 
 // Slide 1: Title
 function slide1() {
@@ -131,23 +141,30 @@ function slide8() {
   screen.show();
 }
 
-var slides = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8];
-var idx = 0;
-
-function next() {
-  slides[idx]();
-  idx = (idx + 1) % slides.length;
+  var slides = [slide1, slide2, slide3, slide4, slide5, slide6, slide7, slide8];
+  var idx = 0;
+  
+  function next() {
+    slides[idx]();
+    idx = (idx + 1) % slides.length;
+  }
+  
+  next();
+  console.log('Auto-advance every 3 seconds...');
+  
+  var timer = setInterval(next, 3000);
+  
+  setTimeout(function() {
+    clearInterval(timer);
+    screen.fill(BLACK);
+    screen.drawText(30, 50, 'Done!', GREEN, 2);
+    screen.show();
+    console.log('Demo complete!');
+  }, 30000);
 }
 
-next();
-console.log('Auto-advance every 3 seconds...');
-
-var timer = setInterval(next, 3000);
-
-setTimeout(function() {
-  clearInterval(timer);
-  screen.fill(BLACK);
-  screen.drawText(30, 50, 'Done!', GREEN, 2);
-  screen.show();
-  console.log('Demo complete!');
-}, 30000);
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { start: startSlideshow };
+} else {
+  startSlideshow();
+}

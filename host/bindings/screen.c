@@ -6,6 +6,7 @@
 
 #include "screen.h"
 #include "bindings.h"
+#include "graphics.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -119,6 +120,8 @@ static screen_state_t s_screen = {
     .byte_length = 0,
     .byte_order = SCREEN_BYTE_ORDER_NATIVE,
     .initialized = false,
+    .owns_buffer = false,
+    .graphics_handle = GRAPHICS_INVALID_HANDLE,
     .driver = 0,
     .show_callback = 0
 };
@@ -212,6 +215,10 @@ uint16_t screen_get_height(void) {
 
 bool screen_is_initialized(void) {
     return s_screen.initialized;
+}
+
+screen_byte_order_t screen_get_byte_order(void) {
+    return s_screen.byte_order;
 }
 
 /*
@@ -435,11 +442,13 @@ static jerry_value_t js_screen_init(
             "Invalid screen dimensions");
     }
     
-    /* Free existing buffer if any */
-    if (s_screen.buffer) {
+    /* Free existing buffer if we own it */
+    if (s_screen.buffer && s_screen.owns_buffer) {
         free(s_screen.buffer);
-        s_screen.buffer = NULL;
     }
+    s_screen.buffer = NULL;
+    s_screen.owns_buffer = false;
+    s_screen.graphics_handle = GRAPHICS_INVALID_HANDLE;
     if (s_screen.driver != 0) {
         jerry_value_free(s_screen.driver);
         s_screen.driver = 0;
@@ -449,12 +458,35 @@ static jerry_value_t js_screen_init(
         s_screen.show_callback = 0;
     }
     
-    /* Allocate buffer */
+    /* Calculate buffer size */
     uint32_t byte_length = (uint32_t)width * (uint32_t)height * sizeof(uint16_t);
-    s_screen.buffer = (uint16_t *)malloc(byte_length);
-    if (!s_screen.buffer) {
-        return jerry_throw_sz(JERRY_ERROR_COMMON, 
-            "Failed to allocate screen buffer (out of memory)");
+    
+    /* Check if driver provides an external buffer (e.g., DVI's draw buffer) */
+    jerry_value_t buf_key = jerry_string_sz("buffer");
+    jerry_value_t buf_val = jerry_object_get(driver, buf_key);
+    jerry_value_free(buf_key);
+    
+    if (jerry_value_is_number(buf_val)) {
+        /* Use external buffer - driver provides raw pointer */
+        uintptr_t buf_ptr = (uintptr_t)jerry_value_as_number(buf_val);
+        s_screen.buffer = (uint16_t *)buf_ptr;
+        s_screen.owns_buffer = false;
+        jerry_value_free(buf_val);
+        
+        if (!s_screen.buffer) {
+            return jerry_throw_sz(JERRY_ERROR_COMMON, 
+                "Driver provided NULL buffer pointer");
+        }
+    } else {
+        jerry_value_free(buf_val);
+        
+        /* Allocate our own buffer */
+        s_screen.buffer = (uint16_t *)malloc(byte_length);
+        if (!s_screen.buffer) {
+            return jerry_throw_sz(JERRY_ERROR_COMMON, 
+                "Failed to allocate screen buffer (out of memory)");
+        }
+        s_screen.owns_buffer = true;
     }
     
     /* Initialize state */
@@ -471,8 +503,10 @@ static jerry_value_t js_screen_init(
     jerry_value_free(show_key);
     
     if (!jerry_value_is_function(s_screen.show_callback)) {
-        free(s_screen.buffer);
+        if (s_screen.owns_buffer) free(s_screen.buffer);
         s_screen.buffer = NULL;
+        s_screen.owns_buffer = false;
+        s_screen.graphics_handle = GRAPHICS_INVALID_HANDLE;
         jerry_value_free(s_screen.driver);
         s_screen.driver = 0;
         jerry_value_free(s_screen.show_callback);
@@ -487,7 +521,7 @@ static jerry_value_t js_screen_init(
     jerry_value_free(init_key);
     
     if (jerry_value_is_function(init_func)) {
-        /* Build config object to pass to init */
+        /* Build config object to pass to init (backward compatible) */
         jerry_value_t config = jerry_object();
         js_set_number(config, "width", width);
         js_set_number(config, "height", height);
@@ -499,8 +533,10 @@ static jerry_value_t js_screen_init(
         
         if (jerry_value_is_exception(result)) {
             jerry_value_free(init_func);
-            free(s_screen.buffer);
+            if (s_screen.owns_buffer) free(s_screen.buffer);
             s_screen.buffer = NULL;
+            s_screen.owns_buffer = false;
+            s_screen.graphics_handle = GRAPHICS_INVALID_HANDLE;
             jerry_value_free(s_screen.driver);
             s_screen.driver = 0;
             jerry_value_free(s_screen.show_callback);
@@ -798,6 +834,24 @@ static jerry_value_t js_screen_show(
         return result;
     }
     jerry_value_free(result);
+
+    /* Refresh buffer pointer if driver updates it (e.g., DVI double buffering) */
+    jerry_value_t buf_key = jerry_string_sz("buffer");
+    jerry_value_t buf_val = jerry_object_get(s_screen.driver, buf_key);
+    jerry_value_free(buf_key);
+    if (jerry_value_is_number(buf_val)) {
+        uintptr_t buf_ptr = (uintptr_t)jerry_value_as_number(buf_val);
+        uint16_t *new_buffer = (uint16_t *)buf_ptr;
+        if (new_buffer && new_buffer != s_screen.buffer) {
+            s_screen.buffer = new_buffer;
+            s_screen.owns_buffer = false;
+            if (s_screen.graphics_handle != GRAPHICS_INVALID_HANDLE) {
+                graphics_replace_buffer(s_screen.graphics_handle, s_screen.buffer,
+                                        s_screen.width, s_screen.height);
+            }
+        }
+    }
+    jerry_value_free(buf_val);
     
     return jerry_undefined();
 }
@@ -824,6 +878,56 @@ static jerry_value_t js_screen_height_getter(
     return jerry_number((double)s_screen.height);
 }
 
+/* screen.getBufferHandle() - Get a graphics handle for the screen's buffer */
+static jerry_value_t js_screen_get_buffer_handle(
+    const jerry_call_info_t *call_info_p,
+    const jerry_value_t args[],
+    const jerry_length_t argc) {
+    (void)call_info_p;
+    (void)args;
+    (void)argc;
+    
+    if (!s_screen.initialized || !s_screen.buffer) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, 
+            "Screen not initialized");
+    }
+    
+    if (s_screen.graphics_handle != GRAPHICS_INVALID_HANDLE) {
+        uint16_t *data = graphics_get_buffer_data(s_screen.graphics_handle);
+        if (data == s_screen.buffer) {
+            return jerry_number((double)s_screen.graphics_handle);
+        }
+        s_screen.graphics_handle = GRAPHICS_INVALID_HANDLE;
+    }
+    
+    /* Register screen's buffer with the graphics system */
+    s_screen.graphics_handle = graphics_register_buffer(
+        s_screen.buffer, s_screen.width, s_screen.height);
+    
+    if (s_screen.graphics_handle == GRAPHICS_INVALID_HANDLE) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, 
+            "Failed to register screen buffer");
+    }
+    
+    return jerry_number((double)s_screen.graphics_handle);
+}
+
+/* screen.getByteOrder() - Get the byte order string ('native' or 'swapped') */
+static jerry_value_t js_screen_get_byte_order(
+    const jerry_call_info_t *call_info_p,
+    const jerry_value_t args[],
+    const jerry_length_t argc) {
+    (void)call_info_p;
+    (void)args;
+    (void)argc;
+    
+    if (s_screen.byte_order == SCREEN_BYTE_ORDER_NATIVE) {
+        return jerry_string_sz("native");
+    } else {
+        return jerry_string_sz("swapped");
+    }
+}
+
 /*
  * Module creation and registration
  */
@@ -847,6 +951,10 @@ jerry_value_t js_create_screen_module(void) {
     /* Width/height as getter functions (simpler than property descriptors) */
     js_set_function(module, "getWidth", js_screen_width_getter);
     js_set_function(module, "getHeight", js_screen_height_getter);
+    
+    /* Buffer access for image module integration */
+    js_set_function(module, "getBufferHandle", js_screen_get_buffer_handle);
+    js_set_function(module, "getByteOrder", js_screen_get_byte_order);
     
     /* Preset colors (native byte order - fixed values) */
     js_set_number(module, "BLACK", COLOR_BLACK);

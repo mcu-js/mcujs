@@ -37,8 +37,16 @@ typedef struct {
 graphics_buffer_handle_t graphics_create_buffer(uint16_t width, uint16_t height);
 
 /*
+ * Register an external buffer (e.g., screen's buffer) with the graphics system.
+ * The graphics system will NOT free this buffer - caller retains ownership.
+ * Returns a handle that can be used with image decoding functions.
+ */
+graphics_buffer_handle_t graphics_register_buffer(uint16_t *buffer, uint16_t width, uint16_t height);
+
+/*
  * Free the graphics buffer.
  * Returns true on success, false if handle is invalid.
+ * Note: Does not free external buffers registered via graphics_register_buffer.
  */
 bool graphics_free_buffer(graphics_buffer_handle_t handle);
 
@@ -58,6 +66,13 @@ bool graphics_get_buffer_info(graphics_buffer_handle_t handle, graphics_buffer_i
  * Used for DMA transfers. Returns NULL if handle is invalid.
  */
 uint16_t *graphics_get_buffer_data(graphics_buffer_handle_t handle);
+
+/*
+ * Replace the backing buffer for an existing handle.
+ * Keeps the handle stable for callers that cache it.
+ */
+bool graphics_replace_buffer(graphics_buffer_handle_t handle, uint16_t *buffer,
+                             uint16_t width, uint16_t height);
 
 /*
  * Get buffer byte length.

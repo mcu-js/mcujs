@@ -276,6 +276,31 @@ const mcujs_dvi_state_t* mcujs_dvi_get_state(void) {
     return &s_mcujs_dvi_state;
 }
 
+uint16_t* mcujs_dvi_get_draw_buffer(void) {
+    if (!s_mcujs_dvi_state.initialized || !s_mcujs_dvi_state.running) {
+        return NULL;
+    }
+    return s_draw_buffer;
+}
+
+bool mcujs_dvi_swap_and_show(void) {
+    if (!s_mcujs_dvi_state.initialized || !s_mcujs_dvi_state.running || !s_display_buffer || !s_draw_buffer) {
+        return false;
+    }
+    
+    /* Swap buffers atomically */
+    uint16_t *old_display = (uint16_t *)s_display_buffer;
+    s_display_buffer = s_draw_buffer;
+    s_draw_buffer = old_display;
+    __dmb();
+    
+    /* Render the new frame */
+    s_frame_complete = false;
+    render_scanlines();
+    
+    return true;
+}
+
 /*
  * =============================================================================
  * JerryScript Bindings
@@ -409,6 +434,51 @@ static jerry_value_t js_dvi_is_running(
     return jerry_boolean(mcujs_dvi_is_running());
 }
 
+/* DVI.getDrawBuffer() - Returns pointer to draw buffer for direct rendering */
+static jerry_value_t js_dvi_get_draw_buffer(
+    const jerry_call_info_t *call_info_p,
+    const jerry_value_t args[],
+    const jerry_length_t argc) {
+    (void)call_info_p;
+    (void)args;
+    (void)argc;
+    
+    uint16_t *buffer = mcujs_dvi_get_draw_buffer();
+    if (!buffer) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "DVI not started");
+    }
+    
+    return jerry_number((double)(uintptr_t)buffer);
+}
+
+/* DVI.getBufferSize() - Returns size in bytes of the draw buffer */
+static jerry_value_t js_dvi_get_buffer_size(
+    const jerry_call_info_t *call_info_p,
+    const jerry_value_t args[],
+    const jerry_length_t argc) {
+    (void)call_info_p;
+    (void)args;
+    (void)argc;
+    
+    return jerry_number((double)(FRAME_WIDTH * FRAME_HEIGHT * sizeof(uint16_t)));
+}
+
+/* DVI.swapAndShow() - Swap buffers and display (for direct rendering) */
+static jerry_value_t js_dvi_swap_and_show(
+    const jerry_call_info_t *call_info_p,
+    const jerry_value_t args[],
+    const jerry_length_t argc) {
+    (void)call_info_p;
+    (void)args;
+    (void)argc;
+    
+    if (!mcujs_dvi_swap_and_show()) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "Failed to swap/show DVI buffer");
+    }
+    
+    return jerry_undefined();
+}
+
 jerry_value_t js_create_dvi_module(void) {
     jerry_value_t module = jerry_object();
     
@@ -418,6 +488,9 @@ jerry_value_t js_create_dvi_module(void) {
     js_set_function(module, "show", js_dvi_show);
     js_set_function(module, "fill", js_dvi_fill);
     js_set_function(module, "isRunning", js_dvi_is_running);
+    js_set_function(module, "getDrawBuffer", js_dvi_get_draw_buffer);
+    js_set_function(module, "getBufferSize", js_dvi_get_buffer_size);
+    js_set_function(module, "swapAndShow", js_dvi_swap_and_show);
     
     js_set_number(module, "width", FRAME_WIDTH);
     js_set_number(module, "height", FRAME_HEIGHT);

@@ -70,6 +70,14 @@ static int levenshtein(const char *s1, const char *s2, int max_dist) {
 /* Maximum number of cached modules */
 #define MAX_MODULES 16
 
+/* Maximum module size for static wrapper buffer (8KB source + wrapper overhead)
+ * Using a static buffer avoids malloc() during require(), which is critical
+ * when memory is constrained (e.g., DVI running with large framebuffers).
+ * Modules larger than this will fall back to malloc(). */
+#define MAX_STATIC_MODULE_SIZE 8192
+#define WRAPPER_OVERHEAD 128  /* Space for wrapper prefix/suffix */
+static char s_module_wrapper_buf[MAX_STATIC_MODULE_SIZE + WRAPPER_OVERHEAD];
+
 /* Forward declaration for module suggestions */
 static const char *s_builtin_module_names[];
 
@@ -86,6 +94,66 @@ static size_t s_cache_count = 0;
 
 /* Current module path (for resolving relative paths) */
 static char s_current_module_path[MAX_MODULE_PATH] = "";
+
+/*
+ * Read a module file, using a static buffer for small files to avoid malloc().
+ */
+static js_result_t read_module_file(const char *filename,
+                                    char **content,
+                                    size_t *content_len,
+                                    bool *used_static) {
+    if (filename == NULL || content == NULL || content_len == NULL || used_static == NULL) {
+        return JS_ERROR_FILE_READ;
+    }
+    
+    fs_file_t file;
+    fs_result_t result = fs_open(&file, filename, FS_MODE_READ);
+    if (result != FS_OK) {
+        return JS_ERROR_FILE_NOT_FOUND;
+    }
+    
+    size_t file_size = 0;
+    result = fs_size(&file, &file_size);
+    if (result != FS_OK) {
+        fs_close(&file);
+        return JS_ERROR_FILE_READ;
+    }
+    
+    if (file_size <= MAX_STATIC_MODULE_SIZE) {
+        size_t bytes_read = 0;
+        result = fs_read(&file, s_module_wrapper_buf, file_size, &bytes_read);
+        fs_close(&file);
+        if (result != FS_OK || bytes_read != file_size) {
+            return JS_ERROR_FILE_READ;
+        }
+        s_module_wrapper_buf[file_size] = '\0';
+        *content = s_module_wrapper_buf;
+        *content_len = file_size;
+        *used_static = true;
+        return JS_OK;
+    }
+    
+    *content = (char *)malloc(file_size + 1);
+    if (*content == NULL) {
+        fs_close(&file);
+        return JS_ERROR_MEMORY;
+    }
+    
+    size_t bytes_read = 0;
+    result = fs_read(&file, *content, file_size, &bytes_read);
+    fs_close(&file);
+    
+    if (result != FS_OK || bytes_read != file_size) {
+        free(*content);
+        *content = NULL;
+        return JS_ERROR_FILE_READ;
+    }
+    
+    (*content)[file_size] = '\0';
+    *content_len = file_size;
+    *used_static = false;
+    return JS_OK;
+}
 
 /*
  * Find a module in the cache
@@ -225,8 +293,9 @@ static jerry_value_t load_module(const char *resolved_path) {
     /* Read file content */
     char *content = NULL;
     size_t content_len = 0;
+    bool content_is_static = false;
     
-    js_result_t result = js_module_read_file(resolved_path, &content, &content_len);
+    js_result_t result = read_module_file(resolved_path, &content, &content_len, &content_is_static);
     if (result != JS_OK) {
         /* Try to find a similar module name to suggest */
         char error_msg[192];
@@ -268,7 +337,9 @@ static jerry_value_t load_module(const char *resolved_path) {
     if (ends_with(resolved_path, ".json")) {
         /* Parse JSON directly using JSON.parse() */
         jerry_value_t json_str = jerry_string((const jerry_char_t *)content, content_len, JERRY_ENCODING_UTF8);
-        js_module_free_file(content);
+        if (!content_is_static) {
+            js_module_free_file(content);
+        }
         
         if (jerry_value_is_exception(json_str)) {
             return json_str;
@@ -313,25 +384,45 @@ static jerry_value_t load_module(const char *resolved_path) {
      * (function(exports, require, module, __filename, __dirname) {
      *   <module code>
      * })
+     * 
+     * Use static buffer when possible to avoid malloc() during require().
+     * This is critical for memory-constrained situations (e.g., DVI running).
      */
     const char *wrapper_start = "(function(exports, require, module, __filename, __dirname) {\n";
     const char *wrapper_end = "\n})";
     
-    size_t wrapper_len = strlen(wrapper_start) + content_len + strlen(wrapper_end) + 1;
-    char *wrapped = (char *)malloc(wrapper_len);
+    size_t wrapper_start_len = strlen(wrapper_start);
+    size_t wrapper_end_len = strlen(wrapper_end);
+    size_t wrapper_len = wrapper_start_len + content_len + wrapper_end_len + 1;
+    char *wrapped = NULL;
     
-    if (wrapped == NULL) {
-        js_module_free_file(content);
-        strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "Out of memory loading module");
+    if (content_is_static) {
+        if (wrapper_len > sizeof(s_module_wrapper_buf)) {
+            strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
+            return jerry_throw_sz(JERRY_ERROR_COMMON, "Module too large for static buffer");
+        }
+        /* Shift content forward and wrap in-place */
+        memmove(s_module_wrapper_buf + wrapper_start_len, s_module_wrapper_buf, content_len + 1);
+        memcpy(s_module_wrapper_buf, wrapper_start, wrapper_start_len);
+        memcpy(s_module_wrapper_buf + wrapper_start_len + content_len, wrapper_end, wrapper_end_len);
+        wrapped = s_module_wrapper_buf;
+    } else {
+        wrapped = (char *)realloc(content, wrapper_len);
+        if (wrapped == NULL) {
+            js_module_free_file(content);
+            strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
+            return jerry_throw_sz(JERRY_ERROR_COMMON, "Out of memory loading module");
+        }
+        memmove(wrapped + wrapper_start_len, wrapped, content_len + 1);
+        memcpy(wrapped, wrapper_start, wrapper_start_len);
+        memcpy(wrapped + wrapper_start_len + content_len, wrapper_end, wrapper_end_len);
     }
-    
-    snprintf(wrapped, wrapper_len, "%s%s%s", wrapper_start, content, wrapper_end);
-    js_module_free_file(content);
     
     /* Parse the wrapper function */
     jerry_value_t parsed = jerry_parse((const jerry_char_t *)wrapped, strlen(wrapped), NULL);
-    free(wrapped);
+    if (!content_is_static) {
+        free(wrapped);
+    }
     
     if (jerry_value_is_exception(parsed)) {
         strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));

@@ -74,9 +74,9 @@
  * 3: UTF-32
  */
 
-#define FF_LFN_BUF      255
+#define FF_LFN_BUF      64
 #define FF_SFN_BUF      12
-/* Buffer sizes for FILINFO structure */
+/* Buffer sizes for FILINFO structure - reduced from 255 to save stack space */
 
 #define FF_FS_RPATH     0
 /* Disable relative path - we handle paths in JS layer */

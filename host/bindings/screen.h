@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "jerryscript.h"
+#include "graphics.h"
 
 /* Maximum screen dimensions (memory safety limit for RP2040 with 264KB RAM) 
  * 320x240 RGB565 = 153KB, leaving ~100KB for JS heap and stack
@@ -40,6 +41,8 @@ typedef struct {
     uint32_t byte_length;
     screen_byte_order_t byte_order;
     bool initialized;
+    bool owns_buffer;               /* True if we allocated the buffer (should free on cleanup) */
+    graphics_buffer_handle_t graphics_handle; /* Cached graphics handle for screen buffer */
     jerry_value_t driver;           /* JS driver object reference */
     jerry_value_t show_callback;    /* Cached driver.show function */
 } screen_state_t;

@@ -19,6 +19,7 @@ static uint16_t s_height = 0;
 static uint32_t s_byte_length = 0;
 static graphics_buffer_handle_t s_current_handle = GRAPHICS_INVALID_HANDLE;
 static graphics_buffer_handle_t s_next_handle = 0;
+static bool s_is_external_buffer = false;  /* True if buffer is externally owned */
 
 /*
  * Core graphics functions
@@ -32,11 +33,12 @@ graphics_buffer_handle_t graphics_create_buffer(uint16_t width, uint16_t height)
     }
     
     /* Free existing buffer if any (single buffer strategy) */
-    if (s_buffer != NULL) {
+    if (s_buffer != NULL && !s_is_external_buffer) {
         free(s_buffer);
-        s_buffer = NULL;
-        s_current_handle = GRAPHICS_INVALID_HANDLE;
     }
+    s_buffer = NULL;
+    s_current_handle = GRAPHICS_INVALID_HANDLE;
+    s_is_external_buffer = false;
     
     /* Calculate buffer size */
     uint32_t pixel_count = (uint32_t)width * (uint32_t)height;
@@ -56,6 +58,29 @@ graphics_buffer_handle_t graphics_create_buffer(uint16_t width, uint16_t height)
     s_height = height;
     s_byte_length = byte_length;
     s_current_handle = s_next_handle++;
+    s_is_external_buffer = false;
+    
+    return s_current_handle;
+}
+
+graphics_buffer_handle_t graphics_register_buffer(uint16_t *buffer, uint16_t width, uint16_t height) {
+    /* Validate parameters */
+    if (buffer == NULL || width == 0 || height == 0) {
+        return GRAPHICS_INVALID_HANDLE;
+    }
+    
+    /* Free existing owned buffer if any */
+    if (s_buffer != NULL && !s_is_external_buffer) {
+        free(s_buffer);
+    }
+    
+    /* Register external buffer */
+    s_buffer = buffer;
+    s_width = width;
+    s_height = height;
+    s_byte_length = (uint32_t)width * height * sizeof(uint16_t);
+    s_current_handle = s_next_handle++;
+    s_is_external_buffer = true;
     
     return s_current_handle;
 }
@@ -65,18 +90,35 @@ bool graphics_free_buffer(graphics_buffer_handle_t handle) {
         return false;
     }
     
-    free(s_buffer);
+    /* Only free if we own the buffer */
+    if (!s_is_external_buffer) {
+        free(s_buffer);
+    }
     s_buffer = NULL;
     s_width = 0;
     s_height = 0;
     s_byte_length = 0;
     s_current_handle = GRAPHICS_INVALID_HANDLE;
+    s_is_external_buffer = false;
     
     return true;
 }
 
 bool graphics_buffer_valid(graphics_buffer_handle_t handle) {
-    return (handle == s_current_handle && s_buffer != NULL);
+    if (s_buffer == NULL) {
+        return false;
+    }
+    
+    if (handle == s_current_handle) {
+        return true;
+    }
+    
+    /* Allow stale handles for external buffers (single-buffer strategy) */
+    if (s_is_external_buffer && handle >= 0 && handle < s_next_handle) {
+        return true;
+    }
+    
+    return false;
 }
 
 bool graphics_get_buffer_info(graphics_buffer_handle_t handle, graphics_buffer_info_t *info) {
@@ -95,6 +137,25 @@ uint16_t *graphics_get_buffer_data(graphics_buffer_handle_t handle) {
         return NULL;
     }
     return s_buffer;
+}
+
+bool graphics_replace_buffer(graphics_buffer_handle_t handle, uint16_t *buffer,
+                             uint16_t width, uint16_t height) {
+    if (handle != s_current_handle || buffer == NULL || width == 0 || height == 0) {
+        return false;
+    }
+    
+    if (s_buffer != buffer && !s_is_external_buffer) {
+        free(s_buffer);
+    }
+    
+    s_buffer = buffer;
+    s_width = width;
+    s_height = height;
+    s_byte_length = (uint32_t)width * height * sizeof(uint16_t);
+    s_is_external_buffer = true;
+    
+    return true;
 }
 
 uint32_t graphics_get_buffer_byte_length(graphics_buffer_handle_t handle) {
@@ -356,6 +417,28 @@ static jerry_value_t graphics_color565_handler(
     return jerry_number((double)graphics_color565(r, g, b));
 }
 
+/* graphics.getPointer(handle) - Get raw buffer pointer for DMA/DVI */
+static jerry_value_t graphics_get_pointer_handler(
+    const jerry_call_info_t *call_info_p,
+    const jerry_value_t args[],
+    const jerry_length_t argc) {
+    (void)call_info_p;
+    
+    if (argc < 1 || !jerry_value_is_number(args[0])) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE, 
+            "graphics.getPointer requires a buffer handle");
+    }
+    
+    graphics_buffer_handle_t handle = (graphics_buffer_handle_t)jerry_value_as_number(args[0]);
+    uint16_t *data = graphics_get_buffer_data(handle);
+    
+    if (data == NULL) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "Invalid buffer handle");
+    }
+    
+    return jerry_number((double)(uintptr_t)data);
+}
+
 /*
  * Module creation and registration
  */
@@ -366,6 +449,7 @@ jerry_value_t js_create_graphics_module(void) {
     js_set_function(module, "createBuffer", graphics_create_buffer_handler);
     js_set_function(module, "freeBuffer", graphics_free_buffer_handler);
     js_set_function(module, "getBufferInfo", graphics_get_buffer_info_handler);
+    js_set_function(module, "getPointer", graphics_get_pointer_handler);
     js_set_function(module, "fill", graphics_fill_handler);
     js_set_function(module, "setPixel", graphics_set_pixel_handler);
     js_set_function(module, "fillRect", graphics_fill_rect_handler);

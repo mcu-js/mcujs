@@ -56,9 +56,22 @@ static inline uint16_t rgb_to_565_swapped(uint8_t r, uint8_t g, uint8_t b) {
     return (color >> 8) | (color << 8);  /* Byte swap for big-endian SPI */
 }
 
-int image_decode_jpeg(graphics_buffer_handle_t handle,
-                      const uint8_t *data, size_t data_len,
-                      int16_t dest_x, int16_t dest_y)
+/* Convert RGB888 to native RGB565 for DVI displays */
+static inline uint16_t rgb_to_565_native(uint8_t r, uint8_t g, uint8_t b) {
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
+/* Byte order enum for image decoding */
+typedef enum {
+    IMAGE_BYTE_ORDER_SWAPPED = 0,  /* Default: SPI displays (big-endian) */
+    IMAGE_BYTE_ORDER_NATIVE = 1    /* DVI displays (little-endian) */
+} image_byte_order_t;
+
+/* Extended JPEG decode with byte order option */
+int image_decode_jpeg_ex(graphics_buffer_handle_t handle,
+                         const uint8_t *data, size_t data_len,
+                         int16_t dest_x, int16_t dest_y,
+                         image_byte_order_t byte_order)
 {
     if (!graphics_buffer_valid(handle) || data == NULL || data_len == 0) {
         return -1;
@@ -88,8 +101,6 @@ int image_decode_jpeg(graphics_buffer_handle_t handle,
     if (status != 0) {
         return status;
     }
-    
-
     
     /* Decode MCU by MCU */
     int mcu_x = 0;
@@ -163,8 +174,12 @@ int image_decode_jpeg(graphics_buffer_handle_t handle,
                             b = img_info.m_pMCUBufB[pixel_offset];
                         }
                         
-                        /* Write to buffer */
-                        buffer[dy * buf_info.width + dx] = rgb_to_565_swapped(r, g, b);
+                        /* Write to buffer with appropriate byte order */
+                        if (byte_order == IMAGE_BYTE_ORDER_NATIVE) {
+                            buffer[dy * buf_info.width + dx] = rgb_to_565_native(r, g, b);
+                        } else {
+                            buffer[dy * buf_info.width + dx] = rgb_to_565_swapped(r, g, b);
+                        }
                     }
                 }
             }
@@ -184,6 +199,14 @@ int image_decode_jpeg(graphics_buffer_handle_t handle,
     }
     
     return status;
+}
+
+/* Legacy wrapper for backward compatibility - uses swapped byte order for SPI displays */
+int image_decode_jpeg(graphics_buffer_handle_t handle,
+                      const uint8_t *data, size_t data_len,
+                      int16_t dest_x, int16_t dest_y)
+{
+    return image_decode_jpeg_ex(handle, data, data_len, dest_x, dest_y, IMAGE_BYTE_ORDER_SWAPPED);
 }
 
 /*
@@ -232,9 +255,11 @@ static inline int32_t read_le32_signed(const uint8_t *p) {
     return (int32_t)read_le32(p);
 }
 
-int image_decode_bmp(graphics_buffer_handle_t handle,
-                     const uint8_t *data, size_t data_len,
-                     int16_t dest_x, int16_t dest_y)
+/* Extended BMP decode with byte order option */
+int image_decode_bmp_ex(graphics_buffer_handle_t handle,
+                        const uint8_t *data, size_t data_len,
+                        int16_t dest_x, int16_t dest_y,
+                        image_byte_order_t byte_order)
 {
     if (!graphics_buffer_valid(handle) || data == NULL || data_len < 54) {
         return IMAGE_BMP_ERR_INVALID;
@@ -326,8 +351,11 @@ int image_decode_bmp(graphics_buffer_handle_t handle,
                 case 16: {
                     /* Assume RGB565 format */
                     uint16_t pixel = read_le16(row + x * 2);
-                    /* Byte-swap for SPI */
-                    color565 = (pixel >> 8) | (pixel << 8);
+                    if (byte_order == IMAGE_BYTE_ORDER_NATIVE) {
+                        color565 = pixel;  /* Keep native */
+                    } else {
+                        color565 = (pixel >> 8) | (pixel << 8);  /* Byte-swap for SPI */
+                    }
                     break;
                 }
                 case 24: {
@@ -335,7 +363,11 @@ int image_decode_bmp(graphics_buffer_handle_t handle,
                     uint8_t b = row[x * 3 + 0];
                     uint8_t g = row[x * 3 + 1];
                     uint8_t r = row[x * 3 + 2];
-                    color565 = rgb_to_565_swapped(r, g, b);
+                    if (byte_order == IMAGE_BYTE_ORDER_NATIVE) {
+                        color565 = rgb_to_565_native(r, g, b);
+                    } else {
+                        color565 = rgb_to_565_swapped(r, g, b);
+                    }
                     break;
                 }
                 case 32: {
@@ -344,7 +376,11 @@ int image_decode_bmp(graphics_buffer_handle_t handle,
                     uint8_t g = row[x * 4 + 1];
                     uint8_t r = row[x * 4 + 2];
                     /* Alpha at row[x * 4 + 3] is ignored */
-                    color565 = rgb_to_565_swapped(r, g, b);
+                    if (byte_order == IMAGE_BYTE_ORDER_NATIVE) {
+                        color565 = rgb_to_565_native(r, g, b);
+                    } else {
+                        color565 = rgb_to_565_swapped(r, g, b);
+                    }
                     break;
                 }
                 default:
@@ -357,6 +393,14 @@ int image_decode_bmp(graphics_buffer_handle_t handle,
     }
     
     return IMAGE_BMP_OK;
+}
+
+/* Legacy wrapper for backward compatibility - uses swapped byte order for SPI displays */
+int image_decode_bmp(graphics_buffer_handle_t handle,
+                     const uint8_t *data, size_t data_len,
+                     int16_t dest_x, int16_t dest_y)
+{
+    return image_decode_bmp_ex(handle, data, data_len, dest_x, dest_y, IMAGE_BYTE_ORDER_SWAPPED);
 }
 
 /*
@@ -536,6 +580,42 @@ static jerry_value_t image_info_handler(
     return result;
 }
 
+/* Helper to parse byteOrder from options object */
+static bool get_byte_order_from_options(jerry_value_t options, image_byte_order_t *byte_order) {
+    *byte_order = IMAGE_BYTE_ORDER_SWAPPED;  /* Default for SPI displays */
+    
+    jerry_value_t bo_key = jerry_string_sz("byteOrder");
+    jerry_value_t bo_val = jerry_object_get(options, bo_key);
+    bool ok = true;
+    
+    if (!jerry_value_is_undefined(bo_val) && !jerry_value_is_null(bo_val)) {
+        if (!jerry_value_is_string(bo_val)) {
+            ok = false;
+        } else {
+            jerry_size_t len = jerry_string_size(bo_val, JERRY_ENCODING_UTF8);
+            if (len > 0 && len < 16) {
+                char buf[16];
+                jerry_string_to_buffer(bo_val, JERRY_ENCODING_UTF8, (jerry_char_t *)buf, sizeof(buf) - 1);
+                buf[len] = '\0';
+                if (strcmp(buf, "native") == 0) {
+                    *byte_order = IMAGE_BYTE_ORDER_NATIVE;
+                } else if (strcmp(buf, "swapped") == 0) {
+                    *byte_order = IMAGE_BYTE_ORDER_SWAPPED;
+                } else {
+                    ok = false;
+                }
+            } else {
+                ok = false;
+            }
+        }
+    }
+    
+    jerry_value_free(bo_val);
+    jerry_value_free(bo_key);
+    
+    return ok;
+}
+
 /* image.decodeJPEG(handle, data, options) */
 static jerry_value_t image_decode_jpeg_handler(
     const jerry_call_info_t *call_info_p,
@@ -562,8 +642,9 @@ static jerry_value_t image_decode_jpeg_handler(
         return jerry_throw_sz(JERRY_ERROR_TYPE, "data must be a string");
     }
     
-    /* Get optional x, y from options object */
+    /* Get optional x, y, byteOrder from options object */
     int16_t x = 0, y = 0;
+    image_byte_order_t byte_order = IMAGE_BYTE_ORDER_SWAPPED;
     if (argc >= 3 && jerry_value_is_object(args[2])) {
         jerry_value_t options = args[2];
         
@@ -582,10 +663,15 @@ static jerry_value_t image_decode_jpeg_handler(
         }
         jerry_value_free(y_val);
         jerry_value_free(y_key);
+        
+        if (!get_byte_order_from_options(options, &byte_order)) {
+            return jerry_throw_sz(JERRY_ERROR_TYPE, 
+                "byteOrder must be 'native' or 'swapped'");
+        }
     }
     
     /* Decode */
-    int result = image_decode_jpeg(handle, data, data_len, x, y);
+    int result = image_decode_jpeg_ex(handle, data, data_len, x, y, byte_order);
     if (result != 0) {
         char msg[64];
         snprintf(msg, sizeof(msg), "JPEG decode failed with error %d", result);
@@ -621,8 +707,9 @@ static jerry_value_t image_decode_bmp_handler(
         return jerry_throw_sz(JERRY_ERROR_TYPE, "data must be a string");
     }
     
-    /* Get optional x, y from options object */
+    /* Get optional x, y, byteOrder from options object */
     int16_t x = 0, y = 0;
+    image_byte_order_t byte_order = IMAGE_BYTE_ORDER_SWAPPED;
     if (argc >= 3 && jerry_value_is_object(args[2])) {
         jerry_value_t options = args[2];
         
@@ -641,10 +728,15 @@ static jerry_value_t image_decode_bmp_handler(
         }
         jerry_value_free(y_val);
         jerry_value_free(y_key);
+        
+        if (!get_byte_order_from_options(options, &byte_order)) {
+            return jerry_throw_sz(JERRY_ERROR_TYPE, 
+                "byteOrder must be 'native' or 'swapped'");
+        }
     }
     
     /* Decode */
-    int result = image_decode_bmp(handle, data, data_len, x, y);
+    int result = image_decode_bmp_ex(handle, data, data_len, x, y, byte_order);
     if (result != IMAGE_BMP_OK) {
         const char *msg;
         switch (result) {
@@ -704,8 +796,9 @@ static jerry_value_t image_draw_jpeg_handler(
         return jerry_throw_sz(JERRY_ERROR_TYPE, "path must be a string");
     }
     
-    /* Get optional x, y from options object */
+    /* Get optional x, y, byteOrder from options object */
     int16_t x = 0, y = 0;
+    image_byte_order_t byte_order = IMAGE_BYTE_ORDER_SWAPPED;
     if (argc >= 3 && jerry_value_is_object(args[2])) {
         jerry_value_t options = args[2];
         
@@ -724,6 +817,11 @@ static jerry_value_t image_draw_jpeg_handler(
         }
         jerry_value_free(y_val);
         jerry_value_free(y_key);
+        
+        if (!get_byte_order_from_options(options, &byte_order)) {
+            return jerry_throw_sz(JERRY_ERROR_TYPE, 
+                "byteOrder must be 'native' or 'swapped'");
+        }
     }
     
     /* Load image from file */
@@ -734,7 +832,7 @@ static jerry_value_t image_draw_jpeg_handler(
     }
     
     /* Decode */
-    int result = image_decode_jpeg(handle, data, data_len, x, y);
+    int result = image_decode_jpeg_ex(handle, data, data_len, x, y, byte_order);
     if (result != 0) {
         char msg[64];
         snprintf(msg, sizeof(msg), "JPEG decode failed with error %d", result);
@@ -769,8 +867,9 @@ static jerry_value_t image_draw_bmp_handler(
         return jerry_throw_sz(JERRY_ERROR_TYPE, "path must be a string");
     }
     
-    /* Get optional x, y from options object */
+    /* Get optional x, y, byteOrder from options object */
     int16_t x = 0, y = 0;
+    image_byte_order_t byte_order = IMAGE_BYTE_ORDER_SWAPPED;
     if (argc >= 3 && jerry_value_is_object(args[2])) {
         jerry_value_t options = args[2];
         
@@ -789,6 +888,11 @@ static jerry_value_t image_draw_bmp_handler(
         }
         jerry_value_free(y_val);
         jerry_value_free(y_key);
+        
+        if (!get_byte_order_from_options(options, &byte_order)) {
+            return jerry_throw_sz(JERRY_ERROR_TYPE, 
+                "byteOrder must be 'native' or 'swapped'");
+        }
     }
     
     /* Load image from file */
@@ -799,7 +903,7 @@ static jerry_value_t image_draw_bmp_handler(
     }
     
     /* Decode */
-    int result = image_decode_bmp(handle, data, data_len, x, y);
+    int result = image_decode_bmp_ex(handle, data, data_len, x, y, byte_order);
     if (result != IMAGE_BMP_OK) {
         const char *msg;
         switch (result) {

@@ -27,8 +27,11 @@ Requires `gh` authenticated with `admin:org`:
 The TXT tokens printed by --add/--list can be passed to:
 
   GITHUB_PAGES_VERIFY_MCUJS_ORG=... \
+  GITHUB_PAGES_VERIFY_MCUJS_ORG_HOST=... \
   GITHUB_PAGES_VERIFY_MCUJS_COM=... \
+  GITHUB_PAGES_VERIFY_MCUJS_COM_HOST=... \
   DYNADOT_API_KEY=... \
+  DYNADOT_API_SECRET=... \
   scripts/configure-pages-dns.sh --apply
 EOF
 }

@@ -41,6 +41,10 @@ DNS target:
   www.mcujs.org and www.mcujs.com CNAME      -> mcu-js.github.io
   mcujs.com nameservers                      -> ns1/ns2.dyna-ns.net
 
+Optional GitHub Pages org-domain verification TXT values:
+  GITHUB_PAGES_VERIFY_MCUJS_ORG -> _github-pages-challenge-mcu-js.mcujs.org
+  GITHUB_PAGES_VERIFY_MCUJS_COM -> _github-pages-challenge-mcu-js.mcujs.com
+
 Note: Dynadot set_dns2 overwrites existing DNS settings. Public DNS currently
 shows no MX, TXT, or CAA records for these domains; re-check before applying if
 that changes.
@@ -130,6 +134,7 @@ set_dynadot_nameservers() {
 
 set_dynadot_dns() {
     local domain="$1"
+    local verification_token=""
     local params=(
         "command=set_dns2"
         "domain=${domain}"
@@ -155,6 +160,23 @@ set_dynadot_dns() {
         "sub_record_type0=cname"
         "sub_record0=mcu-js.github.io"
     )
+
+    case "${domain}" in
+        mcujs.org)
+            verification_token="${GITHUB_PAGES_VERIFY_MCUJS_ORG:-}"
+            ;;
+        mcujs.com)
+            verification_token="${GITHUB_PAGES_VERIFY_MCUJS_COM:-}"
+            ;;
+    esac
+
+    if [[ -n "${verification_token}" ]]; then
+        params+=(
+            "subdomain1=_github-pages-challenge-mcu-js"
+            "sub_record_type1=txt"
+            "sub_record1=${verification_token}"
+        )
+    fi
 
     dynadot_request "Set Dynadot DNS for ${domain}" "${params[@]}"
 }

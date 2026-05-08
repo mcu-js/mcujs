@@ -1,0 +1,60 @@
+name: Configure Pages DNS
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "DNS operation to run"
+        required: true
+        default: "verify"
+        type: choice
+        options:
+          - verify
+          - apply
+          - enable-https
+      github_pages_verify_mcujs_org:
+        description: "Optional GitHub Pages verification TXT token for mcujs.org"
+        required: false
+        type: string
+      github_pages_verify_mcujs_com:
+        description: "Optional GitHub Pages verification TXT token for mcujs.com"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+
+jobs:
+  configure-dns:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GITHUB_PAGES_VERIFY_MCUJS_ORG: ${{ inputs.github_pages_verify_mcujs_org }}
+      GITHUB_PAGES_VERIFY_MCUJS_COM: ${{ inputs.github_pages_verify_mcujs_com }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show runner public IP
+        run: curl -sS https://api.ipify.org && printf '\n'
+
+      - name: Verify DNS plan and current health
+        if: inputs.mode == 'verify'
+        run: scripts/configure-pages-dns.sh --verify
+
+      - name: Apply Dynadot DNS records
+        if: inputs.mode == 'apply'
+        env:
+          DYNADOT_API_KEY: ${{ secrets.DYNADOT_API_KEY }}
+        run: |
+          test -n "${DYNADOT_API_KEY}" || {
+            echo "DYNADOT_API_KEY repository secret is required for apply mode." >&2
+            exit 1
+          }
+          scripts/configure-pages-dns.sh --apply --verify
+
+      - name: Enable GitHub Pages HTTPS
+        if: inputs.mode == 'enable-https'
+        run: scripts/configure-pages-dns.sh --verify --enable-https

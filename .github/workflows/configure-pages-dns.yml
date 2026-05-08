@@ -48,10 +48,15 @@ jobs:
         if: inputs.mode == 'apply'
         env:
           DYNADOT_API_KEY: ${{ secrets.DYNADOT_API_KEY }}
+          DYNADOT_API_SECRET: ${{ secrets.DYNADOT_API_SECRET }}
         run: |
           echo "Dynadot API access is IP-restricted; verify the runner IP printed above is allowed before relying on apply mode."
           test -n "${DYNADOT_API_KEY}" || {
             echo "DYNADOT_API_KEY repository secret is required for apply mode." >&2
+            exit 1
+          }
+          test -n "${DYNADOT_API_SECRET}" || {
+            echo "DYNADOT_API_SECRET repository secret is required for apply mode." >&2
             exit 1
           }
           scripts/configure-pages-dns.sh --apply --verify

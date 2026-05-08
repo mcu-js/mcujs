@@ -11,6 +11,7 @@ DNS resolution, and attempts GitHub Pages health checks.
 Use `mode=apply` only after:
 
 - the repository secret `DYNADOT_API_KEY` exists, and
+- the repository secret `DYNADOT_API_SECRET` exists, and
 - the GitHub-hosted runner IP printed by the workflow is allowed in Dynadot API
   settings.
 
@@ -18,7 +19,8 @@ Dynadot API access is IP-restricted. If the GitHub-hosted runner IP is not
 allowed, run the local helper from an already-whitelisted machine instead:
 
 ```bash
-DYNADOT_API_KEY=... scripts/configure-pages-dns.sh --apply
+# .env may contain DYNADOT_API_KEY and DYNADOT_API_SECRET.
+scripts/configure-pages-dns.sh --apply
 scripts/configure-pages-dns.sh --verify
 ```
 

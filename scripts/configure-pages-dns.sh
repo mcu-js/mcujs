@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-API_URL="${DYNADOT_API_URL:-https://api.dynadot.com/api3.json}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${ROOT_DIR}/.env"
+    set +a
+fi
+
+API_BASE_URL="${DYNADOT_API_BASE_URL:-https://api.dynadot.com}"
+API_VERSION="${DYNADOT_API_VERSION:-v2}"
 APPLY=0
 VERIFY=0
 ENABLE_HTTPS=0
@@ -28,13 +38,13 @@ Usage:
   scripts/configure-pages-dns.sh [options]
 
 Options:
-  --apply          Apply Dynadot DNS changes. Requires DYNADOT_API_KEY.
+  --apply          Apply Dynadot DNS changes. Requires DYNADOT_API_KEY and DYNADOT_API_SECRET.
   --verify         Check DNS and GitHub Pages domain health.
   --enable-https   Ask GitHub Pages to enforce HTTPS for both custom domains.
   --help           Show this help text.
 
-Default behavior is a dry run that prints the Dynadot API changes without
-requiring an API key.
+Default behavior is a dry run that prints the Dynadot REST API changes without
+requiring API credentials. Local .env is loaded automatically when present.
 
 DNS target:
   mcujs.org and mcujs.com apex A/AAAA records -> GitHub Pages
@@ -42,12 +52,14 @@ DNS target:
   mcujs.com nameservers                      -> ns1/ns2.dyna-ns.net
 
 Optional GitHub Pages org-domain verification TXT values:
-  GITHUB_PAGES_VERIFY_MCUJS_ORG -> _github-pages-challenge-mcu-js.mcujs.org
-  GITHUB_PAGES_VERIFY_MCUJS_COM -> _github-pages-challenge-mcu-js.mcujs.com
+  GITHUB_PAGES_VERIFY_MCUJS_ORG -> _gh-mcu-js-o.mcujs.org
+  GITHUB_PAGES_VERIFY_MCUJS_COM -> _gh-mcu-js-o.mcujs.com
 
-Note: Dynadot set_dns2 overwrites existing DNS settings. Public DNS currently
-shows no MX, TXT, or CAA records for these domains; re-check before applying if
-that changes.
+Note: Dynadot records are sent with add_dns_to_current_setting=false, replacing
+existing DNS settings. During apply, existing _gh-mcu-js-o TXT verification
+records are preserved when explicit token values are not supplied. Public DNS
+currently shows no MX, TXT, or CAA records for these domains; re-check before
+applying if that changes.
 EOF
 }
 
@@ -86,18 +98,54 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
-dynadot_request() {
+json_value() {
+    local json="$1"
+    local filter="$2"
+
+    printf '%s\n' "${json}" | jq -r "${filter}"
+}
+
+request_id() {
+    if command -v uuidgen >/dev/null 2>&1; then
+        uuidgen | tr '[:upper:]' '[:lower:]'
+    elif [[ -r /proc/sys/kernel/random/uuid ]]; then
+        cat /proc/sys/kernel/random/uuid
+    else
+        local hex
+        hex="$(openssl rand -hex 16)"
+        printf '%s-%s-%s-%s-%s\n' "${hex:0:8}" "${hex:8:4}" "${hex:12:4}" "${hex:16:4}" "${hex:20:12}"
+    fi
+}
+
+dynadot_signature() {
+    local path="$1"
+    local request_id="$2"
+    local body="$3"
+
+    printf '%s\n%s\n%s\n%s' \
+        "${DYNADOT_API_KEY}" \
+        "${path}" \
+        "${request_id}" \
+        "${body}" |
+        openssl dgst -sha256 -hmac "${DYNADOT_API_SECRET}" -binary |
+        openssl base64 -A
+}
+
+dynadot_rest_request() {
     local label="$1"
-    shift
-    local params=("$@")
+    local method="$2"
+    local path="$3"
+    local body="${4:-}"
     local response
-    local status
+    local response_body
+    local http_code
     local code
 
     printf '\n%s\n' "$label"
-    for param in "${params[@]}"; do
-        printf '  %s\n' "$param"
-    done
+    printf '  %s %s%s\n' "${method}" "${API_BASE_URL}" "${path}"
+    if [[ -n "${body}" ]]; then
+        printf '%s\n' "${body}" | jq . | sed 's/^/  /'
+    fi
 
     if [[ "${APPLY}" -eq 0 ]]; then
         printf '  dry-run: not sent\n'
@@ -106,79 +154,158 @@ dynadot_request() {
 
     require_command curl
     require_command jq
+    require_command openssl
     [[ -n "${DYNADOT_API_KEY:-}" ]] || fail 'DYNADOT_API_KEY is required with --apply'
+    [[ -n "${DYNADOT_API_SECRET:-}" ]] || fail 'DYNADOT_API_SECRET is required with --apply'
 
-    local curl_args=(-sS --get "${API_URL}" --data-urlencode "key=${DYNADOT_API_KEY}")
-    for param in "${params[@]}"; do
-        curl_args+=(--data-urlencode "${param}")
-    done
+    if [[ -n "${body}" ]]; then
+        body="$(printf '%s\n' "${body}" | jq -c .)"
+    fi
+
+    local id
+    local signature
+    id="$(request_id)"
+    signature="$(dynadot_signature "${path}" "${id}" "${body}")"
+
+    local curl_args=(
+        -sS
+        -w $'\n%{http_code}'
+        -X "${method}"
+        "${API_BASE_URL}${path}"
+        -H "Accept: application/json"
+        -H "Authorization: Bearer ${DYNADOT_API_KEY}"
+        -H "X-Request-ID: ${id}"
+        -H "X-Signature: ${signature}"
+    )
+
+    if [[ -n "${body}" ]]; then
+        curl_args+=(
+            -H "Content-Type: application/json"
+            --data "${body}"
+        )
+    fi
 
     response="$(curl "${curl_args[@]}")"
-    printf '%s\n' "${response}" | jq .
+    http_code="${response##*$'\n'}"
+    response_body="${response%$'\n'*}"
 
-    status="$(printf '%s\n' "${response}" | jq -r '.. | objects | .Status? // empty' | head -n 1)"
-    code="$(printf '%s\n' "${response}" | jq -r '.. | objects | (.ResponseCode? // .SuccessCode? // empty)' | head -n 1)"
+    if printf '%s\n' "${response_body}" | jq . >/dev/null 2>&1; then
+        printf '%s\n' "${response_body}" | jq .
+        code="$(json_value "${response_body}" '.code // .Code // empty')"
+    else
+        printf '%s\n' "${response_body}"
+        code=""
+    fi
 
-    [[ "${status}" == "success" && "${code}" == "0" ]] || fail "Dynadot API call failed: ${label}"
+    [[ "${http_code}" =~ ^2[0-9][0-9]$ ]] || fail "Dynadot API call failed: ${label} (HTTP ${http_code})"
+    [[ -z "${code}" || "${code}" =~ ^2[0-9][0-9]$ ]] || fail "Dynadot API call failed: ${label} (code ${code})"
+}
+
+dynadot_existing_txt_record() {
+    local domain="$1"
+    local host="$2"
+    local path="/restful/${API_VERSION}/domains/${domain}/records"
+    local response
+    local response_body
+    local http_code
+    local id
+    local signature
+
+    require_command curl
+    require_command jq
+    require_command openssl
+    [[ -n "${DYNADOT_API_KEY:-}" ]] || fail 'DYNADOT_API_KEY is required with --apply'
+    [[ -n "${DYNADOT_API_SECRET:-}" ]] || fail 'DYNADOT_API_SECRET is required with --apply'
+
+    id="$(request_id)"
+    signature="$(dynadot_signature "${path}" "${id}" "")"
+    response="$(
+        curl -sS -w $'\n%{http_code}' -X GET "${API_BASE_URL}${path}" \
+            -H "Accept: application/json" \
+            -H "Authorization: Bearer ${DYNADOT_API_KEY}" \
+            -H "X-Request-ID: ${id}" \
+            -H "X-Signature: ${signature}"
+    )"
+    http_code="${response##*$'\n'}"
+    response_body="${response%$'\n'*}"
+
+    [[ "${http_code}" =~ ^2[0-9][0-9]$ ]] || return 0
+    printf '%s\n' "${response_body}" |
+        jq -r --arg host "${host}" '
+            .data.name_server_settings.sub_domains[]?
+            | select(.sub_host == $host and .record_type == "txt")
+            | .value
+        ' |
+        head -n 1
 }
 
 set_dynadot_nameservers() {
     local domain="$1"
+    local body
 
-    dynadot_request "Set Dynadot nameservers for ${domain}" \
-        "command=set_ns" \
-        "domain=${domain}" \
-        "ns0=ns1.dyna-ns.net" \
-        "ns1=ns2.dyna-ns.net"
+    body="$(jq -c -n '{nameserver_list: ["ns1.dyna-ns.net", "ns2.dyna-ns.net"]}')"
+
+    dynadot_rest_request \
+        "Set Dynadot nameservers for ${domain}" \
+        "PUT" \
+        "/restful/${API_VERSION}/domains/${domain}/nameservers" \
+        "${body}"
 }
 
 set_dynadot_dns() {
     local domain="$1"
     local verification_token=""
-    local params=(
-        "command=set_dns2"
-        "domain=${domain}"
-        "ttl=300"
-    )
-    local index=0
+    local verification_host="_gh-mcu-js-o"
+    local main_json="[]"
+    local sub_json="[]"
+    local body
     local ip
 
     for ip in "${GITHUB_PAGES_IPV4[@]}"; do
-        params+=("main_record_type${index}=a")
-        params+=("main_record${index}=${ip}")
-        index=$((index + 1))
+        main_json="$(jq -c --arg ip "${ip}" '. + [{record_type: "a", record_value1: $ip}]' <<< "${main_json}")"
     done
 
     for ip in "${GITHUB_PAGES_IPV6[@]}"; do
-        params+=("main_record_type${index}=aaaa")
-        params+=("main_record${index}=${ip}")
-        index=$((index + 1))
+        main_json="$(jq -c --arg ip "${ip}" '. + [{record_type: "aaaa", record_value1: $ip}]' <<< "${main_json}")"
     done
 
-    params+=(
-        "subdomain0=www"
-        "sub_record_type0=cname"
-        "sub_record0=mcu-js.github.io"
-    )
+    sub_json="$(jq -c '. + [{sub_host: "www", record_type: "cname", record_value1: "mcu-js.github.io"}]' <<< "${sub_json}")"
 
     case "${domain}" in
         mcujs.org)
             verification_token="${GITHUB_PAGES_VERIFY_MCUJS_ORG:-}"
+            verification_host="${GITHUB_PAGES_VERIFY_MCUJS_ORG_HOST:-${verification_host}}"
             ;;
         mcujs.com)
             verification_token="${GITHUB_PAGES_VERIFY_MCUJS_COM:-}"
+            verification_host="${GITHUB_PAGES_VERIFY_MCUJS_COM_HOST:-${verification_host}}"
             ;;
     esac
 
-    if [[ -n "${verification_token}" ]]; then
-        params+=(
-            "subdomain1=_github-pages-challenge-mcu-js"
-            "sub_record_type1=txt"
-            "sub_record1=${verification_token}"
-        )
+    if [[ -z "${verification_token}" && "${APPLY}" -eq 1 ]]; then
+        verification_token="$(dynadot_existing_txt_record "${domain}" "${verification_host}")"
     fi
 
-    dynadot_request "Set Dynadot DNS for ${domain}" "${params[@]}"
+    if [[ -n "${verification_token}" ]]; then
+        sub_json="$(
+            jq -c --arg host "${verification_host}" --arg token "${verification_token}" \
+                '. + [{sub_host: $host, record_type: "txt", record_value1: $token}]' \
+                <<< "${sub_json}"
+        )"
+    fi
+
+    body="$(
+        jq -c -n \
+            --argjson main "${main_json}" \
+            --argjson sub "${sub_json}" \
+            '{dns_main_list: $main, sub_list: $sub, ttl: 300, add_dns_to_current_setting: false}'
+    )"
+
+    dynadot_rest_request \
+        "Set Dynadot DNS for ${domain}" \
+        "POST" \
+        "/restful/${API_VERSION}/domains/${domain}/records" \
+        "${body}"
 }
 
 check_dns() {
@@ -237,8 +364,8 @@ enable_https() {
 }
 
 set_dynadot_dns mcujs.org
-set_dynadot_dns mcujs.com
 set_dynadot_nameservers mcujs.com
+set_dynadot_dns mcujs.com
 
 if [[ "${VERIFY}" -eq 1 ]]; then
     printf '\nDNS verification\n'

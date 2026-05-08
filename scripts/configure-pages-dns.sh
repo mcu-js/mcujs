@@ -210,7 +210,11 @@ pages_health() {
     gh api "repos/${repo}/pages/health" >/dev/null
     sleep 5
     gh api "repos/${repo}/pages/health" \
-        --jq '{domain: .domain.reason, alt_domain: .alt_domain.reason}'
+        --jq 'if .domain == null and .alt_domain == null then
+                {status: "GitHub Pages health check is still pending; rerun --verify."}
+              else
+                {domain: .domain.reason, alt_domain: .alt_domain.reason}
+              end'
 }
 
 enable_https() {

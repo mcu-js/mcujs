@@ -140,6 +140,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/build.sh"
         "${ROOT_DIR}/docker-entrypoint.sh"
         "${ROOT_DIR}/scripts/boards.sh"
+        "${ROOT_DIR}/scripts/configure-pages-dns.sh"
         "${ROOT_DIR}/scripts/package-release.sh"
         "${ROOT_DIR}/scripts/release.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"

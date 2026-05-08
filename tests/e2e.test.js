@@ -640,7 +640,7 @@ describe("javascript APIs", () => {
     processOutput = await sendCommand(port, reader, "console.log(process.version);\rconsole.log(JSON.stringify(process.versions));", prompt);
 
     await sendRaw(port, "setTimeout(() => console.log(\"timer-done\"), 150);\r");
-    timerOutput = await sendCommand(port, reader, "", "timer-done");
+    timerOutput = await readUntil(reader, (buffer) => buffer.includes("timer-done"));
   });
 
   test("board name", () => {

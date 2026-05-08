@@ -17,7 +17,20 @@ RUN apk add --no-cache \
 ENV PICO_SDK_PATH=/opt/pico-sdk
 RUN git clone --depth 1 --branch 2.2.0 https://github.com/raspberrypi/pico-sdk.git ${PICO_SDK_PATH} \
     && cd ${PICO_SDK_PATH} \
-    && git submodule update --init --depth 1
+    && git submodule update --init --recursive --depth 1
+
+# Build picotool during image creation so firmware builds do not fetch it.
+ENV PICOTOOL_VERSION=2.2.0
+ENV PICOTOOL_SOURCE_PATH=/opt/picotool-src
+ENV picotool_DIR=/opt/picotool/picotool
+RUN git clone --depth 1 --branch ${PICOTOOL_VERSION} https://github.com/raspberrypi/picotool.git ${PICOTOOL_SOURCE_PATH} \
+    && cmake -S ${PICOTOOL_SOURCE_PATH} -B ${PICOTOOL_SOURCE_PATH}/build \
+        -DPICO_SDK_PATH=${PICO_SDK_PATH} \
+        -DPICOTOOL_NO_LIBUSB=1 \
+        -DPICOTOOL_FLAT_INSTALL=1 \
+        -DCMAKE_INSTALL_PREFIX=/opt/picotool \
+    && cmake --build ${PICOTOOL_SOURCE_PATH}/build --target install --parallel \
+    && rm -rf ${PICOTOOL_SOURCE_PATH}
 
 # Clone JerryScript
 ENV JERRYSCRIPT_PATH=/opt/jerryscript

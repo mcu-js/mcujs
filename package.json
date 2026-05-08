@@ -2,7 +2,16 @@
   "name": "mcujs-e2e",
   "private": true,
   "scripts": {
+    "boards": "bash scripts/boards.sh",
+    "build": "bash build.sh all",
+    "build:pico": "bash build.sh pico",
+    "docs:build": "npm --prefix docs run build",
+    "docs:typecheck": "npm --prefix docs run typecheck",
+    "e2e": "bun test tests/e2e.test.js",
+    "release": "bash scripts/release.sh",
+    "release:package": "bash scripts/package-release.sh",
+    "release:verify": "bash scripts/verify-release.sh",
     "test": "bun test",
-    "e2e": "bun test tests/e2e.test.js"
+    "verify": "bash scripts/verify-release.sh --docs"
   }
 }

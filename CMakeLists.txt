@@ -14,9 +14,6 @@ message(STATUS "Building mcujs v${MCUJS_VERSION} for board: ${BOARD}")
 # Include board-specific configuration
 include(${CMAKE_CURRENT_LIST_DIR}/board/${BOARD}/board_config.cmake)
 
-# Force picotool to be fetched from git (required for SDK 2.2.0+)
-set(PICOTOOL_FORCE_FETCH_FROM_GIT ON CACHE BOOL "Force picotool fetch from git")
-
 # Initialize Pico SDK
 include(pico_sdk_import.cmake)
 

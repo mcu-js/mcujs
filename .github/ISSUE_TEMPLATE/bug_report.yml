@@ -1,0 +1,73 @@
+name: Bug report
+description: Report broken runtime, board, filesystem, USB, or tooling behavior.
+title: "[bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Include enough hardware and firmware detail for someone else to reproduce the issue.
+  - type: input
+    id: board
+    attributes:
+      label: Board ID
+      description: Use the board ID from `scripts/boards.sh`.
+      placeholder: pico
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Firmware build ID
+      description: Run `.info` in the REPL and paste the Build line.
+      placeholder: 0.1.0+abcdef0
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - REPL or JavaScript evaluation
+        - USB serial or mass storage
+        - Filesystem
+        - Native binding
+        - Board support
+        - Build, release, or test tooling
+        - Documentation or examples
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include REPL input, files copied to the device, commands run, and host OS details when relevant.
+      placeholder: |
+        1. Flash `mcujs-...uf2`
+        2. Connect to `/dev/ttyACM0`
+        3. Run ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Paste serial output, logs, screenshots, or error messages.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Checks run
+      description: Paste output from relevant commands.
+      placeholder: |
+        scripts/verify-release.sh --allow-dirty
+        ./build.sh pico
+        bun run e2e

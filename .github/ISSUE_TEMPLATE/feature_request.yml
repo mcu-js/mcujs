@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose a runtime API, board capability, example, or tooling improvement.
+title: "[feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What should mcujs make possible for a user or contributor?
+    validations:
+      required: true
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Likely runtime boundary
+      options:
+        - JavaScript engine adapter
+        - Module system
+        - Native binding
+        - Firmware service
+        - Board support
+        - Tooling, docs, examples, or tests
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the API, board support, command, or workflow you want.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and compatibility
+      description: Note memory, flash, timing, hardware, or Node.js compatibility concerns.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

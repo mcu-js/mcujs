@@ -193,12 +193,12 @@ function fillCircle(cx,cy,r,c) {
 function drawLine(x0,y0,x1,y1,c) {
   var dx=Math.abs(x1-x0),dy=Math.abs(y1-y0);
   var sx=x0<x1?1:-1,sy=y0<y1?1:-1,e=dx-dy;
-  while(true) {
-    setPixel(x0,y0,c);
-    if(x0===x1&&y0===y1)break;
+  setPixel(x0,y0,c);
+  while(x0!==x1||y0!==y1) {
     var e2=2*e;
     if(e2>-dy){e-=dy;x0+=sx;}
     if(e2<dx){e+=dx;y0+=sy;}
+    setPixel(x0,y0,c);
   }
 }
 

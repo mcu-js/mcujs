@@ -8,7 +8,6 @@ This roadmap tracks what is coming next. For the full list, see the repository `
 
 ## Near-Term Improvements
 
-- Better error reporting and stack traces
 - Source map support for debugging
 - Filesystem timestamps
 - Larger file support
@@ -25,8 +24,8 @@ Open an issue with your use case, especially if you are shipping a product or a 
 
 ## Future Features
 
-- Additional hardware APIs (UART, PIO, DMA, RTC, WS2812)
-- More board support (Pico W, Waveshare RP2350, Adafruit, Pimoroni)
+- Additional hardware APIs (UART, PIO, DMA, RTC)
+- More board support beyond the current Pico, Pico 2, Waveshare, and Adafruit Feather RP2040 targets
 - Host tooling (CLI, VS Code extension)
 - Debugger support
 - Networking for Pico W / Pico 2 W (WiFi, HTTP, WebSocket, MQTT, Bluetooth)

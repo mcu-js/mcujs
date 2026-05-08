@@ -108,13 +108,15 @@ const GPIO = require('gpio');
 
 // Button on GPIO 15
 GPIO.init(15, GPIO.INPUT_PULLUP);
+let wasPressed = false;
 
 setInterval(() => {
-    if (GPIO.get(15) === 0) {
+    const pressed = GPIO.get(15) === 0;
+    if (pressed && !wasPressed) {
         K.print('console.log("Hello!");');
         K.tap('enter');
-        while (GPIO.get(15) === 0) {} // debounce
     }
+    wasPressed = pressed;
 }, 10);
 ```
 

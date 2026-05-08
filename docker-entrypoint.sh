@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+source /workspace/scripts/lib/boards.sh
 
 BOARDS="${1:-all}"
 BUILD_TYPE="${2:-Release}"
@@ -25,24 +27,30 @@ log_error() {
 build_board() {
     local board=$1
     log_info "Building mcujs for board: ${board}"
-    
+
     # Create build directory
-    mkdir -p /workspace/cmake-build-${board}
-    cd /workspace/cmake-build-${board}
-    
+    mkdir -p "/workspace/cmake-build-${board}"
+    cd "/workspace/cmake-build-${board}"
+
+    cmake_args=(
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+        -DBOARD="${board}"
+        -DPICO_SDK_PATH="${PICO_SDK_PATH}"
+    )
+
+    if [[ -d "/opt/picotool/picotool" ]]; then
+        cmake_args+=(-Dpicotool_DIR=/opt/picotool/picotool)
+    fi
+
     # Configure
-    cmake \
-        -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-        -DBOARD=${board} \
-        -DPICO_SDK_PATH=${PICO_SDK_PATH} \
-        ..
-    
+    cmake "${cmake_args[@]}" ..
+
     # Build
-    make -j$(nproc)
-    
+    make -j"$(nproc)"
+
     # Copy UF2 to build directory
-    cp /workspace/cmake-build-${board}/*.uf2 /workspace/build/ 2>/dev/null || true
-    
+    cp "/workspace/cmake-build-${board}"/*.uf2 /workspace/build/ 2>/dev/null || true
+
     log_info "Build complete for ${board}"
 }
 
@@ -50,27 +58,20 @@ build_board() {
 mkdir -p /workspace/build
 
 # Build requested boards
-case "${BOARDS}" in
-    "all")
-        build_board "pico"
-        build_board "pico2"
-        build_board "pico2_w"
-        build_board "waveshare_rp2040_zero"
-        build_board "waveshare_rp2040_pizero"
-        build_board "waveshare_rp2040_touch_lcd_1.28"
-        build_board "waveshare_rp2350_lcd_1.47_a"
-        build_board "waveshare_rp2350_touch_lcd_1.69"
-        build_board "adafruit_feather_rp2040"
-        ;;
-    "pico"|"pico2"|"pico2_w"|"waveshare_rp2040_zero"|"waveshare_rp2040_pizero"|"waveshare_rp2040_touch_lcd_1.28"|"waveshare_rp2350_lcd_1.47_a"|"waveshare_rp2350_touch_lcd_1.69"|"adafruit_feather_rp2040")
-        build_board "${BOARDS}"
-        ;;
-    *)
+if [[ "${BOARDS}" == "all" ]]; then
+    for board in "${MCUJS_BOARDS[@]}"; do
+        build_board "${board}"
+    done
+else
+    if ! mcujs_is_board "${BOARDS}"; then
         log_error "Unknown board: ${BOARDS}"
-        log_info "Available boards: pico, pico2, pico2_w, waveshare_rp2040_zero, waveshare_rp2040_pizero, waveshare_rp2040_touch_lcd_1.28, waveshare_rp2350_lcd_1.47_a, waveshare_rp2350_touch_lcd_1.69, adafruit_feather_rp2040, all"
+        log_info "Available boards:"
+        mcujs_print_board_list
+        log_info "  all"
         exit 1
-        ;;
-esac
+    fi
+    build_board "${BOARDS}"
+fi
 
 log_info "All builds complete!"
 ls -la /workspace/build/*.uf2 2>/dev/null || log_warn "No UF2 files found in build directory"

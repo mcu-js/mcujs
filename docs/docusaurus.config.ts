@@ -15,14 +15,14 @@ const config: Config = {
   },
 
   // Set the production url of your site here
-  url: 'https://mcujs.github.io',
+  url: 'https://mcujs.org',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/mcujs/',
+  baseUrl: '/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'mcujs', // Usually your GitHub org/user name.
+  organizationName: 'mcu-js', // Usually your GitHub org/user name.
   projectName: 'mcujs', // Usually your repo name.
 
   onBrokenLinks: 'throw',
@@ -41,7 +41,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/mcujs/mcujs/tree/main/docs/',
+          editUrl: 'https://github.com/mcu-js/mcujs/tree/main/docs/',
         },
         blog: false,
         theme: {
@@ -81,7 +81,7 @@ const config: Config = {
           position: 'left',
         },
         {
-          href: 'https://github.com/mcujs/mcujs',
+          href: 'https://github.com/mcu-js/mcujs',
           label: 'GitHub',
           position: 'right',
         },
@@ -112,7 +112,7 @@ const config: Config = {
             },
             {
               label: 'GitHub',
-              href: 'https://github.com/mcujs/mcujs',
+              href: 'https://github.com/mcu-js/mcujs',
             },
           ],
         },

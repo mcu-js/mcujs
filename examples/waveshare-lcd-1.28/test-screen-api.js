@@ -134,12 +134,12 @@ function createScreen(options) {
     var sx = x0 < x1 ? 1 : -1;
     var sy = y0 < y1 ? 1 : -1;
     var err = dx - dy;
-    while (true) {
-      graphics.setPixel(buffer, x0, y0, color);
-      if (x0 === x1 && y0 === y1) break;
+    graphics.setPixel(buffer, x0, y0, color);
+    while (x0 !== x1 || y0 !== y1) {
       var e2 = 2 * err;
       if (e2 > -dy) { err -= dy; x0 += sx; }
       if (e2 < dx) { err += dx; y0 += sy; }
+      graphics.setPixel(buffer, x0, y0, color);
     }
     return screen;
   }

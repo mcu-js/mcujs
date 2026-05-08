@@ -2,7 +2,7 @@
 
 All notable changes to mcujs will be documented in this file.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-05-08
 
 ### Core Features
 - JavaScript runtime using JerryScript v3.0.0
@@ -118,17 +118,24 @@ Full `require()` implementation for modular code:
 ### Board Support
 - Raspberry Pi Pico (RP2040, 2MB flash)
 - Raspberry Pi Pico 2 (RP2350, 4MB flash)
+- Raspberry Pi Pico 2 W (RP2350, 4MB flash, CYW43 LED support)
 - Waveshare RP2040-Zero (RP2040, 2MB flash, NeoPixel on GPIO 16)
 - Waveshare RP2040-PiZero (RP2040, 16MB flash, DVI/HDMI output, MicroSD slot)
 - Waveshare RP2040 Touch LCD 1.28" (RP2040, 4MB flash, round display, touch, IMU)
 - Waveshare RP2350-LCD-1.47-A (RP2350, 16MB flash, ST7789V3 320x172 display, NeoPixel)
+- Waveshare RP2350-Touch-LCD-1.69 (RP2350, 16MB flash, ST7789V2 240x280 display, touch, IMU, buzzer)
+- Adafruit Feather RP2040 (RP2040, 8MB flash, NeoPixel, STEMMA QT)
 
 ### Build System
 - Docker-based build for reproducibility
 - Alpine Linux image (~1.3GB)
-- Support for Raspberry Pi Pico (RP2040) and Pico 2 (RP2350)
+- Central board registry shared by build, docs, verification, and release packaging
+- Deterministic release scripts for all supported board UF2s, manifests, checksums, and tarballs
+- Prebuilt picotool v2.2.0 in the Docker builder to avoid network fetches during firmware builds
+- Support for RP2040 and RP2350 release boards
 
 ### Third-Party Libraries
+- **Pico SDK** v2.2.0 - Hardware abstraction and TinyUSB integration
 - **JerryScript** v3.0.0 - JavaScript engine
 - **FatFs** R0.16 - FAT filesystem (Elm Chan)
 - **picojpeg** v1.1 - JPEG decoder (Rich Geldreich, Public Domain)

@@ -1,0 +1,56 @@
+name: Board support
+description: Request or propose support for a Pico-compatible board.
+title: "[board]: "
+labels:
+  - board
+  - enhancement
+body:
+  - type: input
+    id: board_name
+    attributes:
+      label: Board name
+      placeholder: Raspberry Pi Pico
+    validations:
+      required: true
+  - type: input
+    id: proposed_id
+    attributes:
+      label: Proposed board ID
+      description: Lowercase ID used by `./build.sh <board-id>`.
+      placeholder: pico
+    validations:
+      required: true
+  - type: dropdown
+    id: chip
+    attributes:
+      label: MCU
+      options:
+        - RP2040
+        - RP2350
+        - Other UF2-compatible MCU
+    validations:
+      required: true
+  - type: input
+    id: flash
+    attributes:
+      label: Flash size
+      placeholder: 2MB
+    validations:
+      required: true
+  - type: textarea
+    id: sdk
+    attributes:
+      label: Pico SDK board support
+      description: Name the Pico SDK board header or explain what custom CMake config is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: features
+    attributes:
+      label: Board features
+      description: List LED, display, touch, sensors, storage, USB, or other features that need config or examples.
+  - type: textarea
+    id: testing
+    attributes:
+      label: Hardware testing available
+      description: Say whether you can flash and run REPL tests on this board.

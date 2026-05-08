@@ -1,22 +1,35 @@
 # mcujs
 
-A minimal JavaScript runtime for Raspberry Pi Pico and Pico 2 microcontrollers.
+A JavaScript runtime for RP2040 and RP2350 microcontrollers, in the same spirit as Node.js for servers.
 
 ## Features
 
 - **USB Flash Drive**: Mount your Pico as a USB drive and drop in your `index.js`
 - **Serial REPL**: Interactive JavaScript console over USB serial
 - **Hardware APIs**: GPIO, PWM, I2C, SPI, ADC, and NeoPixel
-- **ES Modules**: Use `require()` for modular code with `/lib/` module resolution
+- **CommonJS Modules**: Use `require()` for modular code with `/lib/` module resolution
 - **Minimal Footprint**: Built on JerryScript for embedded systems
 
+## Supported Boards
+
+Run `scripts/boards.sh --table` for the release board list. Current board IDs are:
+
+- `pico`
+- `pico2`
+- `pico2_w`
+- `waveshare_rp2040_zero`
+- `waveshare_rp2040_pizero`
+- `waveshare_rp2040_touch_lcd_1.28`
+- `waveshare_rp2350_lcd_1.47_a`
+- `waveshare_rp2350_touch_lcd_1.69`
+- `adafruit_feather_rp2040`
 
 ## Quick Start
 
-1. Download the latest `.uf2` file for your board from [Releases](https://github.com/your-repo/mcujs/releases)
-2. Hold BOOTSEL and connect your Pico via USB
-3. Drag the `.uf2` file to the RPI-RP2 drive
-4. The Pico will reboot and appear as a USB drive named "MCUJS"
+1. Download the latest `.uf2` file for your board from [Releases](https://github.com/mcu-js/mcujs/releases)
+2. Hold BOOTSEL and connect your board via USB
+3. Drag the `.uf2` file to the `RPI-RP2` drive on RP2040 boards or the `RP2350` drive on RP2350 boards
+4. The board will reboot and appear as a USB drive named "MCUJS"
 5. Create an `index.js` file on the drive:
 
 ```javascript
@@ -32,7 +45,7 @@ setInterval(() => {
 console.log('Blinking!');
 ```
 
-6. Reset the Pico - your code runs automatically!
+6. Reset the board - your code runs automatically!
 
 ## Serial REPL
 
@@ -245,7 +258,7 @@ const { builtinModules } = require('mcujs:module');
 
 ### Filesystem Sync
 
-The Pico appears as both a USB serial device and a USB flash drive (composite device). There are some sync considerations:
+The board appears as both a USB serial device and a USB flash drive (composite device). There are some sync considerations:
 
 | Direction | Behavior |
 |-----------|----------|
@@ -258,6 +271,22 @@ The Pico appears as both a USB serial device and a USB flash drive (composite de
 - Remount on Linux: `udisksctl unmount -b /dev/sdX1 && udisksctl mount -b /dev/sdX1`
 - Or simply unplug and replug the Pico
 
+## Development
+
+```bash
+scripts/verify-release.sh --allow-dirty
+./build.sh pico
+bun run e2e
+```
+
+Build every release board and package deterministic artifacts:
+
+```bash
+scripts/release.sh
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md), and the Docusaurus docs under `docs/docs/` for the full contributor workflow.
+
 Files written from JavaScript are always persisted to flash immediately - they will survive power cycles even if not yet visible on the host.
 
 ## Building from Source
@@ -267,7 +296,7 @@ Files written from JavaScript are always persisted to flash immediately - they w
 - Docker (recommended) or:
   - ARM GCC toolchain (`gcc-arm-none-eabi`)
   - CMake 3.13+
-  - Pico SDK 2.x
+  - Pico SDK 2.2.0
 
 ### Build with Docker
 
@@ -282,9 +311,7 @@ Files written from JavaScript are always persisted to flash immediately - they w
 ./build.sh all
 ```
 
-Output files are in `build/`:
-- `mcujs-0.1.0-pico.uf2`
-- `mcujs-0.1.0-pico2.uf2`
+Output files are written to `build/` as `mcujs-<version>-<board>.uf2`.
 
 ### End-to-End Tests (Bun)
 
@@ -310,34 +337,34 @@ make -j$(nproc)
 
 ## Supported Boards
 
-| Board | Chip | Flash | Status |
-|-------|------|-------|--------|
-| Raspberry Pi Pico | RP2040 | 2MB | Supported |
-| Raspberry Pi Pico 2 | RP2350 | 4MB | Supported |
-| Waveshare RP2040-Zero | RP2040 | 2MB | Supported |
-| Waveshare RP2040 Touch LCD 1.28 | RP2040 | 4MB | Supported |
-| Waveshare RP2350-LCD-1.47-A | RP2350 | 16MB | Supported |
-| Adafruit Feather RP2040/RP2350 | Various | Various | Planned |
+| Board ID | Board | Chip | Flash | Notes |
+| --- | --- | --- | --- | --- |
+| `pico` | Raspberry Pi Pico | RP2040 | 2MB | Onboard LED |
+| `pico2` | Raspberry Pi Pico 2 | RP2350 | 4MB | Onboard LED |
+| `pico2_w` | Raspberry Pi Pico 2 W | RP2350 | 4MB | CYW43 LED support |
+| `waveshare_rp2040_zero` | Waveshare RP2040-Zero | RP2040 | 2MB | Onboard NeoPixel |
+| `waveshare_rp2040_pizero` | Waveshare RP2040-PiZero | RP2040 | 16MB | DVI/HDMI output |
+| `waveshare_rp2040_touch_lcd_1.28` | Waveshare RP2040 Touch LCD 1.28 | RP2040 | 4MB | Round LCD, touch, IMU |
+| `waveshare_rp2350_lcd_1.47_a` | Waveshare RP2350-LCD-1.47-A | RP2350 | 16MB | LCD, NeoPixel |
+| `waveshare_rp2350_touch_lcd_1.69` | Waveshare RP2350-Touch-LCD-1.69 | RP2350 | 16MB | LCD, touch, IMU, buzzer |
+| `adafruit_feather_rp2040` | Adafruit Feather RP2040 | RP2040 | 8MB | NeoPixel, STEMMA QT |
 
 ## Architecture
 
 ```
 mcujs/
-├── host/                # JavaScript engine and bindings
-│   ├── engine.c         # JerryScript wrapper
+├── host/                # Engine boundary, module loader, and bindings
+│   ├── engine.*         # JerryScript adapter
 │   ├── module_loader.c  # CommonJS require() implementation
 │   └── bindings/        # Native API bindings (GPIO, I2C, fs, etc.)
-├── javascript/          # JerryScript engine (built from source)
-├── board/               # Board-specific configurations
-│   ├── pico/            # Raspberry Pi Pico
-│   ├── pico2/           # Raspberry Pi Pico 2
-│   ├── waveshare_rp2040_zero/ # Waveshare RP2040-Zero
-│   ├── waveshare_rp2040_touch_lcd_1.28/ # Waveshare RP2040 Touch LCD 1.28
-│   └── waveshare_rp2350_lcd_1.47_a/ # Waveshare RP2350-LCD-1.47-A
+├── javascript/          # JerryScript build adapter
+├── board/               # Board-specific configurations by board ID
+│   └── <board-id>/      # board_config.h and board_config.cmake
 ├── src/                 # Core firmware
 │   ├── usb/             # USB CDC + MSC composite device
 │   └── filesystem/      # FAT12 filesystem with subdirectory support
-└── examples/            # Example JavaScript programs
+├── examples/            # Example JavaScript programs
+└── scripts/             # Board registry, verification, and release tooling
 ```
 
 ## Contributing

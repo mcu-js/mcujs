@@ -9,8 +9,8 @@ This guide gets you from zero to blinking in just a few minutes.
 ## Flash the firmware
 
 1. Download the latest [UF2](./glossary.md#uf2) for your board from GitHub Releases.
-2. Hold **BOOTSEL** and connect the Pico via [USB](./glossary.md#usb).
-3. Drag the [UF2](./glossary.md#uf2) to the `RPI-RP2` drive.
+2. Hold **BOOTSEL** and connect the board via [USB](./glossary.md#usb).
+3. Drag the [UF2](./glossary.md#uf2) to the `RPI-RP2` drive on RP2040 boards or the `RP2350` drive on RP2350 boards.
 4. The device reboots and shows up as a USB drive named `MCUJS`.
 
 ## Create your first script
@@ -31,7 +31,7 @@ setInterval(() => {
 console.log('Blinking!');
 ```
 
-Reset the Pico. Your script runs automatically.
+Reset the board. Your script runs automatically.
 
 ## Open the [REPL](./glossary.md#repl)
 

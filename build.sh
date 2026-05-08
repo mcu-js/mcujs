@@ -1,8 +1,9 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
+source "${SCRIPT_DIR}/scripts/lib/boards.sh"
 
 # Color output
 RED='\033[0;31m'
@@ -23,28 +24,31 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+job_count() {
+    if command -v nproc >/dev/null 2>&1; then
+        nproc
+        return
+    fi
+    getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1\n'
+}
+
 show_help() {
     echo -e "${CYAN}mcujs build script${NC}"
     echo ""
     echo "Usage: ./build.sh [board] [options]"
     echo ""
     echo "Boards:"
-    echo "  pico                          Build for Raspberry Pi Pico (RP2040)"
-    echo "  pico2                         Build for Raspberry Pi Pico 2 (RP2350)"
-    echo "  pico2_w                       Build for Raspberry Pi Pico 2 W (RP2350 + WiFi)"
-    echo "  waveshare_rp2040_zero          Build for Waveshare RP2040-Zero (RP2040)"
-    echo "  waveshare_rp2040_pizero        Build for Waveshare RP2040-PiZero (RP2040)"
-    echo "  waveshare_rp2040_touch_lcd_1.28 Build for Waveshare RP2040 Touch LCD 1.28 (RP2040)"
-    echo "  waveshare_rp2350_lcd_1.47_a    Build for Waveshare RP2350-LCD-1.47-A (RP2350)"
-    echo "  waveshare_rp2350_touch_lcd_1.69 Build for Waveshare RP2350-Touch-LCD-1.69 (RP2350)"
-    echo "  adafruit_feather_rp2040 Build for Adafruit Feather RP2040 (RP2040)"
-    echo "  all                  Build for all supported boards (default)"
+    mcujs_print_board_list
+    echo "  all                                  Build for all supported boards (default)"
     echo ""
     echo "Options:"
-    echo "  --clean       Clean build directories before building"
-    echo "  --debug       Build with debug symbols"
-    echo "  --no-docker   Build without Docker (requires local toolchain)"
-    echo "  --help        Show this help message"
+    echo "  --clean          Clean build directories before building"
+    echo "  --debug          Build with debug symbols"
+    echo "  --no-docker      Build without Docker (requires local toolchain)"
+    echo "  --docker-network VALUE"
+    echo "                   Docker network mode for build/run (default: host on Linux)"
+    echo "  --rebuild-image  Rebuild the Docker builder image before building"
+    echo "  --help           Show this help message"
     echo ""
     echo "Examples:"
     echo "  ./build.sh pico"
@@ -56,11 +60,17 @@ BOARD="all"
 BUILD_TYPE="Release"
 CLEAN=0
 USE_DOCKER=1
+REBUILD_IMAGE=0
+DOCKER_NETWORK="${MCUJS_DOCKER_NETWORK:-}"
+
+if [[ -z "${DOCKER_NETWORK}" && "$(uname -s)" == "Linux" ]]; then
+    DOCKER_NETWORK="host"
+fi
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        pico|pico2|pico2_w|waveshare_rp2040_zero|waveshare_rp2040_pizero|waveshare_rp2040_touch_lcd_1.28|waveshare_rp2350_lcd_1.47_a|waveshare_rp2350_touch_lcd_1.69|adafruit_feather_rp2040|all)
+    case "$1" in
+        all)
             BOARD="$1"
             shift
             ;;
@@ -76,19 +86,36 @@ while [[ $# -gt 0 ]]; do
             USE_DOCKER=0
             shift
             ;;
+        --docker-network)
+            if [[ $# -lt 2 ]]; then
+                log_error "--docker-network requires a value"
+                exit 1
+            fi
+            DOCKER_NETWORK="$2"
+            shift 2
+            ;;
+        --rebuild-image)
+            REBUILD_IMAGE=1
+            shift
+            ;;
         --help|-h)
             show_help
             exit 0
             ;;
         *)
-            log_error "Unknown option: $1"
-            show_help
-            exit 1
+            if mcujs_is_board "$1"; then
+                BOARD="$1"
+                shift
+            else
+                log_error "Unknown option or board: $1"
+                show_help
+                exit 1
+            fi
             ;;
     esac
 done
 
-VERSION=$(cat version.txt | tr -d '[:space:]')
+VERSION="$(tr -d '[:space:]' < version.txt)"
 log_info "mcujs version: ${VERSION}"
 log_info "Target board: ${BOARD}"
 log_info "Build type: ${BUILD_TYPE}"
@@ -99,74 +126,74 @@ mkdir -p build
 # Always delete old UF2 files to ensure we're testing fresh builds
 rm -f build/*.uf2
 
-if [[ $CLEAN -eq 1 ]]; then
+if [[ "${CLEAN}" -eq 1 ]]; then
     log_info "Cleaning build directories..."
     rm -rf cmake-build-*
-    rm -rf build/*.uf2
+    rm -f build/*.uf2
 fi
 
-if [[ $USE_DOCKER -eq 1 ]]; then
+if [[ "${USE_DOCKER}" -eq 1 ]]; then
     # Check if Docker is available
     if ! command -v docker &> /dev/null; then
         log_error "Docker is not installed or not in PATH"
         log_info "Install Docker or use --no-docker for local build"
         exit 1
     fi
-    
+
     IMAGE_NAME="mcujs-builder"
-    
-    # Build Docker image if it doesn't exist or Dockerfile changed
-    if [[ "$(docker images -q ${IMAGE_NAME} 2> /dev/null)" == "" ]] || \
-       [[ "Dockerfile" -nt "$(docker inspect -f '{{.Created}}' ${IMAGE_NAME} 2>/dev/null || echo '1970-01-01')" ]]; then
+
+    # Build Docker image if it doesn't exist, or when explicitly requested.
+    if [[ "${REBUILD_IMAGE}" -eq 1 ]] || ! docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
         log_info "Building Docker image..."
-        docker build -t ${IMAGE_NAME} .
+        docker_build_args=(-t "${IMAGE_NAME}")
+        if [[ -n "${DOCKER_NETWORK}" ]]; then
+            docker_build_args+=(--network "${DOCKER_NETWORK}")
+        fi
+        docker build "${docker_build_args[@]}" .
+    else
+        log_info "Using Docker image ${IMAGE_NAME}; pass --rebuild-image after dependency changes"
     fi
-    
+
     log_info "Running build in Docker container..."
-    docker run --rm \
+    docker_run_args=(--rm)
+    if [[ -n "${DOCKER_NETWORK}" ]]; then
+        docker_run_args+=(--network "${DOCKER_NETWORK}")
+    fi
+    docker run "${docker_run_args[@]}" \
         -v "${SCRIPT_DIR}:/workspace" \
         -u "$(id -u):$(id -g)" \
-        ${IMAGE_NAME} \
+        "${IMAGE_NAME}" \
         "${BOARD}" "${BUILD_TYPE}"
 else
     # Local build
-    if [[ -z "${PICO_SDK_PATH}" ]]; then
+    if [[ -z "${PICO_SDK_PATH:-}" ]]; then
         log_error "PICO_SDK_PATH environment variable is not set"
         exit 1
     fi
-    
+
     build_board() {
         local board=$1
         log_info "Building for board: ${board}"
-        
+
         mkdir -p "cmake-build-${board}"
         cd "cmake-build-${board}"
-        
+
         cmake \
-            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-            -DBOARD=${board} \
+            -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+            -DBOARD="${board}" \
             ..
-        
-        make -j$(nproc)
+
+        make -j"$(job_count)"
         cd ..
     }
-    
-    case "${BOARD}" in
-        "all")
-            build_board "pico"
-            build_board "pico2"
-            build_board "pico2_w"
-            build_board "waveshare_rp2040_zero"
-            build_board "waveshare_rp2040_pizero"
-            build_board "waveshare_rp2040_touch_lcd_1.28"
-            build_board "waveshare_rp2350_lcd_1.47_a"
-            build_board "waveshare_rp2350_touch_lcd_1.69"
-            build_board "adafruit_feather_rp2040"
-            ;;
-        *)
-            build_board "${BOARD}"
-            ;;
-    esac
+
+    if [[ "${BOARD}" == "all" ]]; then
+        for board in "${MCUJS_BOARDS[@]}"; do
+            build_board "${board}"
+        done
+    else
+        build_board "${BOARD}"
+    fi
 fi
 
 log_info "Build complete!"

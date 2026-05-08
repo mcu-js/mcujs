@@ -2,6 +2,8 @@
 
 A JavaScript runtime for RP2040 and RP2350 microcontrollers, in the same spirit as Node.js for servers.
 
+Docs: https://mcu-js.github.io/ while the canonical `mcujs.org` domain finishes DNS cutover.
+
 ## Features
 
 - **USB Flash Drive**: Mount your Pico as a USB drive and drop in your `index.js`

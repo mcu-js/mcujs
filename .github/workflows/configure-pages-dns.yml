@@ -49,6 +49,7 @@ jobs:
         env:
           DYNADOT_API_KEY: ${{ secrets.DYNADOT_API_KEY }}
         run: |
+          echo "Dynadot API access is IP-restricted; verify the runner IP printed above is allowed before relying on apply mode."
           test -n "${DYNADOT_API_KEY}" || {
             echo "DYNADOT_API_KEY repository secret is required for apply mode." >&2
             exit 1

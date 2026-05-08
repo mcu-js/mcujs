@@ -81,6 +81,11 @@ const config: Config = {
           position: 'left',
         },
         {
+          href: 'https://github.com/mcu-js/mcujs/releases',
+          label: 'Downloads',
+          position: 'right',
+        },
+        {
           href: 'https://github.com/mcu-js/mcujs',
           label: 'GitHub',
           position: 'right',
@@ -109,6 +114,10 @@ const config: Config = {
             {
               label: 'Roadmap',
               to: '/docs/roadmap',
+            },
+            {
+              label: 'Downloads',
+              href: 'https://github.com/mcu-js/mcujs/releases',
             },
             {
               label: 'GitHub',

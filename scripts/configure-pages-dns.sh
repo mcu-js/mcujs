@@ -206,15 +206,25 @@ PY
 
 pages_health() {
     local repo="$1"
+    local output
 
-    gh api "repos/${repo}/pages/health" >/dev/null
+    if ! output="$(gh api "repos/${repo}/pages/health" 2>&1 >/dev/null)"; then
+        printf '{"status":"GitHub Pages health check unavailable; run locally with a token that can read Pages health."}\n'
+        return 0
+    fi
+
     sleep 5
-    gh api "repos/${repo}/pages/health" \
+    if ! output="$(gh api "repos/${repo}/pages/health" \
         --jq 'if .domain == null and .alt_domain == null then
                 {status: "GitHub Pages health check is still pending; rerun --verify."}
               else
                 {domain: .domain.reason, alt_domain: .alt_domain.reason}
-              end'
+              end' 2>&1)"; then
+        printf '{"status":"GitHub Pages health check unavailable; run locally with a token that can read Pages health."}\n'
+        return 0
+    fi
+
+    printf '%s\n' "${output}"
 }
 
 enable_https() {

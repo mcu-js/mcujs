@@ -2,7 +2,7 @@
 
 A JavaScript runtime for RP2040 and RP2350 microcontrollers, in the same spirit as Node.js for servers.
 
-Docs: https://mcu-js.github.io/ while the canonical `mcujs.org` domain finishes DNS cutover.
+Docs: https://mcujs.org/
 
 ## Features
 

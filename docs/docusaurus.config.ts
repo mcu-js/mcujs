@@ -52,11 +52,19 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/mcujs-social-card.png',
     metadata: [
       {
         name: 'description',
-        content: 'mcujs documentation for the JavaScript runtime for microcontrollers.',
+        content: 'mcujs is a JavaScript runtime for RP2040 and RP2350 microcontrollers.',
+      },
+      {
+        property: 'og:image:alt',
+        content: 'mcujs — JavaScript runtime for microcontrollers',
+      },
+      {
+        name: 'twitter:image:alt',
+        content: 'mcujs — JavaScript runtime for microcontrollers',
       },
     ],
     colorMode: {

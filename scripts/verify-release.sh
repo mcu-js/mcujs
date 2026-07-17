@@ -158,6 +158,21 @@ check_shell_syntax() {
     pass 'shell entrypoints parse cleanly'
 }
 
+check_python_syntax() {
+    local script
+    local scripts=(
+        "${ROOT_DIR}/platform/esp32/make-uf2.py"
+        "${ROOT_DIR}/platform/esp32/hardware-smoke.py"
+        "${ROOT_DIR}/platform/esp32/boot-smoke.py"
+    )
+
+    for script in "${scripts[@]}"; do
+        require_file "${script}"
+        PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/mcujs-pycache" python3 -m py_compile "${script}"
+    done
+    pass 'Python entrypoints parse cleanly'
+}
+
 check_platform_boundaries() {
     "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
     pass 'platform boundary checks passed'
@@ -179,6 +194,7 @@ check_version
 check_board_registry
 check_docs_board_coverage
 check_shell_syntax
+check_python_syntax
 check_platform_boundaries
 check_docs_build
 

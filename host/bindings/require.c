@@ -22,9 +22,11 @@
 
 #include "bindings.h"
 #include "../module_loader.h"
+#include "../runtime_features.h"
 #include "jerryscript.h"
 #include "fs.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -78,6 +80,12 @@ static int levenshtein(const char *s1, const char *s2, int max_dist) {
 #define WRAPPER_OVERHEAD 128  /* Space for wrapper prefix/suffix */
 static char s_module_wrapper_buf[MAX_STATIC_MODULE_SIZE + WRAPPER_OVERHEAD];
 
+static void set_property_value(jerry_value_t object, jerry_value_t property,
+                               jerry_value_t value) {
+    jerry_value_t result = jerry_object_set(object, property, value);
+    jerry_value_free(result);
+}
+
 /* Forward declaration for module suggestions */
 static const char *s_builtin_module_names[];
 
@@ -92,8 +100,39 @@ typedef struct {
 static cached_module_t s_module_cache[MAX_MODULES];
 static size_t s_cache_count = 0;
 
-/* Current module path (for resolving relative paths) */
-static char s_current_module_path[MAX_MODULE_PATH] = "";
+typedef struct {
+    char from_path[MAX_MODULE_PATH];
+} require_context_t;
+
+static jerry_value_t require_handler(const jerry_call_info_t *call_info,
+                                     const jerry_value_t args[],
+                                     const jerry_length_t argc);
+
+static void require_context_free(void *native_p, jerry_object_native_info_t *info_p) {
+    (void)info_p;
+    free(native_p);
+}
+
+static const jerry_object_native_info_t s_require_context_info = {
+    .free_cb = require_context_free,
+};
+
+static jerry_value_t create_require_function(const char *from_path) {
+    jerry_value_t function = jerry_function_external(require_handler);
+    if (from_path == NULL || from_path[0] == '\0') {
+        return function;
+    }
+
+    require_context_t *context = malloc(sizeof(*context));
+    if (context == NULL) {
+        jerry_value_free(function);
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "Out of memory creating module require");
+    }
+    strncpy(context->from_path, from_path, sizeof(context->from_path) - 1);
+    context->from_path[sizeof(context->from_path) - 1] = '\0';
+    jerry_object_set_native_ptr(function, &s_require_context_info, context);
+    return function;
+}
 
 /*
  * Read a module file, using a static buffer for small files to avoid malloc().
@@ -194,6 +233,18 @@ static bool ends_with(const char *str, const char *suffix) {
     return strcmp(str + str_len - suffix_len, suffix) == 0;
 }
 
+static bool join_path(char *output, size_t output_len,
+                      const char *prefix, const char *suffix) {
+    size_t prefix_len = strlen(prefix);
+    size_t suffix_len = strlen(suffix);
+    if (prefix_len + suffix_len >= output_len) {
+        return false;
+    }
+    memcpy(output, prefix, prefix_len);
+    memcpy(output + prefix_len, suffix, suffix_len + 1);
+    return true;
+}
+
 /*
  * Resolve a module path
  * Handles: ./relative, ../parent, /absolute, bare (searches /lib/)
@@ -207,8 +258,9 @@ static bool resolve_module_path(const char *specifier, const char *from_path,
     
     /* Absolute path */
     if (specifier[0] == '/') {
-        strncpy(resolved, specifier, resolved_len - 1);
-        resolved[resolved_len - 1] = '\0';
+        if (!join_path(resolved, resolved_len, "", specifier)) {
+            return false;
+        }
     }
     /* Relative path: ./ or ../ */
     else if (specifier[0] == '.') {
@@ -245,11 +297,15 @@ static bool resolve_module_path(const char *specifier, const char *from_path,
             rel_path = specifier + 3;
         }
         
-        snprintf(resolved, resolved_len, "%s%s", base_dir, rel_path);
+        if (!join_path(resolved, resolved_len, base_dir, rel_path)) {
+            return false;
+        }
     }
     /* Bare specifier - search in /lib/ */
     else {
-        snprintf(resolved, resolved_len, "/lib/%s", specifier);
+        if (!join_path(resolved, resolved_len, "/lib/", specifier)) {
+            return false;
+        }
     }
     
     /* Add extension if missing - try .js first, then .json */
@@ -274,6 +330,8 @@ static bool resolve_module_path(const char *specifier, const char *from_path,
                     }
                 }
             }
+        } else {
+            return false;
         }
     }
     
@@ -375,11 +433,6 @@ static jerry_value_t load_module(const char *resolved_path) {
     
     /* JavaScript module - wrap and execute */
     
-    /* Save current module path and set new one */
-    char prev_path[MAX_MODULE_PATH];
-    strncpy(prev_path, s_current_module_path, sizeof(prev_path));
-    strncpy(s_current_module_path, resolved_path, sizeof(s_current_module_path) - 1);
-    
     /* Create module wrapper:
      * (function(exports, require, module, __filename, __dirname) {
      *   <module code>
@@ -398,24 +451,24 @@ static jerry_value_t load_module(const char *resolved_path) {
     
     if (content_is_static) {
         if (wrapper_len > sizeof(s_module_wrapper_buf)) {
-            strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
             return jerry_throw_sz(JERRY_ERROR_COMMON, "Module too large for static buffer");
         }
         /* Shift content forward and wrap in-place */
         memmove(s_module_wrapper_buf + wrapper_start_len, s_module_wrapper_buf, content_len + 1);
         memcpy(s_module_wrapper_buf, wrapper_start, wrapper_start_len);
         memcpy(s_module_wrapper_buf + wrapper_start_len + content_len, wrapper_end, wrapper_end_len);
+        s_module_wrapper_buf[wrapper_start_len + content_len + wrapper_end_len] = '\0';
         wrapped = s_module_wrapper_buf;
     } else {
         wrapped = (char *)realloc(content, wrapper_len);
         if (wrapped == NULL) {
             js_module_free_file(content);
-            strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
             return jerry_throw_sz(JERRY_ERROR_COMMON, "Out of memory loading module");
         }
         memmove(wrapped + wrapper_start_len, wrapped, content_len + 1);
         memcpy(wrapped, wrapper_start, wrapper_start_len);
         memcpy(wrapped + wrapper_start_len + content_len, wrapper_end, wrapper_end_len);
+        wrapped[wrapper_start_len + content_len + wrapper_end_len] = '\0';
     }
     
     /* Parse the wrapper function */
@@ -425,7 +478,6 @@ static jerry_value_t load_module(const char *resolved_path) {
     }
     
     if (jerry_value_is_exception(parsed)) {
-        strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
         return parsed;  /* Return the parse error */
     }
     
@@ -434,7 +486,6 @@ static jerry_value_t load_module(const char *resolved_path) {
     jerry_value_free(parsed);
     
     if (jerry_value_is_exception(wrapper_func)) {
-        strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
         return wrapper_func;
     }
     
@@ -443,15 +494,17 @@ static jerry_value_t load_module(const char *resolved_path) {
     jerry_value_t exports_obj = jerry_object();
     
     jerry_value_t exports_key = jerry_string_sz("exports");
-    jerry_object_set(module_obj, exports_key, exports_obj);
+    set_property_value(module_obj, exports_key, exports_obj);
     jerry_value_free(exports_key);
     
-    /* Get require function from global */
-    jerry_value_t global = jerry_current_realm();
-    jerry_value_t require_key = jerry_string_sz("require");
-    jerry_value_t require_func = jerry_object_get(global, require_key);
-    jerry_value_free(require_key);
-    jerry_value_free(global);
+    /* Each module gets a require function bound to its defining path. */
+    jerry_value_t require_func = create_require_function(resolved_path);
+    if (jerry_value_is_exception(require_func)) {
+        jerry_value_free(wrapper_func);
+        jerry_value_free(module_obj);
+        jerry_value_free(exports_obj);
+        return require_func;
+    }
     
     /* Create __filename and __dirname strings */
     jerry_value_t filename = jerry_string_sz(resolved_path);
@@ -481,9 +534,6 @@ static jerry_value_t load_module(const char *resolved_path) {
     jerry_value_free(require_func);
     jerry_value_free(filename);
     jerry_value_free(dirname_val);
-    
-    /* Restore previous module path */
-    strncpy(s_current_module_path, prev_path, sizeof(s_current_module_path));
     
     if (jerry_value_is_exception(call_result)) {
         jerry_value_free(exports_obj);
@@ -528,17 +578,39 @@ static jerry_value_t create_process_module(void) {
 }
 
 static const char *s_builtin_module_names[] = {
+#if MCUJS_FEATURE_FS
     "fs",
+#endif
+#if MCUJS_FEATURE_PROCESS
     "process",
+#endif
+#if MCUJS_FEATURE_GPIO
     "gpio",
+#endif
+#if MCUJS_FEATURE_PWM
     "pwm",
+#endif
+#if MCUJS_FEATURE_I2C
     "i2c",
+#endif
+#if MCUJS_FEATURE_SPI
     "spi",
+#endif
+#if MCUJS_FEATURE_ADC
     "adc",
+#endif
+#if MCUJS_FEATURE_NEOPIXEL
     "neopixel",
+#endif
+#if MCUJS_FEATURE_IMAGE
     "image",
+#endif
+#if MCUJS_FEATURE_KEYBOARD
     "keyboard",
+#endif
+#if MCUJS_FEATURE_MOUSE
     "mouse",
+#endif
     "mcujs:module",
     "node:module",
     NULL
@@ -550,10 +622,10 @@ static jerry_value_t create_builtin_modules_list(void) {
 
     for (int i = 0; s_builtin_module_names[i] != NULL; i++) {
         char index_str[8];
-        snprintf(index_str, sizeof(index_str), "%u", index++);
+        snprintf(index_str, sizeof(index_str), "%" PRIu32, index++);
         jerry_value_t entry = jerry_string_sz(s_builtin_module_names[i]);
         jerry_value_t idx = jerry_string_sz(index_str);
-        jerry_object_set(array, idx, entry);
+        set_property_value(array, idx, entry);
         jerry_value_free(entry);
         jerry_value_free(idx);
     }
@@ -565,24 +637,46 @@ static jerry_value_t create_module_module(void) {
     jerry_value_t module = jerry_object();
     jerry_value_t list = create_builtin_modules_list();
     jerry_value_t key = jerry_string_sz("builtinModules");
-    jerry_object_set(module, key, list);
+    set_property_value(module, key, list);
     jerry_value_free(key);
     jerry_value_free(list);
     return module;
 }
 
 static const builtin_module_t s_builtin_modules[] = {
+#if MCUJS_FEATURE_FS
     {"fs", js_create_fs_module},
+#endif
+#if MCUJS_FEATURE_PROCESS
     {"process", create_process_module},
+#endif
+#if MCUJS_FEATURE_GPIO
     {"gpio", js_create_gpio_module},
+#endif
+#if MCUJS_FEATURE_PWM
     {"pwm", js_create_pwm_module},
+#endif
+#if MCUJS_FEATURE_I2C
     {"i2c", js_create_i2c_module},
+#endif
+#if MCUJS_FEATURE_SPI
     {"spi", js_create_spi_module},
+#endif
+#if MCUJS_FEATURE_ADC
     {"adc", js_create_adc_module},
+#endif
+#if MCUJS_FEATURE_NEOPIXEL
     {"neopixel", js_create_neopixel_module},
+#endif
+#if MCUJS_FEATURE_IMAGE
     {"image", js_create_image_module},
+#endif
+#if MCUJS_FEATURE_KEYBOARD
     {"keyboard", js_create_keyboard_module},
+#endif
+#if MCUJS_FEATURE_MOUSE
     {"mouse", js_create_mouse_module},
+#endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}
 };
@@ -618,8 +712,6 @@ static jerry_value_t get_builtin_module(const char *specifier) {
 static jerry_value_t require_handler(const jerry_call_info_t *call_info,
                                       const jerry_value_t args[],
                                       const jerry_length_t argc) {
-    (void)call_info;
-    
     if (argc < 1 || !jerry_value_is_string(args[0])) {
         return jerry_throw_sz(JERRY_ERROR_TYPE, "require() argument must be a string");
     }
@@ -644,8 +736,11 @@ static jerry_value_t require_handler(const jerry_call_info_t *call_info,
     }
     
     /* Resolve the path */
+    require_context_t *context = jerry_object_get_native_ptr(
+        call_info->function, &s_require_context_info);
+    const char *from_path = context == NULL ? "" : context->from_path;
     char resolved[MAX_MODULE_PATH];
-    if (!resolve_module_path(specifier, s_current_module_path, resolved, sizeof(resolved))) {
+    if (!resolve_module_path(specifier, from_path, resolved, sizeof(resolved))) {
         return jerry_throw_sz(JERRY_ERROR_COMMON, "Failed to resolve module path");
     }
     
@@ -671,10 +766,10 @@ static jerry_value_t require_cache_getter(const jerry_call_info_t *call_info,
             jerry_value_t module_obj = jerry_object();
             
             jerry_value_t exports_key = jerry_string_sz("exports");
-            jerry_object_set(module_obj, exports_key, s_module_cache[i].exports);
+            set_property_value(module_obj, exports_key, s_module_cache[i].exports);
             jerry_value_free(exports_key);
             
-            jerry_object_set(cache, key, module_obj);
+            set_property_value(cache, key, module_obj);
             jerry_value_free(key);
             jerry_value_free(module_obj);
         }
@@ -694,7 +789,6 @@ void js_require_clear_cache(void) {
         }
     }
     s_cache_count = 0;
-    s_current_module_path[0] = '\0';
 }
 
 /*
@@ -704,7 +798,7 @@ void js_bind_require(void) {
     jerry_value_t global = jerry_current_realm();
     
     /* Create require function */
-    jerry_value_t require_func = jerry_function_external(require_handler);
+    jerry_value_t require_func = create_require_function(NULL);
     
     /* Add require.cache as a getter property */
     jerry_value_t cache_key = jerry_string_sz("cache");
@@ -722,7 +816,7 @@ void js_bind_require(void) {
     
     /* Register global require */
     jerry_value_t require_key = jerry_string_sz("require");
-    jerry_object_set(global, require_key, require_func);
+    set_property_value(global, require_key, require_func);
     jerry_value_free(require_key);
     jerry_value_free(require_func);
     

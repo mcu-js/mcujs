@@ -20,16 +20,43 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 /* External helpers from bindings.c */
 extern void js_set_function(jerry_value_t object, const char *name, 
                             jerry_external_handler_t handler);
 extern void js_register_global(const char *name, jerry_value_t object);
-extern size_t js_get_string_arg(const jerry_value_t args[], jerry_length_t argc,
-                                jerry_length_t index, char *buffer, size_t buffer_size);
 
 /* Maximum file size we can read into memory */
 #define MAX_FILE_SIZE (32 * 1024)
+#define PATH_ARG_TOO_LONG ((size_t)-1)
+
+static size_t get_path_arg(const jerry_value_t args[], jerry_length_t argc,
+                           jerry_length_t index, char *buffer, size_t buffer_size) {
+    if (index >= argc || !jerry_value_is_string(args[index]) || buffer_size == 0) {
+        return 0;
+    }
+    jerry_size_t length = jerry_string_size(args[index], JERRY_ENCODING_UTF8);
+    if (length == 0) {
+        return 0;
+    }
+    if (length >= buffer_size) {
+        return PATH_ARG_TOO_LONG;
+    }
+    jerry_size_t copied = jerry_string_to_buffer(
+        args[index], JERRY_ENCODING_UTF8, (jerry_char_t *)buffer, length);
+    if (copied != length) {
+        return PATH_ARG_TOO_LONG;
+    }
+    buffer[length] = '\0';
+    return (size_t)length;
+}
+
+static void set_property_value(jerry_value_t object, jerry_value_t property,
+                               jerry_value_t value) {
+    jerry_value_t result = jerry_object_set(object, property, value);
+    jerry_value_free(result);
+}
 
 /*
  * Create an error object
@@ -40,12 +67,19 @@ static jerry_value_t create_error(const char *code, const char *message) {
     /* Add code property like Node.js errors */
     jerry_value_t code_str = jerry_string_sz(code);
     jerry_value_t code_prop = jerry_string_sz("code");
-    jerry_object_set(error, code_prop, code_str);
+    set_property_value(error, code_prop, code_str);
     jerry_value_free(code_prop);
     jerry_value_free(code_str);
     
-    return error;
+    return jerry_throw_value(error, true);
 }
+
+#define RETURN_IF_PATH_TOO_LONG(length) \
+    do { \
+        if ((length) == PATH_ARG_TOO_LONG) { \
+            return create_error("ENAMETOOLONG", "path is too long"); \
+        } \
+    } while (0)
 
 /*
  * fs.readFileSync(path[, encoding])
@@ -62,7 +96,8 @@ static jerry_value_t fs_read_file_sync(const jerry_call_info_t *call_info_p,
     
     /* Get path argument */
     char path[64];
-    size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+    size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(path_len);
     if (path_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "path must be a string");
     }
@@ -128,7 +163,8 @@ static jerry_value_t fs_write_file_sync(const jerry_call_info_t *call_info_p,
     
     /* Get path argument */
     char path[64];
-    size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+    size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(path_len);
     if (path_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "path must be a string");
     }
@@ -136,6 +172,7 @@ static jerry_value_t fs_write_file_sync(const jerry_call_info_t *call_info_p,
     /* Get data argument */
     jerry_value_t str_val = jerry_value_to_string(args[1]);
     if (jerry_value_is_exception(str_val)) {
+        jerry_value_free(str_val);
         return create_error("ERR_INVALID_ARG_TYPE", "data must be convertible to string");
     }
     
@@ -164,10 +201,15 @@ static jerry_value_t fs_write_file_sync(const jerry_call_info_t *call_info_p,
     /* Write data */
     size_t bytes_written;
     result = fs_write(&file, data, data_size, &bytes_written);
-    fs_close(&file);
+    fs_result_t close_result = fs_close(&file);
+    if (result == FS_OK && close_result != FS_OK) {
+        result = close_result;
+    }
     free(data);
     
-    if (result != FS_OK) {
+    if (result == FS_ERROR_NO_SPACE) {
+        return create_error("ENOSPC", "no space left on device");
+    } else if (result != FS_OK) {
         return create_error("EIO", "failed to write file");
     }
     
@@ -194,7 +236,8 @@ static jerry_value_t fs_append_file_sync(const jerry_call_info_t *call_info_p,
     
     /* Get path argument */
     char path[64];
-    size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+    size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(path_len);
     if (path_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "path must be a string");
     }
@@ -202,6 +245,7 @@ static jerry_value_t fs_append_file_sync(const jerry_call_info_t *call_info_p,
     /* Get data argument */
     jerry_value_t str_val = jerry_value_to_string(args[1]);
     if (jerry_value_is_exception(str_val)) {
+        jerry_value_free(str_val);
         return create_error("ERR_INVALID_ARG_TYPE", "data must be convertible to string");
     }
     
@@ -230,10 +274,15 @@ static jerry_value_t fs_append_file_sync(const jerry_call_info_t *call_info_p,
     /* Write data */
     size_t bytes_written;
     result = fs_write(&file, data, data_size, &bytes_written);
-    fs_close(&file);
+    fs_result_t close_result = fs_close(&file);
+    if (result == FS_OK && close_result != FS_OK) {
+        result = close_result;
+    }
     free(data);
     
-    if (result != FS_OK) {
+    if (result == FS_ERROR_NO_SPACE) {
+        return create_error("ENOSPC", "no space left on device");
+    } else if (result != FS_OK) {
         return create_error("EIO", "failed to append to file");
     }
     
@@ -261,7 +310,8 @@ static jerry_value_t fs_exists_sync(const jerry_call_info_t *call_info_p,
     
     /* Get path argument */
     char path[64];
-    size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+    size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(path_len);
     if (path_len == 0) {
         return jerry_boolean(false);
     }
@@ -284,7 +334,8 @@ static jerry_value_t fs_unlink_sync(const jerry_call_info_t *call_info_p,
     
     /* Get path argument */
     char path[64];
-    size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+    size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(path_len);
     if (path_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "path must be a string");
     }
@@ -320,7 +371,8 @@ static bool readdir_callback(const fs_entry_t *entry, void *user_data) {
     readdir_data_t *data = (readdir_data_t *)user_data;
     
     jerry_value_t name = jerry_string_sz(entry->name);
-    jerry_object_set_index(data->array, data->index++, name);
+    jerry_value_t set_result = jerry_object_set_index(data->array, data->index++, name);
+    jerry_value_free(set_result);
     jerry_value_free(name);
     
     return true;  /* Continue iteration */
@@ -339,7 +391,8 @@ static jerry_value_t fs_readdir_sync(const jerry_call_info_t *call_info_p,
     char path[64] = "/";
     
     if (argc >= 1) {
-        size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+        size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+        RETURN_IF_PATH_TOO_LONG(path_len);
         if (path_len == 0) {
             /* Use default "/" */
             strcpy(path, "/");
@@ -382,7 +435,7 @@ typedef struct {
 static bool stat_callback(const fs_entry_t *entry, void *user_data) {
     stat_data_t *data = (stat_data_t *)user_data;
     
-    if (strcmp(entry->name, data->target) == 0) {
+    if (strcasecmp(entry->name, data->target) == 0) {
         data->found = true;
         data->size = entry->size;
         data->is_dir = entry->is_dir;
@@ -407,43 +460,62 @@ static jerry_value_t fs_stat_sync(const jerry_call_info_t *call_info_p,
     
     /* Get path argument */
     char path[64];
-    size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+    size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(path_len);
     if (path_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "path must be a string");
     }
     
-    /* Extract filename from path */
-    const char *filename = path;
-    if (path[0] == '/') {
-        filename = path + 1;
-    }
-    
     /* Handle root directory */
-    if (filename[0] == '\0' || strcmp(path, "/") == 0) {
+    if (strcmp(path, "/") == 0) {
         jerry_value_t stat_obj = jerry_object();
         
         jerry_value_t size_prop = jerry_string_sz("size");
         jerry_value_t size_val = jerry_number(0);
-        jerry_object_set(stat_obj, size_prop, size_val);
+        set_property_value(stat_obj, size_prop, size_val);
         jerry_value_free(size_prop);
         jerry_value_free(size_val);
         
         jerry_value_t is_dir_prop = jerry_string_sz("isDirectory");
         jerry_value_t is_dir_val = jerry_boolean(true);
-        jerry_object_set(stat_obj, is_dir_prop, is_dir_val);
+        set_property_value(stat_obj, is_dir_prop, is_dir_val);
         jerry_value_free(is_dir_prop);
         jerry_value_free(is_dir_val);
         
         jerry_value_t is_file_prop = jerry_string_sz("isFile");
         jerry_value_t is_file_val = jerry_boolean(false);
-        jerry_object_set(stat_obj, is_file_prop, is_file_val);
+        set_property_value(stat_obj, is_file_prop, is_file_val);
         jerry_value_free(is_file_prop);
         jerry_value_free(is_file_val);
         
         return stat_obj;
     }
     
-    /* Look up file in directory */
+    /* Split the path into the containing directory and basename. */
+    size_t normalized_len = strlen(path);
+    while (normalized_len > 1 && path[normalized_len - 1] == '/') {
+        path[--normalized_len] = '\0';
+    }
+
+    char directory[64] = "/";
+    const char *filename = path;
+    char *last_slash = strrchr(path, '/');
+    if (last_slash != NULL) {
+        filename = last_slash + 1;
+        if (last_slash != path) {
+            size_t directory_len = (size_t)(last_slash - path);
+            if (directory_len >= sizeof(directory)) {
+                return create_error("ENAMETOOLONG", "path is too long");
+            }
+            memcpy(directory, path, directory_len);
+            directory[directory_len] = '\0';
+        }
+    }
+    if (filename[0] == '\0') {
+        return create_error("ENOENT", "no such file or directory");
+    }
+
+    /* Look up the basename in its containing directory. */
     stat_data_t data = {
         .target = filename,
         .found = false,
@@ -451,7 +523,12 @@ static jerry_value_t fs_stat_sync(const jerry_call_info_t *call_info_p,
         .is_dir = false
     };
     
-    fs_list_dir("/", stat_callback, &data);
+    fs_result_t list_result = fs_list_dir(directory, stat_callback, &data);
+    if (list_result == FS_ERROR_NOT_FOUND) {
+        return create_error("ENOENT", "no such file or directory");
+    } else if (list_result != FS_OK) {
+        return create_error("EIO", "failed to stat file");
+    }
     
     if (!data.found) {
         return create_error("ENOENT", "no such file or directory");
@@ -462,19 +539,19 @@ static jerry_value_t fs_stat_sync(const jerry_call_info_t *call_info_p,
     
     jerry_value_t size_prop = jerry_string_sz("size");
     jerry_value_t size_val = jerry_number(data.size);
-    jerry_object_set(stat_obj, size_prop, size_val);
+    set_property_value(stat_obj, size_prop, size_val);
     jerry_value_free(size_prop);
     jerry_value_free(size_val);
     
     jerry_value_t is_dir_prop = jerry_string_sz("isDirectory");
     jerry_value_t is_dir_val = jerry_boolean(data.is_dir);
-    jerry_object_set(stat_obj, is_dir_prop, is_dir_val);
+    set_property_value(stat_obj, is_dir_prop, is_dir_val);
     jerry_value_free(is_dir_prop);
     jerry_value_free(is_dir_val);
     
     jerry_value_t is_file_prop = jerry_string_sz("isFile");
     jerry_value_t is_file_val = jerry_boolean(!data.is_dir);
-    jerry_object_set(stat_obj, is_file_prop, is_file_val);
+    set_property_value(stat_obj, is_file_prop, is_file_val);
     jerry_value_free(is_file_prop);
     jerry_value_free(is_file_val);
     
@@ -495,7 +572,8 @@ static jerry_value_t fs_mkdir_sync(const jerry_call_info_t *call_info_p,
     
     /* Get path argument */
     char path[64];
-    size_t path_len = js_get_string_arg(args, argc, 0, path, sizeof(path));
+    size_t path_len = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(path_len);
     if (path_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "path must be a string");
     }
@@ -534,14 +612,16 @@ static jerry_value_t fs_rename_sync(const jerry_call_info_t *call_info_p,
     
     /* Get oldPath argument */
     char old_path[64];
-    size_t old_len = js_get_string_arg(args, argc, 0, old_path, sizeof(old_path));
+    size_t old_len = get_path_arg(args, argc, 0, old_path, sizeof(old_path));
+    RETURN_IF_PATH_TOO_LONG(old_len);
     if (old_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "oldPath must be a string");
     }
     
     /* Get newPath argument */
     char new_path[64];
-    size_t new_len = js_get_string_arg(args, argc, 1, new_path, sizeof(new_path));
+    size_t new_len = get_path_arg(args, argc, 1, new_path, sizeof(new_path));
+    RETURN_IF_PATH_TOO_LONG(new_len);
     if (new_len == 0) {
         return create_error("ERR_INVALID_ARG_TYPE", "newPath must be a string");
     }

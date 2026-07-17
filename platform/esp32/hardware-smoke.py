@@ -10,6 +10,7 @@ import time
 
 import serial
 
+PROMPT = "\r\n> "
 
 def wait_for_device(path: Path, timeout: float = 20.0) -> None:
     deadline = time.monotonic() + timeout
@@ -46,7 +47,7 @@ def open_console(path: Path) -> serial.Serial:
             port.reset_input_buffer()
             port.write(b"\r")
             port.flush()
-            read_until(port, ("> ",))
+            read_until(port, (PROMPT,))
             return port
         except (OSError, serial.SerialException, AssertionError):
             if port is not None:
@@ -64,14 +65,18 @@ def evaluate(
     port.reset_input_buffer()
     port.write(source.encode("utf-8") + b"\r")
     port.flush()
-    output = read_until(port, ("> ",), timeout=timeout)
-    result_output = output.replace(source, "", 1)
-    if expected is not None and expected not in result_output:
+    output = read_until(port, (PROMPT,), timeout=timeout)
+    body = output.split(PROMPT, 1)[0].replace("\r\n", "\n")
+    if body.startswith(source):
+        body = body[len(source) :]
+    result_lines = [line for line in body.split("\n") if line]
+    result = result_lines[-1] if result_lines else ""
+    if expected is not None and result != expected:
         raise AssertionError(
-            f"result for {source!r} did not contain {expected!r}: {result_output!r}"
+            f"result for {source!r} was {result!r}, expected {expected!r}; output={output!r}"
         )
-    print(f"PASS: {source} -> result contains {expected!r}")
-    return result_output
+    print(f"PASS: {source} -> exact result {result!r}")
+    return output
 
 
 def evaluate_number(port: serial.Serial, source: str) -> int:
@@ -80,6 +85,11 @@ def evaluate_number(port: serial.Serial, source: str) -> int:
     if not values:
         raise AssertionError(f"result for {source!r} was not numeric: {output!r}")
     return int(values[-1])
+
+
+def output_after_prompt(output: str) -> str:
+    parts = output.split(PROMPT, 1)
+    return parts[1] if len(parts) == 2 else ""
 
 
 def reset_and_reconnect(port: serial.Serial, path: Path) -> serial.Serial:
@@ -108,7 +118,7 @@ def main() -> int:
     port = open_console(path)
     try:
         evaluate(port, "2 + 2", "4")
-        evaluate(port, "board.name + ':' + board.chip", "seeed_xiao_esp32s3:ESP32-S3")
+        evaluate(port, "board.name + ':' + board.chip", "'seeed_xiao_esp32s3:ESP32-S3'")
         evaluate(port, "board.millis() > 0", "true")
         evaluate(
             port,
@@ -118,7 +128,7 @@ def main() -> int:
         evaluate(
             port,
             "try { GPIO.init(26, GPIO.OUTPUT); 'unsafe-open' } catch(e) { 'unsafe-rejected' }",
-            "unsafe-rejected",
+            "'unsafe-rejected'",
         )
         evaluate(port, "board.led(true); board.led()", "true")
         timer_output = evaluate(
@@ -126,7 +136,7 @@ def main() -> int:
             "setTimeout(function(){ GPIO.set(21, true); console.log('M2_TIMER_OK'); }, 50)",
             None,
         )
-        if "M2_TIMER_OK" not in timer_output:
+        if "M2_TIMER_OK" not in output_after_prompt(timer_output):
             read_until(port, ("M2_TIMER_OK",), timeout=5.0)
         print("PASS: asynchronous timer callback produced 'M2_TIMER_OK'")
         evaluate(port, "GPIO.get(21)", "true")
@@ -135,7 +145,7 @@ def main() -> int:
             "var selfClear; selfClear=setTimeout(function(){ clearTimeout(selfClear); console.log('M2_SELF_CLEAR_OK'); }, 20)",
             None,
         )
-        if "M2_SELF_CLEAR_OK" not in self_clear_output:
+        if "M2_SELF_CLEAR_OK" not in output_after_prompt(self_clear_output):
             read_until(port, ("M2_SELF_CLEAR_OK",), timeout=5.0)
         evaluate(port, "2 + 2", "4")
         print("PASS: self-clearing one-shot timer preserved runtime state")
@@ -144,10 +154,77 @@ def main() -> int:
             "var zeroTicks=0, zeroTimer=setInterval(function(){ if(++zeroTicks===2){ clearInterval(zeroTimer); console.log('M2_ZERO_INTERVAL_OK'); } }, 0)",
             None,
         )
-        if "M2_ZERO_INTERVAL_OK" not in zero_interval_output:
+        if "M2_ZERO_INTERVAL_OK" not in output_after_prompt(zero_interval_output):
             read_until(port, ("M2_ZERO_INTERVAL_OK",), timeout=5.0)
         evaluate(port, "zeroTicks >= 2", "true")
         print("PASS: zero-delay interval remained repeating and was cleared")
+
+        evaluate(port, "board.storageReady()", "true")
+        evaluate(port, "board.safeMode()", "false")
+        evaluate(
+            port,
+            "var m3fs=require('fs'); typeof m3fs.writeFileSync==='function'",
+            "true",
+        )
+        evaluate(
+            port,
+            "if(!m3fs.existsSync('/m3'))m3fs.mkdirSync('/m3');"
+            "m3fs.writeFileSync('/m3/persist.txt','alpha');"
+            "m3fs.appendFileSync('/m3/persist.txt','-beta');"
+            "m3fs.readFileSync('/m3/persist.txt')",
+            "'alpha-beta'",
+        )
+        evaluate(
+            port,
+            "var m3stat=m3fs.statSync('/m3/persist.txt');"
+            "m3stat.isFile===true&&m3stat.isDirectory===false&&m3stat.size===10",
+            "true",
+        )
+        evaluate(
+            port,
+            "m3fs.writeFileSync('/m3/rename.tmp','rename');"
+            "m3fs.renameSync('/m3/rename.tmp','/m3/renamed.txt');"
+            "m3fs.readdirSync('/m3').indexOf('renamed.txt')>=0",
+            "true",
+        )
+        evaluate(
+            port,
+            "m3fs.unlinkSync('/m3/renamed.txt');!m3fs.existsSync('/m3/renamed.txt')",
+            "true",
+        )
+        evaluate(
+            port,
+            "if(!m3fs.existsSync('/lib'))m3fs.mkdirSync('/lib');"
+            "m3fs.writeFileSync('/lib/m3-module.js','module.exports={answer:42};');"
+            "require('/lib/m3-module').answer",
+            "42",
+        )
+        evaluate(
+            port,
+            "m3fs.writeFileSync('/lib/m3-child.js','exports.answer=17;');"
+            "m3fs.writeFileSync('/lib/m3-deferred.js',"
+            "\"exports.load=function(){return require('./m3-child').answer;};\");"
+            "require('/lib/m3-deferred').load()",
+            "17",
+        )
+        evaluate(
+            port,
+            "try{m3fs.writeFileSync('../escape.txt','no');false}catch(e){true}",
+            "true",
+        )
+        evaluate(
+            port,
+            "var guardPath='/'+('g'.repeat(62));m3fs.writeFileSync(guardPath,'guard');"
+            "var longRejected=false;try{m3fs.unlinkSync(guardPath+'x')}"
+            "catch(e){longRejected=e.code==='ENAMETOOLONG'};"
+            "longRejected&&m3fs.existsSync(guardPath)",
+            "true",
+        )
+        evaluate(port, "m3fs.unlinkSync(guardPath);true", "true")
+        print(
+            "PASS: filesystem CRUD, nested stat, deferred modules, path confinement, "
+            "and overlong-path rejection"
+        )
 
         for index in range(args.resets):
             uptime_before = evaluate_number(port, "board.millis()")
@@ -158,6 +235,7 @@ def main() -> int:
                     f"reset did not restart uptime: before={uptime_before}, after={uptime_after}"
                 )
             evaluate(port, "2 + 2", "4")
+            evaluate(port, "require('fs').readFileSync('/m3/persist.txt')", "'alpha-beta'")
             print(
                 f"PASS: reset/reconnect cycle {index + 1} restarted uptime "
                 f"({uptime_before} -> {uptime_after})"

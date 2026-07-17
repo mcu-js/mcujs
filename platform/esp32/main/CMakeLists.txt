@@ -10,16 +10,21 @@ endif()
 
 set(MCUJS_SOURCES
     main.c
+    boot.c
     jerry_port.c
     repl.c
     usb_cdc.c
+    filesystem.c
     bindings/board.c
     bindings/gpio.c
     bindings/process.c
     bindings/timers.c
     ${MCUJS_ROOT}/host/engine.c
+    ${MCUJS_ROOT}/host/module_loader.c
     ${MCUJS_ROOT}/host/bindings/bindings.c
     ${MCUJS_ROOT}/host/bindings/console.c
+    ${MCUJS_ROOT}/host/bindings/fs.c
+    ${MCUJS_ROOT}/host/bindings/require.c
 )
 
 idf_component_register(
@@ -30,9 +35,11 @@ idf_component_register(
         ${MCUJS_ROOT}/host
         ${MCUJS_ROOT}/host/bindings
         ${MCUJS_ROOT}/src
+        ${MCUJS_ROOT}/src/filesystem
         ${MCUJS_ROOT}/src/usb
         ${JERRY_ROOT}/jerry-core/include
-    REQUIRES esp_driver_gpio esp_driver_usb_serial_jtag esp_timer esp_system heap log freertos vfs
+    REQUIRES esp_driver_gpio esp_driver_usb_serial_jtag esp_timer esp_system fatfs
+        wear_levelling nvs_flash heap log freertos vfs
 )
 
 # IDF evaluates component files once on the host to discover requirements and
@@ -84,7 +91,7 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MCUJS_PLATFORM_NAME="esp32"
     MCUJS_PLATFORM_ESP32=1
     JERRYSCRIPT_VERSION="3.0.0"
-    MCUJS_FEATURE_MODULE_LOADER=0
+    MCUJS_FEATURE_MODULE_LOADER=1
     MCUJS_FEATURE_CONSOLE=1
     MCUJS_FEATURE_TIMERS=1
     MCUJS_FEATURE_BOARD=1
@@ -95,7 +102,11 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MCUJS_FEATURE_ADC=0
     MCUJS_FEATURE_NEOPIXEL=0
     MCUJS_FEATURE_PROCESS=1
-    MCUJS_FEATURE_REQUIRE=0
+    MCUJS_FEATURE_REQUIRE=1
+    MCUJS_FEATURE_FS=1
+    MCUJS_FEATURE_IMAGE=0
+    MCUJS_FEATURE_KEYBOARD=0
+    MCUJS_FEATURE_MOUSE=0
     MCUJS_FEATURE_GRAPHICS=0
     MCUJS_FEATURE_SCREEN=0
 )

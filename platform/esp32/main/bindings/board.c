@@ -2,11 +2,13 @@
 
 #include "bindings.h"
 #include "board_config.h"
+#include "boot.h"
 #include "jerryscript.h"
 
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
 #include "esp_mac.h"
+#include "esp_private/system_internal.h"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -73,7 +75,34 @@ static jerry_value_t board_delay(const jerry_call_info_t *info,
 static jerry_value_t board_enter_uf2(const jerry_call_info_t *info,
                                      const jerry_value_t args[], jerry_length_t argc) {
     (void)info; (void)args; (void)argc;
-    return jerry_throw_sz(JERRY_ERROR_COMMON, "UF2 entry is not available in Milestone 2");
+    enum { APP_REQUEST_UF2_RESET_HINT = 0x11F2 };
+    /* TinyUF2 requires this reference so IDF links the hint implementation. */
+    (void)esp_reset_reason();
+    esp_reset_reason_set_hint((esp_reset_reason_t)APP_REQUEST_UF2_RESET_HINT);
+    vTaskDelay(pdMS_TO_TICKS(20));
+    esp_restart();
+    return jerry_undefined();
+}
+
+static jerry_value_t board_safe_mode(const jerry_call_info_t *info,
+                                     const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    if (argc == 0) {
+        return jerry_boolean(mcujs_boot_safe_mode());
+    }
+    if (!jerry_value_is_boolean(args[0])) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE, "safeMode value must be boolean");
+    }
+    if (!mcujs_boot_set_safe_mode(jerry_value_is_true(args[0]))) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "Unable to persist safe mode");
+    }
+    return jerry_undefined();
+}
+
+static jerry_value_t board_storage_ready(const jerry_call_info_t *info,
+                                         const jerry_value_t args[], jerry_length_t argc) {
+    (void)info; (void)args; (void)argc;
+    return jerry_boolean(mcujs_boot_storage_ready());
 }
 
 static jerry_value_t board_led(const jerry_call_info_t *info,
@@ -103,6 +132,8 @@ void js_bind_board(void) {
     js_set_function(board, "millis", board_millis);
     js_set_function(board, "delay", board_delay);
     js_set_function(board, "enterUf2", board_enter_uf2);
+    js_set_function(board, "safeMode", board_safe_mode);
+    js_set_function(board, "storageReady", board_storage_ready);
     js_set_function(board, "led", board_led);
     js_register_global("board", board);
     jerry_value_free(board);

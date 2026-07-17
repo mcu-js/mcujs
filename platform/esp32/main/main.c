@@ -1,10 +1,12 @@
 /* MCU.js headless ESP32-S3 bring-up runtime. */
 
 #include "engine.h"
+#include "boot.h"
 #include "repl.h"
 #include "usb_cdc.h"
 
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -36,6 +38,8 @@ void app_main(void) {
     usb_cdc_puts("\r\nMCU.js ESP32-S3 headless runtime\r\n");
     usb_cdc_puts("Build: " MCUJS_BUILD_ID "\r\n");
 
+    mcujs_boot_init();
+
     if (js_engine_init() != JS_OK) {
         ESP_LOGE(TAG, "MCUJS_SMOKE_ENGINE_FAIL");
         return;
@@ -54,6 +58,17 @@ void app_main(void) {
                     NULL);
 
     ESP_LOGI(TAG, "%s", ok ? "MCUJS_SMOKE_SYNC_OK" : "MCUJS_SMOKE_SYNC_FAIL");
+    bool runtime_task_watched = esp_task_wdt_status(NULL) == ESP_OK;
+    if (!runtime_task_watched) {
+        runtime_task_watched = esp_task_wdt_add(NULL) == ESP_OK;
+    }
+    if (!runtime_task_watched) {
+        ESP_LOGE(TAG, "Runtime task watchdog subscription failed; forcing safe mode");
+        mcujs_boot_set_safe_mode(true);
+    } else {
+        esp_task_wdt_reset();
+    }
+    mcujs_boot_execute_index();
     usb_cdc_puts("MCU.js ready; press Enter for the prompt.\r\n");
     repl_init();
 
@@ -61,6 +76,10 @@ void app_main(void) {
         usb_cdc_task();
         repl_task();
         js_engine_process_timers();
+        mcujs_boot_task();
+        if (runtime_task_watched) {
+            esp_task_wdt_reset();
+        }
         /* One RTOS tick is 10 ms with the IDF default. pdMS_TO_TICKS(1)
          * rounds to zero and starves IDLE0, triggering the task watchdog. */
         vTaskDelay(1);

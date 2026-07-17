@@ -15,7 +15,8 @@ static bool valid_pin(int pin) {
         return false;
     }
 
-    /* XIAO D0-D10 plus the onboard LED. Do not expose flash/PSRAM pins. */
+    /* XIAO exposed pins plus the onboard LED. D6/D7 (GPIO43/44) are reserved
+     * for the independent UART recovery console; flash/PSRAM pins stay hidden. */
     switch (pin) {
         case 1:
         case 2:
@@ -27,8 +28,6 @@ static bool valid_pin(int pin) {
         case 8:
         case 9:
         case 21:
-        case 43:
-        case 44:
             return true;
         default:
             return false;

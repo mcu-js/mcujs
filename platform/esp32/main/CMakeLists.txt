@@ -14,6 +14,8 @@ set(MCUJS_SOURCES
     jerry_port.c
     repl.c
     usb_cdc.c
+    usb_msc.c
+    usb_recovery.c
     filesystem.c
     bindings/board.c
     bindings/gpio.c
@@ -38,7 +40,7 @@ idf_component_register(
         ${MCUJS_ROOT}/src/filesystem
         ${MCUJS_ROOT}/src/usb
         ${JERRY_ROOT}/jerry-core/include
-    REQUIRES esp_driver_gpio esp_driver_usb_serial_jtag esp_timer esp_system fatfs
+    REQUIRES esp_driver_gpio esp_driver_uart esp_timer esp_system fatfs
         wear_levelling nvs_flash heap log freertos vfs
 )
 

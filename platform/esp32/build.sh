@@ -34,18 +34,163 @@ verify_checkout() {
 verify_checkout "${IDF_PATH}" "${IDF_COMMIT}" "ESP-IDF"
 verify_checkout "${JERRYSCRIPT_PATH}" "${JERRYSCRIPT_COMMIT}" "JerryScript"
 
+if [[ -n "${SERIAL_TOOL_EXTRA_ARGS:-}" ]]; then
+    printf '%s\n' \
+        'Refusing SERIAL_TOOL_EXTRA_ARGS: app-flash permits no arguments outside the validated response file.' >&2
+    exit 1
+fi
+
 for action in "$@"; do
-    if [[ "${action}" == "flash" && "${MCUJS_ALLOW_DESTRUCTIVE_FULL_FLASH:-0}" != "1" ]]; then
+    case "${action}" in
+      @*)
         printf '%s\n' \
-            'Refusing full flash: it replaces the TinyUF2-aware bootloader and partition metadata.' \
-            'Use app-flash to preserve TinyUF2, or explicitly set MCUJS_ALLOW_DESTRUCTIVE_FULL_FLASH=1.' >&2
+            "Refusing ESP-IDF argument file '${action}': recursive arguments bypass project flash validation." >&2
+        exit 1
+        ;;
+      --force|--extra-args|--extra-args=*)
+        printf '%s\n' \
+            "Refusing ESP-IDF flash option '${action}': app-flash permits no unvalidated esptool arguments." >&2
+        exit 1
+        ;;
+      app-flash)
+        destructive=0
+        ;;
+      *flash*|*erase*)
+        destructive=1
+        ;;
+      *) destructive=0 ;;
+    esac
+    if [[ "${destructive}" == "1" && "${MCUJS_ALLOW_DESTRUCTIVE_FULL_FLASH:-0}" != "1" ]]; then
+        printf '%s\n' \
+            "Refusing destructive ESP-IDF target '${action}': it can replace or erase protected flash regions." \
+            'Use an application-only UF2, or explicitly set MCUJS_ALLOW_DESTRUCTIVE_FULL_FLASH=1 for recovery engineering.' >&2
         exit 1
     fi
 done
 
 export IDF_PATH JERRYSCRIPT_PATH
+export IDF_COMPONENT_STRICT_CHECKSUM=1
 # ESP-IDF's export script sets the pinned Python environment and tool paths.
 # shellcheck disable=SC1090
 source "${IDF_PATH}/export.sh" >/dev/null
 
-exec idf.py -C "${SCRIPT_DIR}" -B "${SCRIPT_DIR}/build" "$@"
+validate_runtime_config() {
+    local config="${SCRIPT_DIR}/build/sdkconfig" required line found
+    [[ -f "${config}" ]] || {
+        printf 'Generated sdkconfig is missing: %s\n' "${config}" >&2
+        return 1
+    }
+
+    for required in \
+        'CONFIG_ESP_CONSOLE_UART_DEFAULT=y' \
+        '# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set' \
+        'CONFIG_ESP_CONSOLE_SECONDARY_NONE=y' \
+        'CONFIG_TINYUSB_DESC_USE_ESPRESSIF_VID=y' \
+        'CONFIG_TINYUSB_DESC_USE_DEFAULT_PID=y' \
+        'CONFIG_TINYUSB_MSC_ENABLED=y' \
+        'CONFIG_TINYUSB_MSC_BUFSIZE=4096' \
+        'CONFIG_TINYUSB_CDC_ENABLED=y' \
+        'CONFIG_TINYUSB_CDC_COUNT=1' \
+        'CONFIG_TINYUSB_NO_DEFAULT_TASK=y' \
+        'CONFIG_ESP_TASK_WDT_EN=y' \
+        'CONFIG_ESP_TASK_WDT_INIT=y' \
+        'CONFIG_ESP_TASK_WDT_PANIC=y' \
+        'CONFIG_ESP_TASK_WDT_TIMEOUT_S=10' \
+        'CONFIG_FATFS_LFN_HEAP=y' \
+        'CONFIG_FATFS_MAX_LFN=255' \
+        'CONFIG_FATFS_API_ENCODING_UTF_8=y'; do
+        found=0
+        while IFS= read -r line; do
+            if [[ "${line}" == "${required}" ]]; then
+                found=1
+                break
+            fi
+        done < "${config}"
+        [[ "${found}" == "1" ]] || {
+            printf 'Generated sdkconfig violates MCU.js runtime policy: missing %s\n' \
+                "${required}" >&2
+            return 1
+        }
+    done
+}
+
+validate_app_flash_metadata() {
+    local build_dir="${SCRIPT_DIR}/build"
+    python - "${build_dir}" <<'PY'
+import json
+import shlex
+import sys
+from pathlib import Path
+
+build_dir = Path(sys.argv[1]).resolve()
+args_path = build_dir / "app-flash_args"
+json_path = build_dir / "flasher_args.json"
+expected_image = "mcujs-esp32s3.bin"
+expected_offset = 0x10000
+ota_end = 0x410000
+
+if not args_path.is_file() or not json_path.is_file():
+    raise SystemExit("Generated app-flash metadata is missing")
+
+tokens = shlex.split(args_path.read_text())
+expected_tokens = [
+    "--flash_mode", "dio",
+    "--flash_freq", "80m",
+    "--flash_size", "8MB",
+    hex(expected_offset), expected_image,
+]
+if tokens != expected_tokens:
+    raise SystemExit(
+        f"Unsafe app-flash arguments: expected {expected_tokens}, found {tokens}"
+    )
+
+metadata = json.loads(json_path.read_text())
+app = metadata.get("app", {})
+if int(str(app.get("offset", "-1")), 0) != expected_offset or app.get("file") != expected_image:
+    raise SystemExit(f"Unsafe generated app metadata: {app}")
+
+image = (build_dir / expected_image).resolve()
+if image.parent != build_dir or not image.is_file():
+    raise SystemExit(f"Generated application image is missing: {image}")
+image_size = image.stat().st_size
+if image_size <= 0 or expected_offset + image_size > ota_end:
+    raise SystemExit(
+        f"Application image range 0x{expected_offset:x}..0x{expected_offset + image_size:x} "
+        f"exceeds ota_0 end 0x{ota_end:x}"
+    )
+
+print(
+    f"Validated app-only flash metadata: 0x{expected_offset:x} {expected_image} "
+    f"({image_size} bytes)"
+)
+PY
+}
+
+idf_args=("$@")
+app_flash=0
+for action in "${idf_args[@]}"; do
+    [[ "${action}" == "app-flash" ]] && app_flash=1
+done
+
+if [[ "${app_flash}" == "1" ]]; then
+    preflight_args=()
+    for action in "${idf_args[@]}"; do
+        if [[ "${action}" == "app-flash" ]]; then
+            preflight_args+=(build)
+        else
+            preflight_args+=("${action}")
+        fi
+    done
+    idf.py -C "${SCRIPT_DIR}" -B "${SCRIPT_DIR}/build" "${preflight_args[@]}"
+    validate_runtime_config
+    validate_app_flash_metadata
+    exec idf.py -C "${SCRIPT_DIR}" -B "${SCRIPT_DIR}/build" "${idf_args[@]}"
+fi
+
+idf.py -C "${SCRIPT_DIR}" -B "${SCRIPT_DIR}/build" "${idf_args[@]}"
+if [[ -f "${SCRIPT_DIR}/build/sdkconfig" ]]; then
+    validate_runtime_config
+fi
+if [[ -f "${SCRIPT_DIR}/build/app-flash_args" ]]; then
+    validate_app_flash_metadata
+fi

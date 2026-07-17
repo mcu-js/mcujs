@@ -4,6 +4,8 @@
 #include "boot.h"
 #include "repl.h"
 #include "usb_cdc.h"
+#include "usb_msc.h"
+#include "usb_recovery.h"
 
 #include "esp_log.h"
 #include "esp_task_wdt.h"
@@ -34,7 +36,10 @@ static bool run_smoke(const char *name, const char *source, const char *expected
 }
 
 void app_main(void) {
+    mcujs_usb_recovery_start();
     usb_cdc_init();
+    usb_cdc_task();
+    mcujs_usb_recovery_mark_healthy();
     usb_cdc_puts("\r\nMCU.js ESP32-S3 headless runtime\r\n");
     usb_cdc_puts("Build: " MCUJS_BUILD_ID "\r\n");
 
@@ -69,11 +74,15 @@ void app_main(void) {
         esp_task_wdt_reset();
     }
     mcujs_boot_execute_index();
+    if (!mcujs_usb_msc_expose()) {
+        ESP_LOGE(TAG, "USB MSC storage ownership transfer failed");
+    }
     usb_cdc_puts("MCU.js ready; press Enter for the prompt.\r\n");
     repl_init();
 
     while (true) {
         usb_cdc_task();
+        mcujs_usb_msc_task();
         repl_task();
         js_engine_process_timers();
         mcujs_boot_task();

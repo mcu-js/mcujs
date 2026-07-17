@@ -54,8 +54,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Dependencies (cloned during Docker build)
+# Dependencies (cloned or resolved during builds)
 javascript/jerryscript/
+/platform/esp32/managed_components/
 
 # Backup files
 *.bak

@@ -6,11 +6,17 @@
 #include "esp_err.h"
 #include "esp_partition.h"
 #include "esp_vfs_fat.h"
+#include "diskio_impl.h"
+#include "diskio_wl.h"
+#include "ff.h"
 #include "wear_levelling.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -36,7 +42,26 @@ static const esp_vfs_fat_mount_config_t s_mount_config = {
 
 static const esp_partition_t *s_partition;
 static wl_handle_t s_wl_handle = WL_INVALID_HANDLE;
+static BYTE s_pdrv = 0xff;
+static FATFS *s_fatfs;
 static bool s_initialized;
+static TaskHandle_t s_device_task;
+static atomic_uint s_open_files;
+
+typedef enum {
+    STORAGE_UNINITIALIZED = 0,
+    STORAGE_DEVICE_OWNED,
+    STORAGE_CLAIMING_HOST,
+    STORAGE_HOST_OWNED,
+    STORAGE_RELEASING_HOST,
+    STORAGE_FAULT,
+} storage_state_t;
+
+static atomic_int s_storage_state = STORAGE_UNINITIALIZED;
+
+static bool is_device_task(void) {
+    return s_device_task == NULL || xTaskGetCurrentTaskHandle() == s_device_task;
+}
 
 static const esp_partition_t *find_valid_partition(void) {
     const esp_partition_t *partition = esp_partition_find_first(
@@ -132,67 +157,270 @@ static fs_result_t translate_path(const char *path, char *translated, size_t tra
 }
 
 static fs_result_t ensure_initialized(void) {
+    storage_state_t state = (storage_state_t)atomic_load(&s_storage_state);
+    if (state == STORAGE_HOST_OWNED || state == STORAGE_CLAIMING_HOST ||
+        state == STORAGE_RELEASING_HOST) {
+        return FS_ERROR_BUSY;
+    }
+    if (state == STORAGE_FAULT) {
+        return FS_ERROR_IO;
+    }
+    if (!is_device_task()) {
+        return FS_ERROR_BUSY;
+    }
     return s_initialized ? FS_OK : fs_init();
 }
 
-fs_result_t fs_init(void) {
-    if (s_initialized) {
-        return FS_OK;
-    }
+static void drive_name(BYTE pdrv, char drive[3]) {
+    drive[0] = (char)('0' + pdrv);
+    drive[1] = ':';
+    drive[2] = '\0';
+}
 
-    s_partition = find_valid_partition();
-    if (s_partition == NULL) {
-        return FS_ERROR_INVALID;
-    }
-
-    esp_err_t error = esp_vfs_fat_spiflash_mount_rw_wl(
-        MCUJS_FS_BASE_PATH, MCUJS_FS_PARTITION_LABEL, &s_mount_config, &s_wl_handle);
-    if (error != ESP_OK) {
-        if (s_wl_handle != WL_INVALID_HANDLE) {
-            wl_unmount(s_wl_handle);
-        }
-        s_wl_handle = WL_INVALID_HANDLE;
+static fs_result_t attach_fatfs(void) {
+    if (s_wl_handle == WL_INVALID_HANDLE) {
         return FS_ERROR_IO;
     }
 
+    BYTE pdrv = 0xff;
+    if (ff_diskio_get_drive(&pdrv) != ESP_OK ||
+        ff_diskio_register_wl_partition(pdrv, s_wl_handle) != ESP_OK) {
+        return FS_ERROR_IO;
+    }
+
+    char drive[3];
+    drive_name(pdrv, drive);
+    esp_vfs_fat_conf_t config = {
+        .base_path = MCUJS_FS_BASE_PATH,
+        .fat_drive = drive,
+        .max_files = s_mount_config.max_files,
+    };
+    FATFS *fatfs = NULL;
+    esp_err_t error = esp_vfs_fat_register_cfg(&config, &fatfs);
+    if (error != ESP_OK) {
+        ff_diskio_clear_pdrv_wl(s_wl_handle);
+        ff_diskio_unregister(pdrv);
+        return FS_ERROR_IO;
+    }
+
+    FRESULT mount_result = f_mount(fatfs, drive, 1);
+    if (mount_result != FR_OK) {
+        esp_vfs_fat_unregister_path(MCUJS_FS_BASE_PATH);
+        ff_diskio_clear_pdrv_wl(s_wl_handle);
+        ff_diskio_unregister(pdrv);
+        return FS_ERROR_IO;
+    }
+
+    s_pdrv = pdrv;
+    s_fatfs = fatfs;
     s_initialized = true;
     return FS_OK;
 }
 
-fs_result_t fs_format(void) {
-    esp_err_t error = esp_vfs_fat_spiflash_format_rw_wl(
-        MCUJS_FS_BASE_PATH, MCUJS_FS_PARTITION_LABEL);
-    if (error != ESP_OK) {
-        return FS_ERROR_IO;
-    }
-    return s_initialized ? FS_OK : fs_init();
-}
-
-fs_result_t fs_sync(void) {
-    return s_initialized ? FS_OK : FS_ERROR;
-}
-
-fs_result_t fs_invalidate(void) {
+static fs_result_t detach_fatfs(void) {
     if (!s_initialized) {
         return FS_OK;
     }
-    if (esp_vfs_fat_spiflash_unmount_rw_wl(MCUJS_FS_BASE_PATH, s_wl_handle) != ESP_OK) {
+    if (!is_device_task() || atomic_load(&s_open_files) != 0) {
+        return FS_ERROR_BUSY;
+    }
+
+    char drive[3];
+    drive_name(s_pdrv, drive);
+    if (f_mount(NULL, drive, 0) != FR_OK) {
         return FS_ERROR_IO;
     }
+
+    esp_err_t vfs_result = esp_vfs_fat_unregister_path(MCUJS_FS_BASE_PATH);
+    ff_diskio_clear_pdrv_wl(s_wl_handle);
+    ff_diskio_unregister(s_pdrv);
+    s_pdrv = 0xff;
+    s_fatfs = NULL;
     s_initialized = false;
+    return vfs_result == ESP_OK ? FS_OK : FS_ERROR_IO;
+}
+
+static fs_result_t release_wl(void) {
+    if (s_wl_handle == WL_INVALID_HANDLE) {
+        return FS_OK;
+    }
+    if (wl_unmount(s_wl_handle) != ESP_OK) {
+        return FS_ERROR_IO;
+    }
     s_wl_handle = WL_INVALID_HANDLE;
+    return FS_OK;
+}
+
+fs_result_t fs_init(void) {
+    storage_state_t state = (storage_state_t)atomic_load(&s_storage_state);
+    if (state == STORAGE_HOST_OWNED || state == STORAGE_CLAIMING_HOST ||
+        state == STORAGE_RELEASING_HOST) {
+        return FS_ERROR_BUSY;
+    }
+    if (!is_device_task()) {
+        return FS_ERROR_BUSY;
+    }
+    if (s_initialized) {
+        atomic_store(&s_storage_state, STORAGE_DEVICE_OWNED);
+        return FS_OK;
+    }
+
+    if (s_wl_handle != WL_INVALID_HANDLE) {
+        if (release_wl() != FS_OK) {
+            atomic_store(&s_storage_state, STORAGE_FAULT);
+            return FS_ERROR_IO;
+        }
+    }
+    s_partition = find_valid_partition();
+    if (s_partition == NULL || wl_mount(s_partition, &s_wl_handle) != ESP_OK) {
+        s_wl_handle = WL_INVALID_HANDLE;
+        atomic_store(&s_storage_state, STORAGE_FAULT);
+        return FS_ERROR_INVALID;
+    }
+
+    fs_result_t result = attach_fatfs();
+    if (result != FS_OK) {
+        atomic_store(&s_storage_state,
+                     release_wl() == FS_OK ? STORAGE_UNINITIALIZED : STORAGE_FAULT);
+        return result;
+    }
+
+    if (s_device_task == NULL) {
+        s_device_task = xTaskGetCurrentTaskHandle();
+    }
+    atomic_store(&s_storage_state, STORAGE_DEVICE_OWNED);
+    return FS_OK;
+}
+
+fs_result_t fs_format(void) {
+    storage_state_t state = (storage_state_t)atomic_load(&s_storage_state);
+    if (state == STORAGE_HOST_OWNED || state == STORAGE_CLAIMING_HOST ||
+        state == STORAGE_RELEASING_HOST) {
+        return FS_ERROR_BUSY;
+    }
+    if (!is_device_task()) {
+        return FS_ERROR_BUSY;
+    }
+
+    if (s_initialized) {
+        fs_result_t detach_result = detach_fatfs();
+        if (detach_result == FS_ERROR_BUSY) {
+            return detach_result;
+        }
+        if (detach_result != FS_OK) {
+            atomic_store(&s_storage_state, STORAGE_FAULT);
+            return FS_ERROR_IO;
+        }
+    }
+    if (release_wl() != FS_OK) {
+        atomic_store(&s_storage_state, STORAGE_FAULT);
+        return FS_ERROR_IO;
+    }
+
+    s_partition = find_valid_partition();
+    if (s_partition == NULL || wl_mount(s_partition, &s_wl_handle) != ESP_OK) {
+        s_wl_handle = WL_INVALID_HANDLE;
+        atomic_store(&s_storage_state, STORAGE_FAULT);
+        return FS_ERROR_INVALID;
+    }
+
+    BYTE pdrv = 0xff;
+    if (ff_diskio_get_drive(&pdrv) != ESP_OK ||
+        ff_diskio_register_wl_partition(pdrv, s_wl_handle) != ESP_OK) {
+        (void)release_wl();
+        atomic_store(&s_storage_state, STORAGE_FAULT);
+        return FS_ERROR_IO;
+    }
+
+    char drive[3];
+    drive_name(pdrv, drive);
+    static BYTE work_buffer[4096];
+    const MKFS_PARM options = {
+        .fmt = FM_ANY | FM_SFD,
+        .n_fat = 2,
+        .align = 0,
+        .n_root = 0,
+        .au_size = s_mount_config.allocation_unit_size,
+    };
+    FRESULT format_result = f_mkfs(drive, &options, work_buffer, sizeof(work_buffer));
+    ff_diskio_clear_pdrv_wl(s_wl_handle);
+    ff_diskio_unregister(pdrv);
+    if (release_wl() != FS_OK) {
+        atomic_store(&s_storage_state, STORAGE_FAULT);
+        return FS_ERROR_IO;
+    }
+    atomic_store(&s_storage_state, STORAGE_UNINITIALIZED);
+    if (format_result != FR_OK) {
+        return FS_ERROR_IO;
+    }
     return fs_init();
 }
 
+fs_result_t fs_sync(void) {
+    return ensure_initialized();
+}
+
+fs_result_t fs_invalidate(void) {
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
+    atomic_store(&s_storage_state, STORAGE_RELEASING_HOST);
+    fs_result_t result = detach_fatfs();
+    if (result == FS_ERROR_BUSY) {
+        atomic_store(&s_storage_state, STORAGE_DEVICE_OWNED);
+        return result;
+    }
+    if (result == FS_OK) {
+        result = attach_fatfs();
+    }
+    atomic_store(&s_storage_state,
+                 result == FS_OK ? STORAGE_DEVICE_OWNED : STORAGE_FAULT);
+    return result;
+}
+
+fs_result_t mcujs_filesystem_begin_host_access(void) {
+    if ((storage_state_t)atomic_load(&s_storage_state) != STORAGE_DEVICE_OWNED ||
+        !s_initialized || s_wl_handle == WL_INVALID_HANDLE || !is_device_task() ||
+        atomic_load(&s_open_files) != 0) {
+        return FS_ERROR_BUSY;
+    }
+
+    atomic_store(&s_storage_state, STORAGE_CLAIMING_HOST);
+    fs_result_t result = detach_fatfs();
+    atomic_store(&s_storage_state,
+                 result == FS_OK ? STORAGE_HOST_OWNED : STORAGE_FAULT);
+    return result;
+}
+
+fs_result_t mcujs_filesystem_end_host_access(void) {
+    if ((storage_state_t)atomic_load(&s_storage_state) != STORAGE_HOST_OWNED ||
+        s_wl_handle == WL_INVALID_HANDLE || !is_device_task()) {
+        return FS_ERROR_BUSY;
+    }
+
+    atomic_store(&s_storage_state, STORAGE_RELEASING_HOST);
+    fs_result_t result = attach_fatfs();
+    atomic_store(&s_storage_state,
+                 result == FS_OK ? STORAGE_DEVICE_OWNED : STORAGE_FAULT);
+    return result;
+}
+
+bool mcujs_filesystem_host_owned(void) {
+    return (storage_state_t)atomic_load(&s_storage_state) == STORAGE_HOST_OWNED;
+}
+
+uint32_t mcujs_filesystem_sector_size(void) {
+    return s_wl_handle == WL_INVALID_HANDLE ? 0u : (uint32_t)wl_sector_size(s_wl_handle);
+}
+
 void fs_notify_host(void) {
-    /* Runtime MSC is introduced in Milestone 4. */
+    /* The MSC state machine controls host cache notifications. */
 }
 
 uint32_t fs_get_total_sectors(void) {
-    if (ensure_initialized() != FS_OK) {
-        return 0;
-    }
-    return (uint32_t)(wl_size(s_wl_handle) / FS_SECTOR_SIZE);
+    uint32_t sector_size = mcujs_filesystem_sector_size();
+    return sector_size == 0 ? 0u : (uint32_t)(wl_size(s_wl_handle) / sector_size);
 }
 
 uint32_t fs_get_free_space(void) {
@@ -208,31 +436,82 @@ uint32_t fs_get_free_space(void) {
 
 fs_result_t fs_read_sector(uint32_t sector, uint32_t offset,
                            void *buffer, uint32_t size) {
-    if (buffer == NULL || ensure_initialized() != FS_OK || offset >= FS_SECTOR_SIZE ||
-        size > FS_SECTOR_SIZE - offset || sector >= fs_get_total_sectors()) {
+    if (!mcujs_filesystem_host_owned() || buffer == NULL) {
+        return FS_ERROR_BUSY;
+    }
+    uint32_t sector_size = mcujs_filesystem_sector_size();
+    uint32_t sector_count = fs_get_total_sectors();
+    if (sector_size == 0 || offset >= sector_size || sector >= sector_count) {
         return FS_ERROR_INVALID;
     }
-    size_t address = (size_t)sector * FS_SECTOR_SIZE + offset;
-    if (address > wl_size(s_wl_handle) || size > wl_size(s_wl_handle) - address) {
+    uint64_t available = (uint64_t)(sector_count - sector) * sector_size - offset;
+    if (size > available) {
         return FS_ERROR_INVALID;
     }
+    size_t address = (size_t)sector * sector_size + offset;
     return wl_read(s_wl_handle, address, buffer, size) == ESP_OK ? FS_OK : FS_ERROR_IO;
 }
 
 fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
                             const void *buffer, uint32_t size) {
-    (void)sector;
-    (void)offset;
-    (void)buffer;
-    (void)size;
-    /* Raw writes while FatFs is mounted would corrupt its cache. MSC ownership
-     * and unmount/remount coordination belong to Milestone 4. */
-    return FS_ERROR_INVALID;
+    if (!mcujs_filesystem_host_owned() || buffer == NULL) {
+        return FS_ERROR_BUSY;
+    }
+    uint32_t sector_size = mcujs_filesystem_sector_size();
+    uint32_t sector_count = fs_get_total_sectors();
+    if (sector_size == 0 || offset >= sector_size || sector >= sector_count) {
+        return FS_ERROR_INVALID;
+    }
+    uint64_t available = (uint64_t)(sector_count - sector) * sector_size - offset;
+    if (size > available) {
+        return FS_ERROR_INVALID;
+    }
+
+    const uint8_t *source = buffer;
+    uint8_t *scratch = NULL;
+    uint32_t remaining = size;
+    while (remaining != 0) {
+        uint32_t chunk = sector_size - offset;
+        if (chunk > remaining) {
+            chunk = remaining;
+        }
+        size_t address = (size_t)sector * sector_size;
+        const void *write_buffer = source;
+        if (offset != 0 || chunk != sector_size) {
+            if (scratch == NULL) {
+                scratch = malloc(sector_size);
+                if (scratch == NULL) {
+                    return FS_ERROR;
+                }
+            }
+            if (wl_read(s_wl_handle, address, scratch, sector_size) != ESP_OK) {
+                free(scratch);
+                return FS_ERROR_IO;
+            }
+            memcpy(scratch + offset, source, chunk);
+            write_buffer = scratch;
+        }
+        if (wl_erase_range(s_wl_handle, address, sector_size) != ESP_OK ||
+            wl_write(s_wl_handle, address, write_buffer, sector_size) != ESP_OK) {
+            free(scratch);
+            return FS_ERROR_IO;
+        }
+        source += chunk;
+        remaining -= chunk;
+        sector++;
+        offset = 0;
+    }
+    free(scratch);
+    return FS_OK;
 }
 
 fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
-    if (file == NULL || ensure_initialized() != FS_OK) {
+    if (file == NULL) {
         return FS_ERROR_INVALID;
+    }
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
 
     char translated[MCUJS_FS_PATH_MAX];
@@ -270,6 +549,7 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     internal->stream = stream;
     file->internal = internal;
     file->is_open = true;
+    atomic_fetch_add(&s_open_files, 1);
     return FS_OK;
 }
 
@@ -286,10 +566,15 @@ fs_result_t fs_close(fs_file_t *file) {
     free(internal);
     file->internal = NULL;
     file->is_open = false;
+    atomic_fetch_sub(&s_open_files, 1);
     return result == 0 && close_result == 0 ? FS_OK : FS_ERROR_IO;
 }
 
 fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_read) {
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
     if (file == NULL || !file->is_open || file->internal == NULL || buffer == NULL) {
         return FS_ERROR_INVALID;
     }
@@ -304,6 +589,10 @@ fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_re
 
 fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
                      size_t *bytes_written) {
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
     if (file == NULL || !file->is_open || file->internal == NULL || buffer == NULL) {
         return FS_ERROR_INVALID;
     }
@@ -320,6 +609,10 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
 }
 
 fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
     if (file == NULL || !file->is_open || file->internal == NULL) {
         return FS_ERROR_INVALID;
     }
@@ -328,6 +621,10 @@ fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
 }
 
 fs_result_t fs_size(fs_file_t *file, size_t *size) {
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
     if (file == NULL || !file->is_open || file->internal == NULL || size == NULL) {
         return FS_ERROR_INVALID;
     }
@@ -341,8 +638,9 @@ fs_result_t fs_size(fs_file_t *file, size_t *size) {
 }
 
 fs_result_t fs_exists(const char *path) {
-    if (ensure_initialized() != FS_OK) {
-        return FS_ERROR;
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t path_result = translate_path(path, translated, sizeof(translated));
@@ -354,8 +652,9 @@ fs_result_t fs_exists(const char *path) {
 }
 
 fs_result_t fs_remove(const char *path) {
-    if (ensure_initialized() != FS_OK) {
-        return FS_ERROR;
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t path_result = translate_path(path, translated, sizeof(translated));
@@ -371,8 +670,9 @@ fs_result_t fs_remove(const char *path) {
 }
 
 fs_result_t fs_rename(const char *old_path, const char *new_path) {
-    if (ensure_initialized() != FS_OK) {
-        return FS_ERROR;
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     char old_translated[MCUJS_FS_PATH_MAX];
     char new_translated[MCUJS_FS_PATH_MAX];
@@ -387,8 +687,9 @@ fs_result_t fs_rename(const char *old_path, const char *new_path) {
 }
 
 fs_result_t fs_mkdir(const char *path) {
-    if (ensure_initialized() != FS_OK) {
-        return FS_ERROR;
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t path_result = translate_path(path, translated, sizeof(translated));
@@ -399,8 +700,12 @@ fs_result_t fs_mkdir(const char *path) {
 }
 
 fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user_data) {
-    if (callback == NULL || ensure_initialized() != FS_OK) {
+    if (callback == NULL) {
         return FS_ERROR_INVALID;
+    }
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t path_result = translate_path(path, translated, sizeof(translated));

@@ -23,6 +23,9 @@ typedef enum {
     FS_ERROR_NO_SPACE,
     FS_ERROR_INVALID,
     FS_ERROR_IO,
+#ifdef MCUJS_PLATFORM_ESP32
+    FS_ERROR_BUSY,
+#endif
 } fs_result_t;
 
 /* File open modes */

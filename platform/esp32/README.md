@@ -1,17 +1,20 @@
 # ESP32-S3 backend
 
-This backend targets the Seeed XIAO ESP32-S3 with ESP-IDF's fixed USB
-Serial/JTAG console. It deliberately does **not** initialize USB-OTG, TinyUSB,
-or MSC; the shared internal USB PHY remains owned by fixed Serial/JTAG while
-TinyUF2 provides the recovery transport.
+This backend targets the Seeed XIAO ESP32-S3 with a TinyUSB USB-OTG composite
+device: CDC provides the JavaScript REPL and MSC exposes the persistent `MCUJS`
+filesystem. UART0 remains mirrored on XIAO D6/D7 as an independent 3.3 V
+recovery console. TinyUF2 provides the application-update transport.
 
-The GPIO API is restricted to the XIAO's exposed D0-D10 pins and onboard LED;
-JavaScript cannot reconfigure internal flash or PSRAM pins.
+The GPIO API is restricted to the XIAO's exposed pins and onboard LED, excluding
+UART recovery pins D6/D7. JavaScript cannot reconfigure recovery, flash, or
+PSRAM pins.
 
 ## Pinned dependencies
 
 - ESP-IDF `v5.3.2` (`9d7f2d69f50d1288526d4f1027108e314e8c879f`)
 - JerryScript `v3.0.0` (`50200152feb724a74a5f64e44d7885151537cfad`)
+- `espressif/esp_tinyusb` `1.7.6~2`, resolved by `dependencies.lock`
+- TinyUSB `0.21.0~1`, resolved transitively by `dependencies.lock`
 - TinyUF2 source `9af754c408ae76e862830de33dbd03b93a9a82e1`
 - Microsoft UF2 submodule `84444ddb9d2914edf7f6d9e89a7ce41b53d64d98`
 
@@ -47,15 +50,25 @@ destination. Here that partition contains TinyUF2, so the project rewrites the
 generated `flash` and `app-flash` metadata to the named `ota_0` partition and
 fails configuration unless it remains at `0x10000`.
 
-`platform/esp32/build.sh flash` is refused by default because a full ESP-IDF
-flash also replaces the TinyUF2-aware second-stage bootloader, partition table,
-and OTA metadata. Use `app-flash` for routine development updates:
+The build wrapper refuses every ESP-IDF action containing `flash` or `erase`
+except exact `app-flash`. Full flashing can replace the TinyUF2-aware
+second-stage bootloader, partition table, OTA metadata, recovery image, or user
+storage. Invoke ESP-IDF through the wrapper; direct `idf.py` writes bypass these
+project safeguards and are unsupported.
+
+The normal Milestone 4 update path is application-only UF2:
 
 ```sh
-platform/esp32/build.sh -p /dev/mcujs-dev app-flash
+# In the CDC REPL:
+board.enterUf2()
+
+# Then copy the generated file to the XIAOS3BOOT volume:
+cp platform/esp32/build/mcujs-esp32s3.uf2 /path/to/XIAOS3BOOT/
 ```
 
-The destructive full flash requires an explicit
+`app-flash` remains available only when an esptool-compatible ROM or fixed USB
+Serial/JTAG transport is already active; TinyUSB CDC is not an esptool port.
+Destructive targets require an explicit
 `MCUJS_ALLOW_DESTRUCTIVE_FULL_FLASH=1` override. That override is for recovery
 engineering only; it is not a normal installation path.
 
@@ -72,15 +85,17 @@ address zero into `ota_0`, bounds the write to that partition, marks OTA0
 bootable, and preserves its bootloader, partition table, factory image, and
 FFAT region.
 
-A software reset can keep fixed USB Serial/JTAG enumerated. A transition
-between TinyUF2 USB-OTG and fixed Serial/JTAG may require a physical reset or
-USB power cycle because both controllers share the internal PHY.
-
 `board.enterUf2()` sets TinyUF2's pinned `0x11F2` reset-reason hint and performs
 a software reset. A verified TinyUF2-aware bootloader then selects the factory
 `uf2` partition for that boot. The recovery volume should enumerate as
-`XIAOS3BOOT`; power-cycle to return to the selected `ota_0` application without
-rewriting it.
+`XIAOS3BOOT`. Installing an application UF2 returns to `ota_0` without rewriting
+the bootloader, partition table, recovery image, or FFAT.
+
+Before TinyUSB initialization, MCU.js commits a USB-startup `pending` marker in
+NVS. TinyUSB is serviced from the task-watchdog-supervised main task rather than
+an independent task. A reset before the first service pass leaves the marker;
+the next boot clears it and enters TinyUF2. NVS failures also enter TinyUF2 and
+never erase NVS automatically.
 
 ## Filesystem and modules
 
@@ -108,9 +123,32 @@ The filesystem is formatted only when its NVS initialization marker is absent
 **and** a pre-mount scan proves every byte of the FFAT partition is erased
 (`0xff`). Missing NVS state is never treated as evidence that non-erased user
 storage is disposable. Any non-erased mount failure leaves the partition
-untouched and starts the runtime without storage. Raw sector writes are
-unavailable while FatFs is mounted; MSC ownership and cache coordination belong
-to Milestone 4.
+untouched and starts the runtime without storage.
+
+### USB storage ownership
+
+FFAT has exactly one owner:
+
+- During boot, FatFs is device-owned so `/index.js` can run.
+- After startup, FatFs/VFS is flushed, unmounted, and detached from diskio while
+  the wear-levelling handle remains live. MSC then exposes that same WL logical
+  volume to the host as `MCUJS`, using 4096-byte logical sectors.
+- While host-owned, CDC and non-filesystem JavaScript remain available, but all
+  JavaScript filesystem operations throw `EBUSY` and explain that `MCUJS` must
+  be ejected first.
+- Host `SYNCHRONIZE CACHE` is safe because every MSC write completes its
+  WL-aware erase/write synchronously. `START STOP UNIT` eject immediately blocks
+  new MSC I/O, drains in-flight operations, and remounts FatFs on the main task.
+- Host load transfers ownership back to MSC only when no local file handle is
+  open. Local filesystem access is restricted to its owning main task.
+
+USB suspend or a transport reset is not treated as eject. Without a board-level
+VBUS detector, physical disconnect cannot be distinguished safely from a bus
+reset, so ownership remains host-side until an explicit eject or firmware
+reset. Always sync/eject `MCUJS` before JavaScript filesystem access or unplug.
+An interrupted acknowledged host write can preserve FAT structure while losing
+file contents that were still in host caches; this is normal removable-storage
+behavior, not something firmware can make transactional.
 
 ## `/index.js` and persistent safe mode
 
@@ -140,23 +178,26 @@ reset to resume automatic startup.
 
 ## Hardware smoke
 
-With the runtime available at `/dev/mcujs-dev`:
+With the runtime available at `/dev/mcujs-dev`, first sync/eject the host
+`MCUJS` volume so FatFs is device-owned, then run:
 
 ```sh
 source "$IDF_PATH/export.sh"
-python platform/esp32/hardware-smoke.py --resets 2
-python platform/esp32/boot-smoke.py
+python platform/esp32/hardware-smoke.py --port /dev/mcujs-dev --resets 0
 ```
 
-The first harness verifies the Milestone 2 runtime plus filesystem CRUD, nested
+This harness verifies the Milestone 2 runtime plus filesystem CRUD, nested
 metadata, deferred relative CommonJS loading, path confinement, overlong-path
-rejection, persistence across resets, exact line-framed REPL results, and a
-watchdog-free idle window. The boot harness verifies healthy startup,
-qualification, syntax-failure recovery, explicit safe mode, attempted pending
-marker bypass, and automatic recovery from immediate and delayed yielding
-infinite loops. Neither harness reads or prints the board's unique identifier.
+rejection, exact line-framed REPL results, and a watchdog-free idle window.
+`hardware-smoke.py --resets 2` and `boot-smoke.py` remain Milestone 3 regression
+harnesses; each reset in Milestone 4 returns storage to host ownership, so an MSC
+orchestrator must eject between their reset steps. Milestone 4 qualification
+additionally covers CDC while host-owned, exact JavaScript `EBUSY`, host
+write/sync/eject/device read, device write/load/host read, ordinary and abrupt
+resets, TinyUF2 recovery, repeated handoffs, and offline `fsck.fat -n`.
+No harness reads or prints the board's unique identifier.
 
 ## Deliberately unavailable
 
-Until later milestones, this backend excludes runtime MSC/custom USB composite
-mode, PWM, I2C, SPI, ADC, NeoPixel, graphics, and displays.
+Until later milestones, this backend excludes PWM, I2C, SPI, ADC, NeoPixel,
+graphics, and displays.

@@ -74,6 +74,22 @@ static jerry_value_t create_error(const char *code, const char *message) {
     return jerry_throw_value(error, true);
 }
 
+#ifdef MCUJS_PLATFORM_ESP32
+static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
+    if (result == FS_ERROR_BUSY) {
+        return create_error("EBUSY",
+                            "filesystem is owned by the USB host; eject MCUJS first");
+    }
+    if (result == FS_ERROR_NO_SPACE) {
+        return create_error("ENOSPC", "no space left on device");
+    }
+    return create_error("EIO", fallback);
+}
+#define CREATE_FS_ERROR(result, fallback) create_fs_error((result), (fallback))
+#else
+#define CREATE_FS_ERROR(result, fallback) create_error("EIO", (fallback))
+#endif
+
 #define RETURN_IF_PATH_TOO_LONG(length) \
     do { \
         if ((length) == PATH_ARG_TOO_LONG) { \
@@ -108,7 +124,7 @@ static jerry_value_t fs_read_file_sync(const jerry_call_info_t *call_info_p,
     if (result == FS_ERROR_NOT_FOUND) {
         return create_error("ENOENT", "no such file or directory");
     } else if (result != FS_OK) {
-        return create_error("EIO", "failed to open file");
+        return CREATE_FS_ERROR(result, "failed to open file");
     }
     
     /* Get file size */
@@ -116,7 +132,7 @@ static jerry_value_t fs_read_file_sync(const jerry_call_info_t *call_info_p,
     result = fs_size(&file, &file_size);
     if (result != FS_OK) {
         fs_close(&file);
-        return create_error("EIO", "failed to get file size");
+        return CREATE_FS_ERROR(result, "failed to get file size");
     }
     
     if (file_size > MAX_FILE_SIZE) {
@@ -137,7 +153,7 @@ static jerry_value_t fs_read_file_sync(const jerry_call_info_t *call_info_p,
     
     if (result != FS_OK) {
         free(buffer);
-        return create_error("EIO", "failed to read file");
+        return CREATE_FS_ERROR(result, "failed to read file");
     }
     
     buffer[bytes_read] = '\0';
@@ -195,7 +211,7 @@ static jerry_value_t fs_write_file_sync(const jerry_call_info_t *call_info_p,
         return create_error("ENOSPC", "no space left on device");
     } else if (result != FS_OK) {
         free(data);
-        return create_error("EIO", "failed to open file for writing");
+        return CREATE_FS_ERROR(result, "failed to open file for writing");
     }
     
     /* Write data */
@@ -210,7 +226,7 @@ static jerry_value_t fs_write_file_sync(const jerry_call_info_t *call_info_p,
     if (result == FS_ERROR_NO_SPACE) {
         return create_error("ENOSPC", "no space left on device");
     } else if (result != FS_OK) {
-        return create_error("EIO", "failed to write file");
+        return CREATE_FS_ERROR(result, "failed to write file");
     }
     
     /* Sync to flash */
@@ -268,7 +284,7 @@ static jerry_value_t fs_append_file_sync(const jerry_call_info_t *call_info_p,
         return create_error("ENOSPC", "no space left on device");
     } else if (result != FS_OK) {
         free(data);
-        return create_error("EIO", "failed to open file for appending");
+        return CREATE_FS_ERROR(result, "failed to open file for appending");
     }
     
     /* Write data */
@@ -283,7 +299,7 @@ static jerry_value_t fs_append_file_sync(const jerry_call_info_t *call_info_p,
     if (result == FS_ERROR_NO_SPACE) {
         return create_error("ENOSPC", "no space left on device");
     } else if (result != FS_OK) {
-        return create_error("EIO", "failed to append to file");
+        return CREATE_FS_ERROR(result, "failed to append to file");
     }
     
     /* Sync to flash */
@@ -317,6 +333,11 @@ static jerry_value_t fs_exists_sync(const jerry_call_info_t *call_info_p,
     }
     
     fs_result_t result = fs_exists(path);
+#ifdef MCUJS_PLATFORM_ESP32
+    if (result == FS_ERROR_BUSY) {
+        return CREATE_FS_ERROR(result, "failed to inspect path");
+    }
+#endif
     return jerry_boolean(result == FS_OK);
 }
 
@@ -344,7 +365,7 @@ static jerry_value_t fs_unlink_sync(const jerry_call_info_t *call_info_p,
     if (result == FS_ERROR_NOT_FOUND) {
         return create_error("ENOENT", "no such file or directory");
     } else if (result != FS_OK) {
-        return create_error("EIO", "failed to delete file");
+        return CREATE_FS_ERROR(result, "failed to delete file");
     }
     
     /* Sync to flash */
@@ -413,7 +434,7 @@ static jerry_value_t fs_readdir_sync(const jerry_call_info_t *call_info_p,
         return create_error("ENOENT", "no such file or directory");
     } else if (result != FS_OK) {
         jerry_value_free(array);
-        return create_error("EIO", "failed to read directory");
+        return CREATE_FS_ERROR(result, "failed to read directory");
     }
     
     return array;
@@ -468,6 +489,12 @@ static jerry_value_t fs_stat_sync(const jerry_call_info_t *call_info_p,
     
     /* Handle root directory */
     if (strcmp(path, "/") == 0) {
+#ifdef MCUJS_PLATFORM_ESP32
+        fs_result_t root_result = fs_exists("/");
+        if (root_result != FS_OK) {
+            return CREATE_FS_ERROR(root_result, "failed to stat root directory");
+        }
+#endif
         jerry_value_t stat_obj = jerry_object();
         
         jerry_value_t size_prop = jerry_string_sz("size");
@@ -527,7 +554,7 @@ static jerry_value_t fs_stat_sync(const jerry_call_info_t *call_info_p,
     if (list_result == FS_ERROR_NOT_FOUND) {
         return create_error("ENOENT", "no such file or directory");
     } else if (list_result != FS_OK) {
-        return create_error("EIO", "failed to stat file");
+        return CREATE_FS_ERROR(list_result, "failed to stat file");
     }
     
     if (!data.found) {
@@ -586,7 +613,7 @@ static jerry_value_t fs_mkdir_sync(const jerry_call_info_t *call_info_p,
     } else if (result == FS_ERROR_NO_SPACE) {
         return create_error("ENOSPC", "no space left on device");
     } else if (result != FS_OK) {
-        return create_error("EIO", "failed to create directory");
+        return CREATE_FS_ERROR(result, "failed to create directory");
     }
     
     /* Sync to flash */
@@ -632,7 +659,7 @@ static jerry_value_t fs_rename_sync(const jerry_call_info_t *call_info_p,
     } else if (result == FS_ERROR_EXISTS) {
         return create_error("EEXIST", "file already exists");
     } else if (result != FS_OK) {
-        return create_error("EIO", "failed to rename file");
+        return CREATE_FS_ERROR(result, "failed to rename file");
     }
     
     /* Sync to flash */

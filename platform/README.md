@@ -70,9 +70,9 @@ bring-up. ESP-IDF evaluates components through its own project flow rather than
 the RP2 top-level source-list hooks, while shared engine capability flags keep
 unimplemented subsystems out of the link without ESP32 branches in RP2 code.
 
-Milestone 3 supports fixed USB Serial/JTAG, JerryScript, the REPL, console,
-timers, board/process identity, reset, constrained GPIO, a wear-levelled FFAT
-filesystem, CommonJS modules, `/index.js`, and persistent boot-failure safe
-mode. Runtime MSC/custom USB composite mode remains a later milestone. See
+Milestone 4 supports TinyUSB USB-OTG composite CDC+MSC, JerryScript, the REPL,
+console, timers, board/process identity, reset, constrained GPIO, an
+exclusive-owner wear-levelled FFAT filesystem, CommonJS modules, `/index.js`,
+persistent boot-failure safe mode, and buttonless TinyUF2 crash-loop recovery. See
 [`platform/esp32/README.md`](esp32/README.md) for pinned dependencies, build,
 flash ownership, storage behavior, recovery, and hardware verification.

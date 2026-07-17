@@ -145,6 +145,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/finalize-pages-cutover.sh"
         "${ROOT_DIR}/scripts/package-release.sh"
         "${ROOT_DIR}/scripts/release.sh"
+        "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"
         "${ROOT_DIR}/scripts/lib/boards.sh"
     )
@@ -154,6 +155,11 @@ check_shell_syntax() {
         bash -n "${script}"
     done
     pass 'shell entrypoints parse cleanly'
+}
+
+check_platform_boundaries() {
+    "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
+    pass 'platform boundary checks passed'
 }
 
 check_docs_build() {
@@ -172,6 +178,7 @@ check_version
 check_board_registry
 check_docs_board_coverage
 check_shell_syntax
+check_platform_boundaries
 check_docs_build
 
 printf '\nRelease source checks passed.\n'

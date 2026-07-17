@@ -61,11 +61,11 @@ void js_bind_process(void) {
     js_set_string(versions, "jerryscript", "3.0.0");
     #endif
     
-    /* Pico SDK version */
-    #ifdef PICO_SDK_VERSION
-    js_set_string(versions, "pico-sdk", PICO_SDK_VERSION);
+    /* Platform SDK version */
+    #if defined(MCUJS_PLATFORM_SDK_NAME) && defined(MCUJS_PLATFORM_SDK_VERSION)
+    js_set_string(versions, MCUJS_PLATFORM_SDK_NAME, MCUJS_PLATFORM_SDK_VERSION);
     #else
-    js_set_string(versions, "pico-sdk", "2.2.0");
+    js_set_string(versions, "platform-sdk", "unknown");
     #endif
     
     /* TinyUSB version */

@@ -333,7 +333,7 @@ Requirements:
 export PICO_SDK_PATH=/path/to/pico-sdk
 
 mkdir build && cd build
-cmake -DBOARD=pico ..
+cmake -DMCUJS_PLATFORM=rp2 -DBOARD=pico ..
 make -j$(nproc)
 ```
 
@@ -362,12 +362,19 @@ mcujs/
 ├── javascript/          # JerryScript build adapter
 ├── board/               # Board-specific configurations by board ID
 │   └── <board-id>/      # board_config.h and board_config.cmake
-├── src/                 # Core firmware
-│   ├── usb/             # USB CDC + MSC composite device
-│   └── filesystem/      # FAT12 filesystem with subdirectory support
+├── platform/            # MCU/SDK-specific implementations and build hooks
+│   └── rp2/             # RP2040/RP2350 Pico SDK backend
+├── src/                 # Shared firmware contracts and runtime code
+│   ├── usb/             # USB CDC/MSC/HID interfaces
+│   └── filesystem/      # Shared FAT filesystem plus storage interfaces
 ├── examples/            # Example JavaScript programs
 └── scripts/             # Board registry, verification, and release tooling
 ```
+
+The selected `MCUJS_PLATFORM` supplies the firmware entrypoint, JerryScript
+port, board/boot behavior, storage, USB implementation, and hardware bindings.
+See [`platform/README.md`](platform/README.md) for the backend contract. Shared
+runtime sources are prohibited from directly including platform SDK headers.
 
 ## Contributing
 

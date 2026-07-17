@@ -9,6 +9,7 @@
  */
 
 #include "fs.h"
+#include "storage.h"
 #include "ff.h"
 #include "../usb/usb_msc.h"
 #include "../usb/usb_cdc.h"
@@ -16,12 +17,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-
-/* External disk I/O functions for USB MSC (defined in diskio.c) */
-extern uint32_t diskio_get_sector_count(void);
-extern int diskio_read_sector(uint32_t sector, uint32_t offset, void *buffer, uint32_t size);
-extern int diskio_write_sector(uint32_t sector, uint32_t offset, const void *buffer, uint32_t size);
-extern void diskio_sync(void);
 
 /* FatFs objects */
 static FATFS s_fatfs;

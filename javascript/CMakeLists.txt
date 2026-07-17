@@ -58,10 +58,7 @@ if(JERRY_AMALGAM)
         JERRY_VM_THROW=1
     )
     
-    target_link_libraries(mcujs_jerry PUBLIC
-        pico_stdlib
-        pico_time
-    )
+    mcujs_platform_configure_jerry(mcujs_jerry PUBLIC)
 else()
     # Build JerryScript from source with minimal profile
     if(EXISTS "${JERRYSCRIPT_PATH}/jerry-core")
@@ -86,9 +83,8 @@ else()
         add_library(mcujs_jerry INTERFACE)
         target_link_libraries(mcujs_jerry INTERFACE
             jerry-core
-            pico_stdlib
-            pico_time
         )
+        mcujs_platform_configure_jerry(mcujs_jerry INTERFACE)
         target_include_directories(mcujs_jerry INTERFACE
             ${CMAKE_CURRENT_LIST_DIR}
         )

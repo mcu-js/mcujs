@@ -10,6 +10,7 @@
 
 #include "ff.h"
 #include "diskio.h"
+#include "storage.h"
 #include "flash_config.h"
 
 #include "pico/stdlib.h"

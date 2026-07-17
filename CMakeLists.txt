@@ -14,16 +14,26 @@ message(STATUS "Building mcujs v${MCUJS_VERSION} for board: ${BOARD}")
 # Include board-specific configuration
 include(${CMAKE_CURRENT_LIST_DIR}/board/${BOARD}/board_config.cmake)
 
-# Initialize Pico SDK
-include(pico_sdk_import.cmake)
+# Platform selection (current release boards all use the RP2 backend)
+if(NOT DEFINED MCUJS_PLATFORM)
+    set(MCUJS_PLATFORM "rp2")
+endif()
+
+set(MCUJS_PLATFORM_FILE
+    ${CMAKE_CURRENT_LIST_DIR}/platform/${MCUJS_PLATFORM}/platform.cmake
+)
+if(NOT EXISTS ${MCUJS_PLATFORM_FILE})
+    message(FATAL_ERROR "Unsupported MCUJS_PLATFORM: ${MCUJS_PLATFORM}")
+endif()
+include(${MCUJS_PLATFORM_FILE})
 
 project(mcujs VERSION ${MCUJS_VERSION} LANGUAGES C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-# Initialize Pico SDK (must be after project())
-pico_sdk_init()
+# Initialize the selected platform SDK (must be after project())
+mcujs_platform_sdk_init()
 
 # Derive build ID from git
 execute_process(
@@ -44,8 +54,6 @@ add_compile_definitions(
     MCUJS_BUILD_ID="${MCUJS_BUILD_ID}"
     MCUJS_BOARD="${BOARD}"
     JERRYSCRIPT_VERSION="3.0.0"
-    PICO_SDK_VERSION="2.2.0"
-    TINYUSB_VERSION="0.18.0"
 )
 
 # Add subdirectories
@@ -55,32 +63,16 @@ add_subdirectory(src)
 
 # Main executable - include jerry_port.c directly to avoid LTO stripping
 add_executable(mcujs
-    src/main.c
-    ${JERRY_PORT_SOURCE}
+    ${MCUJS_PLATFORM_MAIN_SOURCE}
+    ${MCUJS_PLATFORM_JERRY_PORT_SOURCE}
 )
 
-target_link_libraries(mcujs
+target_link_libraries(mcujs PRIVATE
     mcujs_core
     mcujs_host
     mcujs_bindings
     mcujs_jerry
-    pico_stdlib
-    hardware_flash
-    hardware_sync
-    hardware_gpio
-    hardware_pwm
-    hardware_i2c
-    hardware_spi
-    tinyusb_device
-    tinyusb_board
 )
-
-# Add CYW43 driver for WiFi boards (Pico W, Pico 2 W)
-if(MCUJS_HAS_CYW43)
-    target_link_libraries(mcujs
-        pico_cyw43_arch_none  # Minimal CYW43 support (GPIO only, no network stack)
-    )
-endif()
 
 target_include_directories(mcujs PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
@@ -90,24 +82,12 @@ target_include_directories(mcujs PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/host
     ${CMAKE_CURRENT_LIST_DIR}/javascript
     ${CMAKE_CURRENT_LIST_DIR}/javascript/jerryscript-core
+    ${MCUJS_PLATFORM_INCLUDE_DIRS}
 )
-
-# Disable SDK's USB stdio - we use TinyUSB directly
-pico_enable_stdio_usb(mcujs 0)
-pico_enable_stdio_uart(mcujs 0)
 
 # Set output name with version and board
 set_target_properties(mcujs PROPERTIES
     OUTPUT_NAME "mcujs-${MCUJS_VERSION}-${BOARD}"
 )
 
-# Generate UF2 and other outputs
-pico_add_extra_outputs(mcujs)
-
-# Copy UF2 to build directory in project root
-add_custom_command(TARGET mcujs POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_CURRENT_BINARY_DIR}/mcujs-${MCUJS_VERSION}-${BOARD}.uf2
-        ${CMAKE_CURRENT_LIST_DIR}/build/mcujs-${MCUJS_VERSION}-${BOARD}.uf2
-    COMMENT "Copying UF2 to build directory"
-)
+mcujs_platform_configure_executable(mcujs)

@@ -63,6 +63,14 @@ functional changes:
 - TinyUSB CDC, MSC, HID, and descriptors
 - GPIO, timers, PWM, I2C, SPI, ADC, NeoPixel, board, keyboard, mouse, and DVI bindings
 
-The ESP32-S3 backend should implement the same source groups under
-`platform/esp32/` and use ESP-IDF's component/build integration. It must not
-introduce `#ifdef ESP32` branches into the RP2 implementation.
+## ESP32-S3 backend
+
+`platform/esp32/` is an ESP-IDF 5.3.2 project for the headless XIAO ESP32-S3
+bring-up. ESP-IDF evaluates components through its own project flow rather than
+the RP2 top-level source-list hooks, while shared engine capability flags keep
+unimplemented subsystems out of the link without ESP32 branches in RP2 code.
+
+Milestone 2 supports fixed USB Serial/JTAG, JerryScript, a filesystem-free
+REPL, console, timers, board/process identity, reset, and GPIO. See
+[`platform/esp32/README.md`](esp32/README.md) for pinned dependencies, build,
+flash ownership, recovery, and hardware verification.

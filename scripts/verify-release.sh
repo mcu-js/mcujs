@@ -147,6 +147,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/release.sh"
         "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"
+        "${ROOT_DIR}/platform/esp32/build.sh"
         "${ROOT_DIR}/scripts/lib/boards.sh"
     )
 

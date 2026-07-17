@@ -5,7 +5,10 @@
  */
 
 #include "engine.h"
+#include "runtime_features.h"
+#if MCUJS_FEATURE_MODULE_LOADER
 #include "module_loader.h"
+#endif
 #include "bindings/bindings.h"
 
 #include "jerryscript.h"
@@ -618,8 +621,10 @@ js_result_t js_engine_init(void) {
     /* Register native bindings */
     js_register_bindings();
     
-    /* Initialize module loader */
+    /* Initialize module loader when storage/modules are available. */
+#if MCUJS_FEATURE_MODULE_LOADER
     js_module_loader_init();
+#endif
     
     s_initialized = true;
     return JS_OK;
@@ -630,7 +635,9 @@ void js_engine_cleanup(void) {
         return;
     }
     
+#if MCUJS_FEATURE_MODULE_LOADER
     js_module_loader_cleanup();
+#endif
     jerry_cleanup();
     s_initialized = false;
 }
@@ -693,6 +700,7 @@ js_result_t js_engine_exec_file(const char *filename) {
         return JS_ERROR_INIT;
     }
     
+#if MCUJS_FEATURE_MODULE_LOADER
     /* Read file content */
     char *content = NULL;
     size_t content_len = 0;
@@ -709,6 +717,12 @@ js_result_t js_engine_exec_file(const char *filename) {
     js_module_free_file(content);
     
     return exec_result;
+#else
+    (void)filename;
+    snprintf(s_error_message, sizeof(s_error_message),
+             "File execution is unavailable without the module loader");
+    return JS_ERROR_FILE_READ;
+#endif
 }
 
 size_t js_engine_get_error(char *buf, size_t buf_len) {
@@ -754,20 +768,46 @@ bool js_engine_is_initialized(void) {
 }
 
 void js_register_bindings(void) {
-    /* Register all native JavaScript APIs */
+    /* Register native JavaScript APIs available on this platform. */
+#if MCUJS_FEATURE_CONSOLE
     js_bind_console();
+#endif
+#if MCUJS_FEATURE_TIMERS
     js_bind_timers();
+#endif
+#if MCUJS_FEATURE_BOARD
     js_bind_board();
+#endif
+#if MCUJS_FEATURE_GPIO
     js_bind_gpio();
+#endif
+#if MCUJS_FEATURE_PWM
     js_bind_pwm();
+#endif
+#if MCUJS_FEATURE_I2C
     js_bind_i2c();
+#endif
+#if MCUJS_FEATURE_SPI
     js_bind_spi();
+#endif
+#if MCUJS_FEATURE_ADC
     js_bind_adc();
+#endif
+#if MCUJS_FEATURE_NEOPIXEL
     js_bind_neopixel();
+#endif
+#if MCUJS_FEATURE_PROCESS
     js_bind_process();
+#endif
+#if MCUJS_FEATURE_REQUIRE
     js_bind_require();
+#endif
+#if MCUJS_FEATURE_GRAPHICS
     js_bind_graphics();
+#endif
+#if MCUJS_FEATURE_SCREEN
     js_bind_screen();
+#endif
     
     /* Register DVI module if available */
 #ifdef MCUJS_HAS_DVI
@@ -776,7 +816,11 @@ void js_register_bindings(void) {
 }
 
 bool js_engine_process_timers(void) {
+#if MCUJS_FEATURE_TIMERS
     return js_timers_process();
+#else
+    return false;
+#endif
 }
 
 void js_engine_register_global_identifier(const char *name) {
@@ -935,28 +979,28 @@ bool js_engine_suggest_method(const char *source, char *suggestion, size_t sugge
     const char *p = source;
     while (*p) {
         /* Skip whitespace */
-        while (*p && isspace(*p)) p++;
+        while (*p && isspace((unsigned char)*p)) p++;
         
         /* Look for identifier */
-        if (isalpha(*p) || *p == '_' || *p == '$') {
+        if (isalpha((unsigned char)*p) || *p == '_' || *p == '$') {
             const char *id_start = p;
-            while (*p && (isalnum(*p) || *p == '_' || *p == '$')) p++;
+            while (*p && (isalnum((unsigned char)*p) || *p == '_' || *p == '$')) p++;
             const char *id_end = p;
             
             /* Check for dot */
-            while (*p && isspace(*p)) p++;
+            while (*p && isspace((unsigned char)*p)) p++;
             if (*p == '.') {
                 p++;
-                while (*p && isspace(*p)) p++;
+                while (*p && isspace((unsigned char)*p)) p++;
                 
                 /* Look for property name */
-                if (isalpha(*p) || *p == '_' || *p == '$') {
+                if (isalpha((unsigned char)*p) || *p == '_' || *p == '$') {
                     const char *prop_start = p;
-                    while (*p && (isalnum(*p) || *p == '_' || *p == '$')) p++;
+                    while (*p && (isalnum((unsigned char)*p) || *p == '_' || *p == '$')) p++;
                     const char *prop_end = p;
                     
                     /* Check for opening paren (function call) */
-                    while (*p && isspace(*p)) p++;
+                    while (*p && isspace((unsigned char)*p)) p++;
                     if (*p == '(') {
                         /* Found a method call pattern */
                         best_obj_start = id_start;

@@ -315,6 +315,19 @@ Files written from JavaScript are always persisted to flash immediately - they w
 
 Output files are written to `build/` as `mcujs-<version>-<board>.uf2`.
 
+### Experimental ESP32-S3 Headless Build
+
+The Milestone 2 XIAO ESP32-S3 backend uses pinned ESP-IDF 5.3.2 and fixed USB
+Serial/JTAG. It is intentionally not part of the release board matrix yet.
+
+```bash
+platform/esp32/build.sh build
+platform/esp32/make-uf2.py
+```
+
+See [`platform/esp32/README.md`](platform/esp32/README.md) for dependency pins,
+partition ownership, app-only flashing, recovery, and hardware smoke tests.
+
 ### End-to-End Tests (Bun)
 
 The Bun test suite builds firmware, flashes UF2 if needed, and exercises REPL, filesystem, and JS APIs.

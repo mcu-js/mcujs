@@ -57,6 +57,7 @@ pnpm-debug.log*
 # Dependencies (cloned or resolved during builds)
 javascript/jerryscript/
 /platform/esp32/managed_components/
+/platform/esp32/build-*/
 
 # Backup files
 *.bak

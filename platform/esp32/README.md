@@ -24,6 +24,8 @@ Builds fail if the pinned Git revisions differ or the toolchain trees are dirty.
 
 ## Build
 
+Local build using the pinned toolchains under `$HOME/toolchains`:
+
 ```sh
 platform/esp32/build.sh build
 platform/esp32/make-uf2.py
@@ -31,6 +33,33 @@ platform/esp32/make-uf2.py
 
 `make-uf2.py` verifies the dependency pins and independently checks every UF2
 block, family ID, target address, payload, and OTA boundary.
+
+The ESP32 backend also has a dedicated Docker lane, separate from the root
+Pico/RP builder:
+
+```sh
+platform/esp32/docker-build.sh
+```
+
+It pins the reviewed AMD64 child image for `espressif/idf:v5.3.2`, verifies the
+same ESP-IDF commit, and embeds pinned JerryScript, TinyUF2, Microsoft UF2, and
+strictly validated ESP component trees. It runs as the invoking user with no
+runtime network or USB devices, accepts only a non-flashing build action, mounts
+source read-only, and writes final artifacts only to the fixed, symlink-checked
+`platform/esp32/build-docker/` directory. ARM hosts therefore require Docker's
+AMD64 emulation rather than silently selecting a different native toolchain.
+
+To prove the local and container toolchains produce identical application and
+UF2 bytes from the same source tree:
+
+```sh
+platform/esp32/verify-docker-repro.sh
+```
+
+Reproducible-build mode removes compile timestamps and normalizes all source,
+JerryScript, build, and compiler-tool paths. The verifier performs fresh
+isolated builds and fails unless the ELF, application `.bin`, and `.uf2`
+compare byte-for-byte.
 
 ## Flash ownership
 

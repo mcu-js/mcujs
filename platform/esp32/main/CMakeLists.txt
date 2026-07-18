@@ -50,7 +50,18 @@ if(NOT CMAKE_CROSSCOMPILING)
     return()
 endif()
 
-string(REPLACE ";" " " JERRY_COMPILE_FLAGS "${COMPILE_OPTIONS};${C_COMPILE_OPTIONS}")
+set(JERRY_REPRO_COMPILE_FLAGS
+    "-fdebug-prefix-map=${MCUJS_ROOT}=/MCUJS"
+    "-fmacro-prefix-map=${MCUJS_ROOT}=/MCUJS"
+    "-fdebug-prefix-map=${JERRY_ROOT}=/JERRYSCRIPT"
+    "-fmacro-prefix-map=${JERRY_ROOT}=/JERRYSCRIPT"
+    "-fdebug-prefix-map=$ENV{IDF_TOOLS_PATH}=/IDF_TOOLS"
+    "-fmacro-prefix-map=$ENV{IDF_TOOLS_PATH}=/IDF_TOOLS"
+    "-fdebug-prefix-map=${JERRY_BUILD_DIR}=/IDF_BUILD/jerry"
+    "-fmacro-prefix-map=${JERRY_BUILD_DIR}=/IDF_BUILD/jerry"
+)
+string(REPLACE ";" " " JERRY_COMPILE_FLAGS
+       "${COMPILE_OPTIONS};${C_COMPILE_OPTIONS};${JERRY_REPRO_COMPILE_FLAGS}")
 execute_process(
     COMMAND ${PYTHON} ${JERRY_ROOT}/tools/build.py
         --clean

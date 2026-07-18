@@ -1,0 +1,12 @@
+.git
+.github
+build
+cmake-build-*
+dist
+docs/build
+docs/node_modules
+platform/esp32/build
+platform/esp32/build-*
+platform/esp32/managed_components
+**/__pycache__
+*.pyc

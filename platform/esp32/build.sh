@@ -2,6 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BUILD_DIR="${MCUJS_ESP32_BUILD_DIR:-${SCRIPT_DIR}/build}"
+if [[ "${BUILD_DIR}" != /* ]]; then
+    BUILD_DIR="${SCRIPT_DIR}/${BUILD_DIR}"
+fi
 IDF_PATH="${IDF_PATH:-${HOME}/toolchains/esp-idf-5.3.2}"
 JERRYSCRIPT_PATH="${JERRYSCRIPT_PATH:-${HOME}/toolchains/jerryscript-3.0.0}"
 IDF_COMMIT="9d7f2d69f50d1288526d4f1027108e314e8c879f"
@@ -74,8 +78,17 @@ export IDF_COMPONENT_STRICT_CHECKSUM=1
 # shellcheck disable=SC1090
 source "${IDF_PATH}/export.sh" >/dev/null
 
+# Export ESP-IDF's otherwise implicit host default so the component project
+# include can normalize the compiler-tool path in reproducible debug metadata.
+IDF_TOOLS_PATH="${IDF_TOOLS_PATH:-${HOME}/.espressif}"
+[[ -d "${IDF_TOOLS_PATH}" ]] || {
+    printf 'ESP-IDF tools directory is missing: %s\n' "${IDF_TOOLS_PATH}" >&2
+    exit 1
+}
+export IDF_TOOLS_PATH
+
 validate_runtime_config() {
-    local config="${SCRIPT_DIR}/build/sdkconfig" required line found
+    local config="${BUILD_DIR}/sdkconfig" required line found
     [[ -f "${config}" ]] || {
         printf 'Generated sdkconfig is missing: %s\n' "${config}" >&2
         return 1
@@ -96,6 +109,8 @@ validate_runtime_config() {
         'CONFIG_ESP_TASK_WDT_INIT=y' \
         'CONFIG_ESP_TASK_WDT_PANIC=y' \
         'CONFIG_ESP_TASK_WDT_TIMEOUT_S=10' \
+        'CONFIG_APP_REPRODUCIBLE_BUILD=y' \
+        'CONFIG_COMPILER_HIDE_PATHS_MACROS=y' \
         'CONFIG_FATFS_LFN_HEAP=y' \
         'CONFIG_FATFS_MAX_LFN=255' \
         'CONFIG_FATFS_API_ENCODING_UTF_8=y'; do
@@ -115,7 +130,7 @@ validate_runtime_config() {
 }
 
 validate_app_flash_metadata() {
-    local build_dir="${SCRIPT_DIR}/build"
+    local build_dir="${BUILD_DIR}"
     python - "${build_dir}" <<'PY'
 import json
 import shlex
@@ -181,16 +196,16 @@ if [[ "${app_flash}" == "1" ]]; then
             preflight_args+=("${action}")
         fi
     done
-    idf.py -C "${SCRIPT_DIR}" -B "${SCRIPT_DIR}/build" "${preflight_args[@]}"
+    idf.py -C "${SCRIPT_DIR}" -B "${BUILD_DIR}" "${preflight_args[@]}"
     validate_runtime_config
     validate_app_flash_metadata
-    exec idf.py -C "${SCRIPT_DIR}" -B "${SCRIPT_DIR}/build" "${idf_args[@]}"
+    exec idf.py -C "${SCRIPT_DIR}" -B "${BUILD_DIR}" "${idf_args[@]}"
 fi
 
-idf.py -C "${SCRIPT_DIR}" -B "${SCRIPT_DIR}/build" "${idf_args[@]}"
-if [[ -f "${SCRIPT_DIR}/build/sdkconfig" ]]; then
+idf.py -C "${SCRIPT_DIR}" -B "${BUILD_DIR}" "${idf_args[@]}"
+if [[ -f "${BUILD_DIR}/sdkconfig" ]]; then
     validate_runtime_config
 fi
-if [[ -f "${SCRIPT_DIR}/build/app-flash_args" ]]; then
+if [[ -f "${BUILD_DIR}/app-flash_args" ]]; then
     validate_app_flash_metadata
 fi

@@ -148,6 +148,9 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"
         "${ROOT_DIR}/platform/esp32/build.sh"
+        "${ROOT_DIR}/platform/esp32/docker-build.sh"
+        "${ROOT_DIR}/platform/esp32/docker-entrypoint.sh"
+        "${ROOT_DIR}/platform/esp32/verify-docker-repro.sh"
         "${ROOT_DIR}/scripts/lib/boards.sh"
     )
 
@@ -162,6 +165,7 @@ check_python_syntax() {
     local script
     local scripts=(
         "${ROOT_DIR}/platform/esp32/make-uf2.py"
+        "${ROOT_DIR}/platform/esp32/verify-component-lock.py"
         "${ROOT_DIR}/platform/esp32/hardware-smoke.py"
         "${ROOT_DIR}/platform/esp32/boot-smoke.py"
     )

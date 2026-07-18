@@ -25,6 +25,7 @@ Checks:
   - every board has required CMake/header files
   - public docs mention every release board ID
   - contributor and release docs share the development/release policy
+  - MCU.js 0.2 portable API schema and docs remain consistent
   - shell entrypoints parse cleanly
 EOF
 }
@@ -215,6 +216,11 @@ check_python_syntax() {
     pass 'Python entrypoints parse cleanly'
 }
 
+check_api_schema() {
+    node --test "${ROOT_DIR}/tests/portable-api-schema.test.js"
+    pass 'MCU.js 0.2 portable API schema and docs are consistent'
+}
+
 check_platform_boundaries() {
     "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
     pass 'platform boundary checks passed'
@@ -239,6 +245,7 @@ check_development_policy
 check_shell_syntax
 check_repl_input
 check_python_syntax
+check_api_schema
 check_platform_boundaries
 check_docs_build
 

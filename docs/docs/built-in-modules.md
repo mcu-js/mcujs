@@ -48,9 +48,15 @@ If your board has a built-in NeoPixel, use `board.neopixel` as a shortcut. It ac
 - `board.neopixel([[r,g,b], ...])` for multiple pixels
 - `board.neopixel([{r,g,b}, ...])` for multiple pixels
 
-Missing color values default to 0, and extra pixels are ignored. The helper only exists on boards with onboard NeoPixels. You can also check `board.neopixelPin` and `board.neopixelLength` at runtime.
+Missing color values default to 0. Under the 0.2 contract, a color array longer than three bytes or a multi-pixel list longer than the onboard length throws `RangeError` rather than being truncated. Older 0.1 firmware ignored extra values. The helper only exists on boards with onboard NeoPixels. Portable 0.2 code reads `board.devices.neopixel.length`; `board.neopixelPin` and `board.neopixelLength` remain compatibility aliases through 0.x.
 Object inputs always mean RGB. Array inputs follow the active `neopixel.init()` order.
 Array-of-objects always stay RGB; array-of-arrays follows the order.
+
+## Capability-gated compatibility extensions
+
+The portable 0.2 SPI surface is `init()` and `transfer()`, with fixed 8-bit words and MSB-first order. Existing RP display builds may also expose `spi.writeBufferDMA(bus, bufferHandle, byteLength)` when the SPI capability reports `dma: true` and includes `writeBufferDMA` in `compatibilityExtensions`. Its opaque graphics handle is not portable; feature-detect the method and do not infer it from the board name. The requested length may equal—but not exceed—the selected handle's byte length. Invalid handles and oversized lengths throw `RangeError`; DMA-channel exhaustion throws `ERR_RESOURCE_EXHAUSTED`.
+
+Firmware with persistent boot-script recovery may expose `board.safeMode()` and `board.safeMode(enabled)` when `board.capability('boot').safeMode` is true. This getter/setter is a nonportable compatibility extension. The capability is static; the returned boolean is dynamic state. Clearing during the active boot qualification window throws `EBUSY`; a persistent-state write failure throws `EIO`.
 
 ### More ideas
 

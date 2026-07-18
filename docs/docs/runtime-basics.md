@@ -42,7 +42,7 @@ If you want a quick refresher on REPL terms, check the [Glossary](./glossary.md)
 - Module APIs like `fs`, `gpio`, and `neopixel` live in [Built-in Modules](./built-in-modules.md)
 - NeoPixel is handy for boards with RGB LEDs
 - Use `board.neopixel` on boards with built-in NeoPixels (arrays or objects, missing values default to 0)
-- Multi-pixel arrays are truncated to `board.neopixelLength`
+- In 0.2, oversized color or multi-pixel arrays throw `RangeError`; 0.1 firmware truncated them to `board.neopixelLength`
 - Object inputs are RGB; array inputs match the active `neopixel.init()` order
 - Array-of-objects stays RGB even when order is GRB
 - If you're just getting started, scan the examples below and then follow the links

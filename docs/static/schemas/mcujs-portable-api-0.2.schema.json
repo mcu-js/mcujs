@@ -1,0 +1,2542 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mcujs.org/schemas/mcujs-portable-api-0.2.schema.json",
+  "title": "MCU.js 0.2 portable API and capability manifest",
+  "description": "Validates a board-qualified MCU.js 0.2 capability manifest. The x-mcujs-contract annotation is the machine-readable public JavaScript contract used by runtime, documentation, and conformance tooling.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "apiVersion",
+    "board",
+    "capabilities"
+  ],
+  "properties": {
+    "formatVersion": {
+      "const": 1
+    },
+    "apiVersion": {
+      "const": "0.2"
+    },
+    "board": {
+      "$ref": "#/$defs/boardIdentity"
+    },
+    "capabilities": {
+      "$ref": "#/$defs/capabilityMap"
+    }
+  },
+  "$defs": {
+    "pin": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "boardIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "chip",
+        "firmwareVersion",
+        "exposedPins",
+        "pins",
+        "devices"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chip": {
+          "type": "string",
+          "minLength": 1
+        },
+        "firmwareVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+        },
+        "exposedPins": {
+          "type": "array",
+          "description": "Authoritative set of safe MCU GPIO identifiers exposed by this firmware's public metadata and peripheral APIs. It includes intentional onboard GPIO endpoints and excludes reserved/internal implementation pins. Every MCU pin published through board.pins, board.devices, or a capability descriptor must appear here.",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/pin"
+          }
+        },
+        "pins": {
+          "$ref": "#/$defs/pinMap"
+        },
+        "devices": {
+          "$ref": "#/$defs/onboardDevices"
+        }
+      }
+    },
+    "pinMap": {
+      "type": "object",
+      "description": "Semantic aliases for safe, runtime-exposed board pins. This is not required to enumerate every entry in board.exposedPins.",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/pin"
+      }
+    },
+    "onboardDevices": {
+      "type": "object",
+      "description": "Physical onboard inventory. Omitted keys mean the device is not present.",
+      "additionalProperties": false,
+      "properties": {
+        "led": {
+          "$ref": "#/$defs/onboardLed"
+        },
+        "neopixel": {
+          "$ref": "#/$defs/onboardNeopixel"
+        }
+      }
+    },
+    "onboardLed": {
+      "description": "Physical onboard LED. GPIO LEDs expose their MCU pin; managed LEDs are controlled only through board.led() and have no MCU GPIO pin.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "pin",
+            "activeLow"
+          ],
+          "properties": {
+            "type": {
+              "const": "gpio"
+            },
+            "pin": {
+              "$ref": "#/$defs/pin"
+            },
+            "activeLow": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "const": "managed"
+            }
+          }
+        }
+      ]
+    },
+    "onboardNeopixel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "pin",
+        "length",
+        "order"
+      ],
+      "properties": {
+        "type": {
+          "const": "neopixel"
+        },
+        "pin": {
+          "$ref": "#/$defs/pin"
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "order": {
+          "enum": [
+            "RGB",
+            "GRB"
+          ]
+        }
+      }
+    },
+    "capabilityMap": {
+      "type": "object",
+      "description": "Immutable facts compiled into this firmware for this board. Unsupported capabilities are omitted.",
+      "additionalProperties": false,
+      "properties": {
+        "gpio": {
+          "$ref": "#/$defs/gpioCapability"
+        },
+        "pwm": {
+          "$ref": "#/$defs/pwmCapability"
+        },
+        "adc": {
+          "$ref": "#/$defs/adcCapability"
+        },
+        "boot": {
+          "$ref": "#/$defs/bootCapability"
+        },
+        "i2c": {
+          "$ref": "#/$defs/i2cCapability"
+        },
+        "spi": {
+          "$ref": "#/$defs/spiCapability"
+        },
+        "neopixel": {
+          "$ref": "#/$defs/neopixelCapability"
+        },
+        "fs": {
+          "$ref": "#/$defs/fsCapability"
+        },
+        "usb": {
+          "$ref": "#/$defs/usbCapability"
+        }
+      }
+    },
+    "gpioCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pins",
+        "outputPins",
+        "modes"
+      ],
+      "properties": {
+        "pins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/pin"
+          }
+        },
+        "outputPins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/pin"
+          }
+        },
+        "modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "input",
+              "output",
+              "inputPullup",
+              "inputPulldown"
+            ]
+          }
+        }
+      }
+    },
+    "pwmCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pins",
+        "maxOutputs",
+        "timerCount",
+        "duty",
+        "frequency"
+      ],
+      "properties": {
+        "pins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/pin"
+          }
+        },
+        "maxOutputs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timerCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "duty": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min",
+            "max",
+            "unit"
+          ],
+          "properties": {
+            "min": {
+              "const": 0
+            },
+            "max": {
+              "const": 1
+            },
+            "unit": {
+              "const": "ratio"
+            }
+          }
+        },
+        "frequency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minHz",
+            "maxHz",
+            "resolutionVaries"
+          ],
+          "properties": {
+            "minHz": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxHz": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "resolutionVaries": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "adcCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resolutionBits",
+        "pins",
+        "channels",
+        "voltage",
+        "temperature",
+        "vsys"
+      ],
+      "properties": {
+        "resolutionBits": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "pins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/pin"
+          }
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/adcChannel"
+          }
+        },
+        "voltage": {
+          "$ref": "#/$defs/adcVoltage"
+        },
+        "temperature": {
+          "$ref": "#/$defs/adcTemperature"
+        },
+        "vsys": {
+          "type": "boolean"
+        }
+      }
+    },
+    "adcChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "pin",
+        "aliases"
+      ],
+      "properties": {
+        "channel": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pin": {
+          "$ref": "#/$defs/pin"
+        },
+        "aliases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "adcVoltage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "supported"
+          ],
+          "properties": {
+            "supported": {
+              "const": false
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "supported",
+            "calibrated",
+            "minVolts",
+            "maxVolts"
+          ],
+          "properties": {
+            "supported": {
+              "const": true
+            },
+            "calibrated": {
+              "type": "boolean"
+            },
+            "minVolts": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maxVolts": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "adcTemperature": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "supported"
+          ],
+          "properties": {
+            "supported": {
+              "const": false
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "supported",
+            "rawChannel"
+          ],
+          "properties": {
+            "supported": {
+              "const": true
+            },
+            "rawChannel": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "i2cCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "buses",
+        "routes",
+        "defaultBus",
+        "defaultRoute",
+        "frequency",
+        "maxTransferBytes"
+      ],
+      "properties": {
+        "buses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/i2cRoute"
+          }
+        },
+        "defaultBus": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "defaultRoute": {
+          "$ref": "#/$defs/i2cRoute"
+        },
+        "frequency": {
+          "$ref": "#/$defs/frequencyRange"
+        },
+        "maxTransferBytes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "i2cRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bus",
+        "sda",
+        "scl"
+      ],
+      "properties": {
+        "bus": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sda": {
+          "$ref": "#/$defs/pin"
+        },
+        "scl": {
+          "$ref": "#/$defs/pin"
+        }
+      }
+    },
+    "spiCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "buses",
+        "routes",
+        "defaultBus",
+        "defaultRoute",
+        "frequency",
+        "maxTransferBytes",
+        "modes",
+        "bitsPerWord",
+        "bitOrders",
+        "fullDuplex",
+        "dma"
+      ],
+      "properties": {
+        "buses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "routes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/spiRoute"
+          }
+        },
+        "defaultBus": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "defaultRoute": {
+          "$ref": "#/$defs/spiRoute"
+        },
+        "frequency": {
+          "$ref": "#/$defs/frequencyRange"
+        },
+        "maxTransferBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        },
+        "bitsPerWord": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "bitOrders": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "msb",
+              "lsb"
+            ]
+          }
+        },
+        "fullDuplex": {
+          "type": "boolean"
+        },
+        "dma": {
+          "type": "boolean"
+        },
+        "compatibilityExtensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "writeBufferDMA"
+            ]
+          }
+        }
+      }
+    },
+    "spiRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bus",
+        "sck",
+        "mosi",
+        "miso"
+      ],
+      "properties": {
+        "bus": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sck": {
+          "$ref": "#/$defs/pin"
+        },
+        "mosi": {
+          "$ref": "#/$defs/pin"
+        },
+        "miso": {
+          "$ref": "#/$defs/pin"
+        }
+      }
+    },
+    "frequencyRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minHz",
+        "maxHz"
+      ],
+      "properties": {
+        "minHz": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxHz": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "neopixelCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pins",
+        "maxLength",
+        "orders"
+      ],
+      "properties": {
+        "pins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/pin"
+          }
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "orders": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "RGB",
+              "GRB"
+            ]
+          }
+        }
+      }
+    },
+    "bootCapability": {
+      "type": "object",
+      "description": "Static boot and recovery controls compiled into this firmware. Dynamic safe-mode state is queried through board.safeMode().",
+      "additionalProperties": false,
+      "required": [
+        "safeMode"
+      ],
+      "properties": {
+        "safeMode": {
+          "const": true
+        }
+      }
+    },
+    "fsCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "writable",
+        "hostTransfer"
+      ],
+      "properties": {
+        "implementation": {
+          "enum": [
+            "fat",
+            "littlefs",
+            "other"
+          ]
+        },
+        "writable": {
+          "type": "boolean"
+        },
+        "hostTransfer": {
+          "type": "boolean"
+        }
+      }
+    },
+    "usbCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classes"
+      ],
+      "properties": {
+        "classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "cdc",
+              "msc",
+              "keyboardHid",
+              "mouseHid",
+              "otherHid"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "x-mcujs-contract": {
+    "contractFormatVersion": 1,
+    "versioning": {
+      "apiVersion": "0.2",
+      "apiVersionFormat": "major.minor",
+      "pre1BreakingChanges": "minorOnly",
+      "patchChanges": "nonBreakingOnly",
+      "deprecationDocumentation": "required",
+      "releaseManifestVersion": "exact"
+    },
+    "manifestValidation": {
+      "enforcement": "structuralAndSemanticRequired",
+      "structural": "JSON Schema Draft 2020-12",
+      "semanticValidator": "scripts/validate-portable-api-manifest.js",
+      "constraints": {
+        "board.pinAliasesExposed": "Every board.pins alias resolves to a pin in board.exposedPins.",
+        "onboard.ledPinExposed": "A GPIO-controlled onboard LED pin appears in board.exposedPins; managed LEDs have no MCU pin.",
+        "gpio.pinsExposed": "Every GPIO-capable pin appears in board.exposedPins.",
+        "gpio.outputPinsSubset": "Every gpio.outputPins entry also appears in gpio.pins.",
+        "gpio.outputMode": "The output mode and a non-empty gpio.outputPins list are present together.",
+        "pwm.pinsExposed": "Every PWM-capable pin appears in board.exposedPins.",
+        "pwm.frequencyRange": "pwm.frequency.minHz is less than or equal to maxHz.",
+        "pwm.maxOutputs": "pwm.maxOutputs does not exceed the number of PWM-capable pins.",
+        "adc.pinsExposed": "Every ADC-capable pin appears in board.exposedPins.",
+        "adc.channelPins": "Every ADC channel pin appears in adc.pins.",
+        "adc.uniqueChannels": "ADC channel numbers are unique.",
+        "adc.uniquePins": "ADC channel pins are unique.",
+        "adc.channelAliases": "Every ADC channel alias resolves to that channel's pin in board.pins.",
+        "adc.voltageRange": "When ADC voltage is supported, minVolts is strictly less than maxVolts.",
+        "adc.voltageRoutes": "Supported ADC voltage conversion has at least one exposed pin and channel.",
+        "i2c.defaultBus": "The I2C default bus appears in buses.",
+        "i2c.defaultRoute": "The I2C default route appears in routes and uses defaultBus.",
+        "i2c.routeBus": "Every I2C route bus appears in buses.",
+        "i2c.busRoutes": "Every advertised I2C bus has at least one route.",
+        "i2c.routePinsExposed": "Every I2C route pin appears in board.exposedPins.",
+        "i2c.distinctRoutePins": "SDA and SCL are distinct within each I2C route.",
+        "i2c.frequencyRange": "i2c.frequency.minHz is less than or equal to maxHz.",
+        "spi.defaultBus": "The SPI default bus appears in buses.",
+        "spi.defaultRoute": "The SPI default route appears in routes and uses defaultBus.",
+        "spi.routeBus": "Every SPI route bus appears in buses.",
+        "spi.busRoutes": "Every advertised SPI bus has at least one route.",
+        "spi.routePinsExposed": "Every SPI route pin appears in board.exposedPins.",
+        "spi.distinctRoutePins": "SCK and data roles required by the duplex mode are distinct within each SPI route.",
+        "spi.frequencyRange": "spi.frequency.minHz is less than or equal to maxHz.",
+        "spi.defaultMode": "The default SPI mode defined by the operation contract appears in capabilities.spi.modes.",
+        "spi.fixedBitsPerWord": "The byte-oriented 0.2 SPI contract advertises exactly the executable 8-bit word format.",
+        "spi.fixedBitOrder": "The byte-oriented 0.2 SPI contract advertises exactly the executable MSB-first bit order.",
+        "spi.writeBufferDMARequiresDma": "The writeBufferDMA compatibility extension is advertised only when SPI DMA is available.",
+        "neopixel.pinsExposed": "Every NeoPixel driver pin appears in board.exposedPins.",
+        "neopixel.defaultOrder": "The default NeoPixel order defined by the operation contract appears in capabilities.neopixel.orders.",
+        "onboard.neopixelCapability": "An onboard NeoPixel requires the external NeoPixel driver capability.",
+        "onboard.neopixelPin": "The onboard NeoPixel pin appears in capabilities.neopixel.pins.",
+        "onboard.neopixelLength": "The onboard NeoPixel length does not exceed capabilities.neopixel.maxLength.",
+        "onboard.neopixelOrder": "The onboard NeoPixel order appears in capabilities.neopixel.orders."
+      }
+    },
+    "operationConstraints": {
+      "capabilityPathRoot": "manifest.capabilities",
+      "onboardDevicePathRoot": "manifest.board.devices",
+      "configurationPathRoot": "initialized module state",
+      "pathSyntax": "dotPathWithArrayProjection",
+      "fields": {
+        "defaultFromCapability": "omitted value comes from the referenced capability number",
+        "allowedFromCapability": "value must be a member of the referenced collection",
+        "conditionalAllowedFromCapability": "the referenced argument selects a narrower capability collection for this value",
+        "minimumFromCapability": "value must be greater than or equal to the referenced number",
+        "maximumFromCapability": "value or value length must be less than or equal to the referenced number",
+        "maximumFromArgumentResource": "value must be less than or equal to a runtime resource property resolved from the named argument",
+        "minimumLength": "value length must be greater than or equal to the fixed number",
+        "routeFromCapability": "the correlated argument tuple must equal one object in the referenced route collection",
+        "defaultRouteFromCapability": "omitted correlated route fields come from the referenced route object",
+        "maximumFromCapabilityBitWidth": "numeric result must be at most two raised to the referenced bit width minus one",
+        "maximumFromOnboardDevice": "value length must not exceed the referenced onboard-device number",
+        "exclusiveMaximumFromConfiguration": "value must be less than the referenced initialized configuration value",
+        "invalidResourceError": "programming error thrown when a runtime resource handle is unknown or stale"
+      }
+    },
+    "availabilityStates": {
+      "unsupported": {
+        "apiPresence": "absent",
+        "behavior": "featureDetect",
+        "examples": [
+          "module omitted from builtinModules",
+          "optional method/property omitted"
+        ]
+      },
+      "unsupportedConfiguration": {
+        "apiPresence": "present",
+        "behavior": "throw",
+        "primaryCode": "ERR_NOT_SUPPORTED"
+      },
+      "temporarilyUnavailableOrFailed": {
+        "apiPresence": "present",
+        "behavior": "throw",
+        "codes": [
+          "EBUSY",
+          "ERR_RESOURCE_EXHAUSTED",
+          "ENXIO",
+          "EIO"
+        ]
+      }
+    },
+    "types": {
+      "string": {
+        "javascriptType": "string"
+      },
+      "boolean": {
+        "javascriptType": "boolean"
+      },
+      "number": {
+        "javascriptType": "number",
+        "finite": true
+      },
+      "integer": {
+        "javascriptType": "number",
+        "finite": true,
+        "integral": true
+      },
+      "graphicsBufferHandle": {
+        "javascriptType": "number",
+        "finite": true,
+        "integral": true,
+        "minimum": 0,
+        "portable": false,
+        "meaning": "Opaque handle returned by the RP graphics/screen subsystem.",
+        "resourceProperties": {
+          "byteLength": {
+            "type": "integer",
+            "unit": "transferSize",
+            "minimum": 0
+          }
+        }
+      },
+      "uint8": {
+        "javascriptType": "number",
+        "finite": true,
+        "integral": true,
+        "minimum": 0,
+        "maximum": 255
+      },
+      "undefined": {
+        "javascriptType": "undefined"
+      },
+      "stringArray": {
+        "javascriptType": "array",
+        "items": "string"
+      },
+      "byteArray": {
+        "javascriptType": "array",
+        "items": "uint8"
+      },
+      "neopixelColorArray": {
+        "javascriptType": "array",
+        "items": "uint8",
+        "minItems": 0,
+        "maxItems": 3,
+        "missingItemsDefault": 0,
+        "order": "activeNeopixelOrder",
+        "oversized": "RangeError"
+      },
+      "neopixelColorObject": {
+        "javascriptType": "object",
+        "additionalProperties": false,
+        "fields": {
+          "r": {
+            "type": "uint8",
+            "required": false,
+            "default": 0
+          },
+          "g": {
+            "type": "uint8",
+            "required": false,
+            "default": 0
+          },
+          "b": {
+            "type": "uint8",
+            "required": false,
+            "default": 0
+          }
+        },
+        "order": "RGB"
+      },
+      "neopixelColorArrayList": {
+        "javascriptType": "array",
+        "items": "neopixelColorArray",
+        "minItems": 1,
+        "maximumFromOnboardDevice": "length",
+        "oversized": "RangeError"
+      },
+      "neopixelColorObjectList": {
+        "javascriptType": "array",
+        "items": "neopixelColorObject",
+        "minItems": 1,
+        "maximumFromOnboardDevice": "length",
+        "oversized": "RangeError"
+      },
+      "byteOrByteArray": {
+        "javascriptTypes": [
+          "uint8",
+          "byteArray"
+        ]
+      },
+      "pinMap": {
+        "javascriptType": "object",
+        "values": "integer"
+      },
+      "deviceMap": {
+        "javascriptType": "object",
+        "schema": "#/$defs/onboardDevices"
+      },
+      "capabilityDescriptor": {
+        "javascriptType": "object",
+        "or": "undefined"
+      },
+      "capabilityMap": {
+        "javascriptType": "object",
+        "schema": "#/$defs/capabilityMap"
+      },
+      "gpioMode": {
+        "javascriptType": "number",
+        "finite": true,
+        "integral": true,
+        "capabilityValueMap": {
+          "OUTPUT": "output",
+          "INPUT": "input",
+          "INPUT_PULLUP": "inputPullup",
+          "INPUT_PULLDOWN": "inputPulldown"
+        },
+        "symbolicConstants": [
+          "OUTPUT",
+          "INPUT",
+          "INPUT_PULLUP",
+          "INPUT_PULLDOWN"
+        ]
+      },
+      "i2cOptions": {
+        "javascriptType": "object",
+        "additionalProperties": false,
+        "defaultRouteFromCapability": "i2c.defaultRoute",
+        "fields": {
+          "bus": {
+            "type": "integer",
+            "required": false,
+            "defaultFromCapability": "i2c.defaultBus",
+            "allowedFromCapability": "i2c.buses"
+          },
+          "frequency": {
+            "type": "integer",
+            "required": true,
+            "unit": "frequency",
+            "minimumFromCapability": "i2c.frequency.minHz",
+            "maximumFromCapability": "i2c.frequency.maxHz"
+          },
+          "sda": {
+            "type": "integer",
+            "required": false,
+            "defaultFromCapability": "i2c.defaultRoute.sda",
+            "routeField": true,
+            "routeFromCapability": {
+              "path": "i2c.routes",
+              "field": "sda",
+              "correlatesWith": [
+                "bus",
+                "scl"
+              ]
+            }
+          },
+          "scl": {
+            "type": "integer",
+            "required": false,
+            "defaultFromCapability": "i2c.defaultRoute.scl",
+            "routeField": true,
+            "routeFromCapability": {
+              "path": "i2c.routes",
+              "field": "scl",
+              "correlatesWith": [
+                "bus",
+                "sda"
+              ]
+            }
+          }
+        },
+        "routeRule": "sda and scl are either both omitted with bus omitted/equal to defaultBus, in which case defaultRoute supplies them, or both form a listed route"
+      },
+      "spiOptions": {
+        "javascriptType": "object",
+        "additionalProperties": false,
+        "defaultRouteFromCapability": "spi.defaultRoute",
+        "fields": {
+          "bus": {
+            "type": "integer",
+            "required": false,
+            "defaultFromCapability": "spi.defaultBus",
+            "allowedFromCapability": "spi.buses"
+          },
+          "frequency": {
+            "type": "integer",
+            "required": true,
+            "unit": "frequency",
+            "minimumFromCapability": "spi.frequency.minHz",
+            "maximumFromCapability": "spi.frequency.maxHz"
+          },
+          "mode": {
+            "type": "integer",
+            "required": false,
+            "default": 0,
+            "allowedFromCapability": "spi.modes"
+          },
+          "sck": {
+            "type": "integer",
+            "required": false,
+            "defaultFromCapability": "spi.defaultRoute.sck",
+            "routeField": true,
+            "routeFromCapability": {
+              "path": "spi.routes",
+              "field": "sck",
+              "correlatesWith": [
+                "bus",
+                "mosi",
+                "miso"
+              ]
+            }
+          },
+          "mosi": {
+            "type": "integer",
+            "required": false,
+            "defaultFromCapability": "spi.defaultRoute.mosi",
+            "routeField": true,
+            "routeFromCapability": {
+              "path": "spi.routes",
+              "field": "mosi",
+              "correlatesWith": [
+                "bus",
+                "sck",
+                "miso"
+              ]
+            }
+          },
+          "miso": {
+            "type": "integer",
+            "required": false,
+            "defaultFromCapability": "spi.defaultRoute.miso",
+            "routeField": true,
+            "routeFromCapability": {
+              "path": "spi.routes",
+              "field": "miso",
+              "correlatesWith": [
+                "bus",
+                "sck",
+                "mosi"
+              ]
+            }
+          }
+        },
+        "routeRule": "sck, mosi, and miso are either all omitted with bus omitted/equal to defaultBus, in which case defaultRoute supplies them, or all form a listed route"
+      },
+      "neopixelOptions": {
+        "javascriptType": "object",
+        "additionalProperties": false,
+        "fields": {
+          "pin": {
+            "type": "integer",
+            "required": true,
+            "allowedFromCapability": "neopixel.pins"
+          },
+          "length": {
+            "type": "integer",
+            "required": true,
+            "minimum": 1,
+            "maximumFromCapability": "neopixel.maxLength"
+          },
+          "order": {
+            "type": "string",
+            "required": false,
+            "default": "GRB",
+            "allowedFromCapability": "neopixel.orders",
+            "enum": [
+              "RGB",
+              "GRB"
+            ]
+          }
+        }
+      }
+    },
+    "units": {
+      "ratio": {
+        "symbol": "ratio",
+        "range": [
+          0,
+          1
+        ]
+      },
+      "frequency": {
+        "symbol": "Hz"
+      },
+      "duration": {
+        "symbol": "ms"
+      },
+      "voltage": {
+        "symbol": "V"
+      },
+      "transferSize": {
+        "symbol": "bytes"
+      },
+      "temperature": {
+        "symbol": "°C"
+      }
+    },
+    "errors": {
+      "programming": {
+        "TypeError": {
+          "for": [
+            "missingArgument",
+            "wrongType",
+            "nonFiniteNumber"
+          ],
+          "code": null
+        },
+        "RangeError": {
+          "for": [
+            "nonIntegralNumber",
+            "outOfRange",
+            "oversizedValue"
+          ],
+          "code": null
+        }
+      },
+      "operational": {
+        "ERR_NOT_SUPPORTED": {
+          "class": "Error",
+          "name": "NotSupportedError",
+          "state": "unsupportedConfiguration"
+        },
+        "EBUSY": {
+          "class": "Error",
+          "name": "ResourceBusyError",
+          "state": "temporarilyUnavailableOrFailed"
+        },
+        "ERR_RESOURCE_EXHAUSTED": {
+          "class": "Error",
+          "name": "ResourceExhaustedError",
+          "state": "temporarilyUnavailableOrFailed"
+        },
+        "ENXIO": {
+          "class": "Error",
+          "name": "Error",
+          "state": "temporarilyUnavailableOrFailed",
+          "meaning": "distinguishable external device absence or NACK"
+        },
+        "EIO": {
+          "class": "Error",
+          "name": "Error",
+          "state": "temporarilyUnavailableOrFailed",
+          "meaning": "hardware or native driver I/O failure"
+        }
+      },
+      "diagnosticProperties": [
+        "resource",
+        "pin",
+        "owner",
+        "bus",
+        "limit",
+        "nativeCode"
+      ]
+    },
+    "capabilities": {
+      "gpio": {
+        "schema": "#/$defs/gpioCapability",
+        "scope": "externalDriver",
+        "dynamic": false
+      },
+      "pwm": {
+        "schema": "#/$defs/pwmCapability",
+        "scope": "externalDriver",
+        "dynamic": false
+      },
+      "adc": {
+        "schema": "#/$defs/adcCapability",
+        "scope": "externalDriver",
+        "dynamic": false
+      },
+      "boot": {
+        "schema": "#/$defs/bootCapability",
+        "scope": "firmwareSubsystem",
+        "dynamic": false
+      },
+      "i2c": {
+        "schema": "#/$defs/i2cCapability",
+        "scope": "externalDriver",
+        "dynamic": false
+      },
+      "spi": {
+        "schema": "#/$defs/spiCapability",
+        "scope": "externalDriver",
+        "dynamic": false
+      },
+      "neopixel": {
+        "schema": "#/$defs/neopixelCapability",
+        "scope": "externalDriver",
+        "dynamic": false
+      },
+      "fs": {
+        "schema": "#/$defs/fsCapability",
+        "scope": "firmwareSubsystem",
+        "dynamic": false
+      },
+      "usb": {
+        "schema": "#/$defs/usbCapability",
+        "scope": "firmwareSubsystem",
+        "dynamic": false
+      }
+    },
+    "onboardDevices": {
+      "scope": "physicalOnboardInventory",
+      "schema": "#/$defs/onboardDevices",
+      "separateFromCapabilities": true
+    },
+    "dynamicState": {
+      "safeMode": {
+        "owner": "board",
+        "availability": "capabilityField",
+        "capabilityField": "boot.safeMode",
+        "returnType": "boolean"
+      },
+      "storageReady": {
+        "owner": "board",
+        "availability": "capability",
+        "capability": "fs",
+        "returnType": "boolean"
+      }
+    },
+    "modules": {
+      "board": {
+        "canonicalImport": "require('board')",
+        "availability": "required",
+        "exports": {
+          "name": {
+            "kind": "property",
+            "type": "string",
+            "availability": "required",
+            "immutable": true
+          },
+          "chip": {
+            "kind": "property",
+            "type": "string",
+            "availability": "required",
+            "immutable": true
+          },
+          "version": {
+            "kind": "property",
+            "type": "string",
+            "availability": "required",
+            "immutable": true
+          },
+          "apiVersion": {
+            "kind": "property",
+            "type": "string",
+            "availability": "required",
+            "const": "0.2",
+            "immutable": true
+          },
+          "flashSize": {
+            "kind": "property",
+            "type": "integer",
+            "unit": "transferSize",
+            "availability": "required",
+            "immutable": true
+          },
+          "ramSize": {
+            "kind": "property",
+            "type": "integer",
+            "unit": "transferSize",
+            "availability": "required",
+            "immutable": true
+          },
+          "cpuFreq": {
+            "kind": "property",
+            "type": "integer",
+            "unit": "frequency",
+            "availability": "required",
+            "immutable": true
+          },
+          "pins": {
+            "kind": "property",
+            "type": "pinMap",
+            "availability": "required",
+            "immutable": true
+          },
+          "devices": {
+            "kind": "property",
+            "type": "deviceMap",
+            "availability": "required",
+            "immutable": true
+          },
+          "capability": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "name",
+                    "type": "string",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "capabilityDescriptor"
+                  ]
+                }
+              }
+            ]
+          },
+          "capabilities": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "capabilityMap"
+                  ]
+                }
+              }
+            ]
+          },
+          "freeMemory": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "integer"
+                  ],
+                  "unit": "transferSize"
+                }
+              }
+            ]
+          },
+          "uniqueId": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "string"
+                  ]
+                }
+              }
+            ]
+          },
+          "reset": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "millis": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "integer"
+                  ],
+                  "unit": "duration"
+                }
+              }
+            ]
+          },
+          "delay": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "milliseconds",
+                    "type": "integer",
+                    "required": true,
+                    "unit": "duration",
+                    "minimum": 0
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "enterUf2": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "safeMode": {
+            "kind": "method",
+            "availability": "capabilityField",
+            "capabilityField": "boot.safeMode",
+            "dynamic": true,
+            "portable": false,
+            "compatibilityOnly": true,
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "boolean"
+                  ]
+                }
+              },
+              {
+                "arguments": [
+                  {
+                    "name": "enabled",
+                    "type": "boolean",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "argument": {
+                      "name": "enabled",
+                      "equals": false
+                    },
+                    "dynamicState": "bootQualificationActive"
+                  },
+                  {
+                    "code": "EIO",
+                    "nativeFailure": "persistentBootStateWrite"
+                  }
+                ]
+              }
+            ]
+          },
+          "storageReady": {
+            "kind": "method",
+            "availability": "capability",
+            "capability": "fs",
+            "dynamic": true,
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "boolean"
+                  ]
+                }
+              }
+            ]
+          },
+          "led": {
+            "kind": "method",
+            "availability": "onboardDevice",
+            "onboardDevice": "led",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "boolean"
+                  ]
+                }
+              },
+              {
+                "arguments": [
+                  {
+                    "name": "on",
+                    "type": "boolean",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "neopixel": {
+            "kind": "method",
+            "availability": "onboardDevice",
+            "onboardDevice": "neopixel",
+            "compatibilityOnly": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "colors",
+                    "type": "neopixelColorArray",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              },
+              {
+                "arguments": [
+                  {
+                    "name": "color",
+                    "type": "neopixelColorObject",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              },
+              {
+                "arguments": [
+                  {
+                    "name": "colors",
+                    "type": "neopixelColorArrayList",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              },
+              {
+                "arguments": [
+                  {
+                    "name": "colors",
+                    "type": "neopixelColorObjectList",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "mcujs:module": {
+        "canonicalImport": "require('mcujs:module')",
+        "availability": "required",
+        "exports": {
+          "builtinModules": {
+            "kind": "property",
+            "type": "stringArray",
+            "availability": "required",
+            "immutable": true
+          },
+          "has": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "name",
+                    "type": "string",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "boolean"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "gpio": {
+        "canonicalImport": "require('gpio')",
+        "availability": "capability",
+        "capability": "gpio",
+        "exports": {
+          "OUTPUT": {
+            "kind": "property",
+            "type": "gpioMode",
+            "availability": "required",
+            "immutable": true
+          },
+          "INPUT": {
+            "kind": "property",
+            "type": "gpioMode",
+            "availability": "required",
+            "immutable": true
+          },
+          "INPUT_PULLUP": {
+            "kind": "property",
+            "type": "gpioMode",
+            "availability": "required",
+            "immutable": true
+          },
+          "INPUT_PULLDOWN": {
+            "kind": "property",
+            "type": "gpioMode",
+            "availability": "required",
+            "immutable": true
+          },
+          "init": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "gpio.pins",
+                    "conditionalAllowedFromCapability": {
+                      "whenArgument": "mode",
+                      "capabilityValue": "output",
+                      "allowedFromCapability": "gpio.outputPins"
+                    }
+                  },
+                  {
+                    "name": "mode",
+                    "type": "gpioMode",
+                    "required": true,
+                    "allowedFromCapability": "gpio.modes"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "set": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "gpio.outputPins"
+                  },
+                  {
+                    "name": "value",
+                    "type": "boolean",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "get": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "gpio.pins"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "boolean"
+                  ]
+                }
+              }
+            ]
+          },
+          "toggle": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "gpio.outputPins"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "pwm": {
+        "canonicalImport": "require('pwm')",
+        "availability": "capability",
+        "capability": "pwm",
+        "exports": {
+          "init": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "pwm.pins"
+                  },
+                  {
+                    "name": "frequency",
+                    "type": "integer",
+                    "required": true,
+                    "unit": "frequency",
+                    "minimumFromCapability": "pwm.frequency.minHz",
+                    "maximumFromCapability": "pwm.frequency.maxHz"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "setDuty": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "pwm.pins"
+                  },
+                  {
+                    "name": "duty",
+                    "type": "number",
+                    "required": true,
+                    "unit": "ratio",
+                    "minimumFromCapability": "pwm.duty.min",
+                    "maximumFromCapability": "pwm.duty.max",
+                    "range": [
+                      0,
+                      1
+                    ]
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "stop": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "pwm.pins"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "adc": {
+        "canonicalImport": "require('adc')",
+        "availability": "capability",
+        "capability": "adc",
+        "exports": {
+          "readPin": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "adc.pins"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "integer"
+                  ],
+                  "minimum": 0,
+                  "maximumFromCapabilityBitWidth": "adc.resolutionBits"
+                }
+              }
+            ]
+          },
+          "readChannel": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "channel",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "adc.channels[].channel"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "integer"
+                  ],
+                  "minimum": 0,
+                  "maximumFromCapabilityBitWidth": "adc.resolutionBits"
+                }
+              }
+            ]
+          },
+          "readVoltagePin": {
+            "kind": "method",
+            "availability": "capabilityField",
+            "capabilityField": "adc.voltage.supported",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "pin",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "adc.pins"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "number"
+                  ],
+                  "unit": "voltage",
+                  "minimumFromCapability": "adc.voltage.minVolts",
+                  "maximumFromCapability": "adc.voltage.maxVolts"
+                }
+              }
+            ]
+          },
+          "readVoltageChannel": {
+            "kind": "method",
+            "availability": "capabilityField",
+            "capabilityField": "adc.voltage.supported",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "channel",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "adc.channels[].channel"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "number"
+                  ],
+                  "unit": "voltage",
+                  "minimumFromCapability": "adc.voltage.minVolts",
+                  "maximumFromCapability": "adc.voltage.maxVolts"
+                }
+              }
+            ]
+          },
+          "readTempC": {
+            "kind": "method",
+            "availability": "capabilityField",
+            "capabilityField": "adc.temperature.supported",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "number"
+                  ],
+                  "unit": "temperature"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "i2c": {
+        "canonicalImport": "require('i2c')",
+        "availability": "capability",
+        "capability": "i2c",
+        "exports": {
+          "init": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "preferred": true,
+                "arguments": [
+                  {
+                    "name": "options",
+                    "type": "i2cOptions",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              },
+              {
+                "compatibility": "i2c.init(positional)",
+                "arguments": [
+                  {
+                    "name": "bus",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "i2c.buses"
+                  },
+                  {
+                    "name": "sda",
+                    "type": "integer",
+                    "required": true,
+                    "routeFromCapability": {
+                      "path": "i2c.routes",
+                      "field": "sda",
+                      "correlatesWith": [
+                        "bus",
+                        "scl"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "scl",
+                    "type": "integer",
+                    "required": true,
+                    "routeFromCapability": {
+                      "path": "i2c.routes",
+                      "field": "scl",
+                      "correlatesWith": [
+                        "bus",
+                        "sda"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "frequency",
+                    "type": "integer",
+                    "required": true,
+                    "unit": "frequency",
+                    "minimumFromCapability": "i2c.frequency.minHz",
+                    "maximumFromCapability": "i2c.frequency.maxHz"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "write": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "bus",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "i2c.buses"
+                  },
+                  {
+                    "name": "address",
+                    "type": "integer",
+                    "required": true,
+                    "range": [
+                      0,
+                      127
+                    ]
+                  },
+                  {
+                    "name": "data",
+                    "type": "byteOrByteArray",
+                    "required": true,
+                    "minimumLength": 1,
+                    "maximumFromCapability": "i2c.maxTransferBytes"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "integer"
+                  ],
+                  "unit": "transferSize"
+                }
+              }
+            ]
+          },
+          "read": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "bus",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "i2c.buses"
+                  },
+                  {
+                    "name": "address",
+                    "type": "integer",
+                    "required": true,
+                    "range": [
+                      0,
+                      127
+                    ]
+                  },
+                  {
+                    "name": "length",
+                    "type": "integer",
+                    "required": true,
+                    "unit": "transferSize",
+                    "minimum": 1,
+                    "maximumFromCapability": "i2c.maxTransferBytes"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "byteArray"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      "spi": {
+        "canonicalImport": "require('spi')",
+        "availability": "capability",
+        "capability": "spi",
+        "exports": {
+          "init": {
+            "kind": "method",
+            "availability": "required",
+            "implicitConfiguration": {
+              "bitsPerWord": {
+                "value": 8,
+                "allowedFromCapability": "spi.bitsPerWord",
+                "selectable": false
+              },
+              "bitOrder": {
+                "value": "msb",
+                "allowedFromCapability": "spi.bitOrders",
+                "selectable": false
+              }
+            },
+            "signatures": [
+              {
+                "preferred": true,
+                "arguments": [
+                  {
+                    "name": "options",
+                    "type": "spiOptions",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              },
+              {
+                "compatibility": "spi.init(positional)",
+                "arguments": [
+                  {
+                    "name": "bus",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "spi.buses"
+                  },
+                  {
+                    "name": "sck",
+                    "type": "integer",
+                    "required": true,
+                    "routeFromCapability": {
+                      "path": "spi.routes",
+                      "field": "sck",
+                      "correlatesWith": [
+                        "bus",
+                        "mosi",
+                        "miso"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "mosi",
+                    "type": "integer",
+                    "required": true,
+                    "routeFromCapability": {
+                      "path": "spi.routes",
+                      "field": "mosi",
+                      "correlatesWith": [
+                        "bus",
+                        "sck",
+                        "miso"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "miso",
+                    "type": "integer",
+                    "required": true,
+                    "routeFromCapability": {
+                      "path": "spi.routes",
+                      "field": "miso",
+                      "correlatesWith": [
+                        "bus",
+                        "sck",
+                        "mosi"
+                      ]
+                    }
+                  },
+                  {
+                    "name": "frequency",
+                    "type": "integer",
+                    "required": true,
+                    "unit": "frequency",
+                    "minimumFromCapability": "spi.frequency.minHz",
+                    "maximumFromCapability": "spi.frequency.maxHz"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "transfer": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "bus",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "spi.buses"
+                  },
+                  {
+                    "name": "data",
+                    "type": "byteOrByteArray",
+                    "required": true,
+                    "minimumLength": 1,
+                    "maximumFromCapability": "spi.maxTransferBytes"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "uint8",
+                    "byteArray"
+                  ],
+                  "correlatesWithArgument": "data"
+                }
+              }
+            ]
+          },
+          "writeBufferDMA": {
+            "kind": "method",
+            "availability": "capabilityCollectionValue",
+            "capabilityField": "compatibilityExtensions",
+            "capabilityValue": "writeBufferDMA",
+            "requiresInitialization": true,
+            "portable": false,
+            "compatibilityOnly": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "bus",
+                    "type": "integer",
+                    "required": true,
+                    "allowedFromCapability": "spi.buses"
+                  },
+                  {
+                    "name": "bufferHandle",
+                    "type": "graphicsBufferHandle",
+                    "required": true,
+                    "invalidResourceError": "RangeError"
+                  },
+                  {
+                    "name": "byteLength",
+                    "type": "integer",
+                    "required": true,
+                    "unit": "transferSize",
+                    "minimum": 0,
+                    "maximumFromArgumentResource": {
+                      "argument": "bufferHandle",
+                      "property": "byteLength",
+                      "relation": "lessThanOrEqual"
+                    },
+                    "oversized": "RangeError"
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                },
+                "operationalErrors": [
+                  "ERR_RESOURCE_EXHAUSTED"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "dynamicState": "dmaChannelUnavailable"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "neopixel": {
+        "canonicalImport": "require('neopixel')",
+        "availability": "capability",
+        "capability": "neopixel",
+        "exports": {
+          "init": {
+            "kind": "method",
+            "availability": "required",
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "options",
+                    "type": "neopixelOptions",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "setPixel": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [
+                  {
+                    "name": "index",
+                    "type": "integer",
+                    "required": true,
+                    "minimum": 0,
+                    "exclusiveMaximumFromConfiguration": "neopixel.length"
+                  },
+                  {
+                    "name": "red",
+                    "type": "uint8",
+                    "required": true
+                  },
+                  {
+                    "name": "green",
+                    "type": "uint8",
+                    "required": true
+                  },
+                  {
+                    "name": "blue",
+                    "type": "uint8",
+                    "required": true
+                  }
+                ],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "show": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          },
+          "clear": {
+            "kind": "method",
+            "availability": "required",
+            "requiresInitialization": true,
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": {
+                  "types": [
+                    "undefined"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "compatibility": {
+      "policy": "Aliases listed here remain available through the 0.x series when their target capability exists. They are not portable names and may be removed in 1.0 with migration notes.",
+      "removalNotBefore": "1.0",
+      "aliases": [
+        {
+          "name": "global.board",
+          "target": "require('board')",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "global.GPIO",
+          "target": "require('gpio')",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "global.PWM",
+          "target": "require('pwm')",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "global.adc",
+          "target": "require('adc')",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "global.I2C",
+          "target": "require('i2c')",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "global.SPI",
+          "target": "require('spi')",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "global.neopixel",
+          "target": "require('neopixel')",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "i2c.init(positional)",
+          "target": "i2c.init(options)",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "spi.init(positional)",
+          "target": "spi.init(options)",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "board.ledPin",
+          "target": "board.led()",
+          "portable": false,
+          "meaning": "Legacy onboard LED identifier; it is not necessarily an MCU GPIO pin.",
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "board.neopixelPin",
+          "target": "board.devices.neopixel.pin",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "board.neopixelLength",
+          "target": "board.devices.neopixel.length",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "adc.TEMP",
+          "target": "board.capability('adc').temperature",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        },
+        {
+          "name": "adc.VSYS",
+          "target": "board.capability('adc').vsys",
+          "portable": false,
+          "removalNotBefore": "1.0"
+        }
+      ]
+    }
+  }
+}

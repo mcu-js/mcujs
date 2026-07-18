@@ -22,6 +22,15 @@ These display helpers are globals or built-in modules, depending on the board:
 - `image` (module): `byteOrder` option for `decodeJPEG`, `decodeBMP`, `drawJPEG`, `drawBMP`
 - `DVI` (global on DVI boards): `DVI.getDrawBuffer()`, `DVI.swapAndShow()`
 
+## MCU.js 0.2 portable contract
+
+- API names, types, units, capabilities, and errors: [Portable API contract](./api-design/portable-api-contract.md)
+- Updating 0.1 programs: [Migrating from MCU.js 0.1 to 0.2](./migration/0.2.md)
+- Machine-readable contract and capability-manifest schema: [MCU.js 0.2 JSON Schema](/schemas/mcujs-portable-api-0.2.schema.json)
+- Capability-gated nonportable compatibility methods, including RP `spi.writeBufferDMA()` and persistent `board.safeMode()`, are inventoried in the schema rather than silently treated as portable or removed.
+
+The 0.2 pages define the implementation target. Check `board.apiVersion` and the running firmware's discovery surface before assuming a proposed API has reached a release.
+
 ## Notes
 
 Refer to the [REPL](./glossary.md#repl) `.help` output or the runtime source for details while the API docs expand.

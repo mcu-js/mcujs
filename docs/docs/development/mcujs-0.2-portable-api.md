@@ -109,6 +109,7 @@ board.capability('spi');
 //     { bus: 0, sck: 7, mosi: 9, miso: 8 }
 //   ],
 //   defaultBus: 0,
+//   defaultRoute: { bus: 0, sck: 7, mosi: 9, miso: 8 },
 //   maxTransferBytes: 64,
 //   modes: [0],
 //   bitsPerWord: [8],
@@ -172,6 +173,8 @@ board.pins = {
 };
 ```
 
+`board.exposedPins` is the authoritative set of safe MCU GPIO identifiers exposed through public metadata and peripheral APIs. It includes intentional onboard GPIO endpoints and excludes reserved implementation pins. Every MCU pin published through `board.pins`, `board.devices`, or a capability descriptor must appear there; `board.pins` remains the smaller semantic alias map.
+
 Only expose aliases that physically exist. Do not expose internal/reserved GPIO in `board.pins` or GPIO capability lists.
 
 Aliases improve source portability, while capability route maps support boards with multiple valid routes.
@@ -184,6 +187,7 @@ Keep onboard inventory separate from external peripheral drivers:
 board.devices;
 // {
 //   led: { type: 'gpio', pin: 21, activeLow: true }
+//   // or: led: { type: 'managed' } for a non-MCU-controlled onboard LED
 //   // neopixel absent on XIAO ESP32-S3
 // }
 ```
@@ -268,8 +272,10 @@ Errors may include diagnostic properties such as `resource`, `pin`, `owner`, `bu
 ### ADC
 
 - Keep the five cross-board methods.
+- Advertise the ADC capability only with at least one executable raw pin and channel route; otherwise the capability and module are absent.
+- Raw results are `0..(2^resolutionBits - 1)`; calibrated voltage results are `minVolts..maxVolts`. Encode both as machine-readable result constraints, not prose-only limits.
 - `readVoltage*()` always returns volts.
-- `readTempC()` remains the portable temperature operation when supported.
+- Gate `readVoltage*()` and `readTempC()` with the exact `capabilityField` support discriminator so each method is absent when its sub-capability is false.
 - Do not expose `TEMP`/`VSYS` magic constants as portable API.
 - Board-specific channel aliases belong in capability metadata and `board.pins`.
 - If raw temperature-channel access is retained for RP compatibility, mark it board-specific and deprecated during 0.x.
@@ -281,7 +287,7 @@ Errors may include diagnostic properties such as `resource`, `pin`, `owner`, `bu
 - Retain the positional form through 0.x for migration, but document the options form for portable code.
 - Use strict addresses, bytes, lengths, and baud rates.
 - Reject oversize transfers on every backend.
-- Expose buses, routes, default route, baud limits, and max transfer size.
+- Expose buses, routes, `defaultBus`, one complete listed `defaultRoute`, baud limits, and max transfer size. A non-default bus requires explicit route pins.
 - No attached device is an operational error, not lack of I2C capability.
 
 ### SPI
@@ -290,8 +296,8 @@ Errors may include diagnostic properties such as `resource`, `pin`, `owner`, `bu
 - Add a preferred options form with board defaults: `spi.init({ bus: 0, frequency: 1000000, mode: 0 })`; explicit route pins remain available for advanced wiring.
 - Retain the positional form through 0.x for migration.
 - Reject oversize transfers on every backend.
-- Expose modes, word sizes, bit order, duplex, routes, transfer maximum, and DMA availability.
-- `writeBufferDMA` remains absent where unsupported and should not be part of the portable core. Evaluate a portable buffer-transfer API later rather than standardizing a graphics-handle accident.
+- Expose modes, duplex, routes, one complete listed `defaultRoute`, transfer maximum, DMA availability, and any explicitly capability-gated compatibility extensions. The byte-oriented 0.2 contract implicitly uses exactly 8-bit words and MSB-first order; manifests must advertise only those executable formats until initialization makes format selectable.
+- `writeBufferDMA` remains outside the portable core because its graphics handle is an RP display-stack accident. Preserve it only as a nonportable compatibility extension when `dma` is true and `compatibilityExtensions` contains `writeBufferDMA`; otherwise the method is absent. Its `byteLength` maximum comes from the selected handle, an invalid handle or oversize request throws `RangeError`, and DMA-channel exhaustion throws `ERR_RESOURCE_EXHAUSTED`. Evaluate a portable buffer-transfer API later.
 
 ### NeoPixel
 
@@ -306,6 +312,7 @@ Errors may include diagnostic properties such as `resource`, `pin`, `owner`, `bu
 - Core board identity methods are common.
 - Optional onboard shortcuts are omitted when absent.
 - Storage support is static capability; `storageReady()` is dynamic state.
+- Persistent boot-script safe mode is a static `boot.safeMode` capability. The compatibility-only `board.safeMode()` getter/setter is present only with that capability; its current boolean state remains dynamic. `board.safeMode(false)` during the active boot qualification window throws `EBUSY`; persistence failure throws `EIO`.
 - USB descriptors distinguish CDC, MSC, keyboard HID, mouse HID, and other configured classes.
 - Silicon potential that is not enabled in the current firmware is not advertised as a runtime capability.
 
@@ -361,11 +368,17 @@ if (modules.has('spi')) {
 
 ```js
 const board = require('board');
-const gpio = require('gpio');
-
 if (board.devices.led) {
-  gpio.init(board.devices.led.pin, gpio.OUTPUT);
-  gpio.set(board.devices.led.pin, !board.devices.led.activeLow);
+  const led = board.devices.led;
+  const gpioCapability = board.capability('gpio');
+  if (led.type === 'gpio' && gpioCapability &&
+      gpioCapability.pins.indexOf(led.pin) !== -1) {
+    const gpio = require('gpio');
+    gpio.init(led.pin, gpio.OUTPUT);
+    gpio.set(led.pin, !led.activeLow);
+  } else {
+    board.led(true);
+  }
 } else {
   console.log('This board has no onboard LED');
 }

@@ -71,7 +71,8 @@ the RP2 top-level source-list hooks, while shared engine capability flags keep
 unimplemented subsystems out of the link without ESP32 branches in RP2 code.
 
 Milestone 4 supports TinyUSB USB-OTG composite CDC+MSC, JerryScript, the REPL,
-console, timers, board/process identity, reset, constrained GPIO, an
+console, timers, board/process identity, reset, constrained GPIO, ADC, PWM,
+I2C, SPI, an
 exclusive-owner wear-levelled FFAT filesystem, CommonJS modules, `/index.js`,
 persistent boot-failure safe mode, and button-independent TinyUF2 crash-loop recovery. See
 [`platform/esp32/README.md`](esp32/README.md) for pinned dependencies, build,

@@ -1,73 +1,90 @@
 /* MCU.js GPIO binding for ESP32-S3. */
 
+#include "binding_utils.h"
 #include "bindings.h"
 #include "jerryscript.h"
+#include "pin_policy.h"
 
 #include "driver/gpio.h"
+#include "esp_err.h"
 
 #define MCUJS_GPIO_OUTPUT 0
 #define MCUJS_GPIO_INPUT 1
 #define MCUJS_GPIO_INPUT_PULLUP 2
 #define MCUJS_GPIO_INPUT_PULLDOWN 3
 
-static bool valid_pin(int pin) {
-    if (!GPIO_IS_VALID_GPIO((gpio_num_t)pin)) {
-        return false;
-    }
-
-    /* XIAO exposed pins plus the onboard LED. D6/D7 (GPIO43/44) are reserved
-     * for the independent UART recovery console; flash/PSRAM pins stay hidden. */
-    switch (pin) {
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-        case 9:
-        case 21:
-            return true;
-        default:
-            return false;
-    }
-}
-
 static jerry_value_t gpio_init_handler(const jerry_call_info_t *info,
                                        const jerry_value_t args[], jerry_length_t argc) {
     (void)info;
-    if (argc < 2) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.init requires pin and mode");
+    int pin;
+    int mode;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO pin must be a finite number",
+                              "GPIO pin must be an integer");
     }
-    int pin = (int)js_get_number_arg(args, argc, 0, -1);
-    int mode = (int)js_get_number_arg(args, argc, 1, MCUJS_GPIO_OUTPUT);
-    if (!valid_pin(pin)) {
+    status = mcujs_get_integer(args, argc, 1, &mode);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO mode must be a finite number",
+                              "GPIO mode must be an integer");
+    }
+    if (!mcujs_pin_is_exposed(pin)) {
         return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
     }
-    if (mode == MCUJS_GPIO_OUTPUT && !GPIO_IS_VALID_OUTPUT_GPIO((gpio_num_t)pin)) {
+    if (mode < MCUJS_GPIO_OUTPUT || mode > MCUJS_GPIO_INPUT_PULLDOWN) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO mode");
+    }
+    if (mode == MCUJS_GPIO_OUTPUT && !mcujs_pin_is_exposed_output(pin)) {
         return jerry_throw_sz(JERRY_ERROR_RANGE, "GPIO is not output-capable");
     }
+    if (!mcujs_pin_can_claim(pin, MCUJS_PIN_OWNER_GPIO)) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "GPIO pin is owned by another peripheral");
+    }
 
-    gpio_reset_pin((gpio_num_t)pin);
-    switch (mode) {
-        case MCUJS_GPIO_OUTPUT:
-            gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT_OUTPUT);
-            break;
-        case MCUJS_GPIO_INPUT:
-            gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT);
-            gpio_set_pull_mode((gpio_num_t)pin, GPIO_FLOATING);
-            break;
-        case MCUJS_GPIO_INPUT_PULLUP:
-            gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT);
-            gpio_set_pull_mode((gpio_num_t)pin, GPIO_PULLUP_ONLY);
-            break;
-        case MCUJS_GPIO_INPUT_PULLDOWN:
-            gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT);
-            gpio_set_pull_mode((gpio_num_t)pin, GPIO_PULLDOWN_ONLY);
-            break;
-        default:
-            return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO mode");
+    if (!mcujs_pin_claim(pin, MCUJS_PIN_OWNER_GPIO)) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "GPIO pin claim failed");
+    }
+    esp_err_t err = gpio_reset_pin((gpio_num_t)pin);
+    if (err == ESP_OK) {
+        switch (mode) {
+            case MCUJS_GPIO_OUTPUT:
+                err = gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT_OUTPUT);
+                break;
+            case MCUJS_GPIO_INPUT:
+                err = gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT);
+                if (err == ESP_OK) err = gpio_set_pull_mode((gpio_num_t)pin, GPIO_FLOATING);
+                break;
+            case MCUJS_GPIO_INPUT_PULLUP:
+                err = gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT);
+                if (err == ESP_OK) err = gpio_set_pull_mode((gpio_num_t)pin, GPIO_PULLUP_ONLY);
+                break;
+            case MCUJS_GPIO_INPUT_PULLDOWN:
+                err = gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT);
+                if (err == ESP_OK) err = gpio_set_pull_mode((gpio_num_t)pin, GPIO_PULLDOWN_ONLY);
+                break;
+        }
+    }
+    if (err != ESP_OK) {
+        (void)gpio_reset_pin((gpio_num_t)pin);
+        mcujs_pin_release(pin, MCUJS_PIN_OWNER_GPIO);
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "GPIO initialization failed");
+    }
+    return jerry_undefined();
+}
+
+static jerry_value_t require_gpio_pin(const jerry_value_t args[], jerry_length_t argc,
+                                      int *pin, bool output) {
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO pin must be a finite number",
+                              "GPIO pin must be an integer");
+    }
+    if (!(output ? mcujs_pin_is_exposed_output(*pin) : mcujs_pin_is_exposed(*pin))) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              output ? "Invalid GPIO output pin" : "Invalid GPIO pin number");
+    }
+    if (mcujs_pin_owner(*pin) != MCUJS_PIN_OWNER_GPIO) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "GPIO pin is not initialized or is busy");
     }
     return jerry_undefined();
 }
@@ -75,41 +92,39 @@ static jerry_value_t gpio_init_handler(const jerry_call_info_t *info,
 static jerry_value_t gpio_set_handler(const jerry_call_info_t *info,
                                       const jerry_value_t args[], jerry_length_t argc) {
     (void)info;
-    if (argc < 2) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.set requires pin and value");
+    int pin;
+    jerry_value_t validation = require_gpio_pin(args, argc, &pin, true);
+    if (jerry_value_is_exception(validation)) return validation;
+    jerry_value_free(validation);
+    if (argc < 2 || !jerry_value_is_boolean(args[1])) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO value must be boolean");
     }
-    int pin = (int)js_get_number_arg(args, argc, 0, -1);
-    if (!valid_pin(pin) || !GPIO_IS_VALID_OUTPUT_GPIO((gpio_num_t)pin)) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO output pin");
+    if (gpio_set_level((gpio_num_t)pin, jerry_value_is_true(args[1])) != ESP_OK) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "GPIO write failed");
     }
-    gpio_set_level((gpio_num_t)pin, js_get_boolean_arg(args, argc, 1, false));
     return jerry_undefined();
 }
 
 static jerry_value_t gpio_get_handler(const jerry_call_info_t *info,
                                       const jerry_value_t args[], jerry_length_t argc) {
     (void)info;
-    if (argc < 1) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.get requires pin");
-    }
-    int pin = (int)js_get_number_arg(args, argc, 0, -1);
-    if (!valid_pin(pin)) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
-    }
+    int pin;
+    jerry_value_t validation = require_gpio_pin(args, argc, &pin, false);
+    if (jerry_value_is_exception(validation)) return validation;
+    jerry_value_free(validation);
     return jerry_boolean(gpio_get_level((gpio_num_t)pin) != 0);
 }
 
 static jerry_value_t gpio_toggle_handler(const jerry_call_info_t *info,
                                          const jerry_value_t args[], jerry_length_t argc) {
     (void)info;
-    if (argc < 1) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.toggle requires pin");
+    int pin;
+    jerry_value_t validation = require_gpio_pin(args, argc, &pin, true);
+    if (jerry_value_is_exception(validation)) return validation;
+    jerry_value_free(validation);
+    if (gpio_set_level((gpio_num_t)pin, !gpio_get_level((gpio_num_t)pin)) != ESP_OK) {
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "GPIO toggle failed");
     }
-    int pin = (int)js_get_number_arg(args, argc, 0, -1);
-    if (!valid_pin(pin) || !GPIO_IS_VALID_OUTPUT_GPIO((gpio_num_t)pin)) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO output pin");
-    }
-    gpio_set_level((gpio_num_t)pin, !gpio_get_level((gpio_num_t)pin));
     return jerry_undefined();
 }
 

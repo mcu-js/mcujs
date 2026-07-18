@@ -149,6 +149,32 @@ fs.mkdirSync('/lib');
 const config = require('/config.json');
 ```
 
+The XIAO build exposes these native modules:
+
+```text
+fs, process, gpio, pwm, i2c, spi, adc, neopixel, mcujs:module, node:module
+```
+
+`require('mcujs:module').builtinModules` and `.help` are generated from the
+build's feature flags and are the authoritative per-board lists. The ESP32 ADC
+binding supports XIAO GPIO1-GPIO9 (ADC1 channels 0-8), calibrated voltage in
+volts, and the internal chip-temperature sensor. XIAO has no RP-style ADC VSYS
+divider or raw temperature channel, so ESP32 does not expose `adc.VSYS` or
+`adc.TEMP`; use `adc.readTempC()`. PWM uses eight LEDC channels sharing up to
+four frequency timers. I2C bus 0/1 and SPI bus 0/1 accept only the exposed XIAO
+pins; GPIO43/GPIO44 remain reserved for the recovery UART. SPI array transfers
+are limited to 64 bytes, matching the ESP32-S3 polling/no-DMA transaction limit.
+
+The external `neopixel` module supports WS2812 strips on header GPIO1-GPIO9,
+with GRB (default) or RGB ordering and a 256-pixel limit. The XIAO ESP32-S3 has
+no onboard NeoPixel, so `board.neopixel()` and an onboard default pin remain
+unavailable. Use a common ground, adequate external strip power, and a level
+shifter when the strip requires 5 V logic; never power a strip from a GPIO.
+
+Image, keyboard, and mouse modules are not enabled in this build. Image remains
+deferred until graphics/display support; keyboard and mouse require a dedicated
+CDC+MSC+HID USB-composite milestone.
+
 The backend uses ESP-IDF FatFs with wear levelling, heap-backed long filenames,
 and UTF-8 paths. It implements read, write, append, seek, rename, delete,
 directory listing, nested stat, and CommonJS/JSON loading. Filesystem failures
@@ -156,6 +182,9 @@ throw JavaScript exceptions with Node-style error codes. Paths are measured
 before copying, so overlong destructive paths fail with `ENAMETOOLONG` instead
 of operating on a truncated prefix. Every CommonJS module receives a require
 function bound to its own filename, including deferred relative loads.
+The `.ls` REPL command hides dot-prefixed host metadata such as `.Trash-1000`,
+matching normal `ls` behavior. Explicit filesystem paths and `readdirSync()`
+still expose those entries; firmware does not delete or rewrite host trash.
 
 The filesystem is formatted only when its NVS initialization marker is absent
 **and** a pre-mount scan proves every byte of the FFAT partition is erased
@@ -237,5 +266,5 @@ No harness reads or prints the board's unique identifier.
 
 ## Deliberately unavailable
 
-Until later milestones, this backend excludes PWM, I2C, SPI, ADC, NeoPixel,
-graphics, and displays.
+Until later milestones, this backend excludes graphics, displays, USB keyboard,
+and USB mouse support.

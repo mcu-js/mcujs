@@ -3,6 +3,7 @@
 #include "engine.h"
 #include "fs.h"
 #include "board.h"
+#include "runtime_features.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -123,7 +124,11 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
 fs_result_t fs_remove(const char *path) { (void)path; return FS_OK; }
 fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback,
                         void *user_data) {
-    (void)path; (void)callback; (void)user_data;
+    (void)path;
+    fs_entry_t hidden = {.name = ".Trash-1000", .size = 0, .is_dir = true};
+    fs_entry_t visible = {.name = "index.js", .size = 123, .is_dir = false};
+    callback(&hidden, user_data);
+    callback(&visible, user_data);
     return FS_OK;
 }
 
@@ -212,6 +217,51 @@ static void test_info_reports_host_ownership(void) {
     assert(strstr(s_output, "FS Free: 0 B") == NULL);
 }
 
+static void test_help_matches_build_features(void) {
+    reset_io();
+    repl_init();
+    feed_bytes(".help\r");
+    assert(strstr(s_output, "uniqueId()") != NULL);
+    assert(strstr(s_output, " led, ids") == NULL);
+    assert(strstr(s_output, "require('fs')") != NULL);
+    assert(strstr(s_output, "require('gpio')") != NULL);
+    assert(strstr(s_output, "require('mcujs:module')") != NULL);
+    assert(strstr(s_output, "require('node:module')") != NULL);
+#if MCUJS_FEATURE_PWM
+    assert(strstr(s_output, "require('pwm')") != NULL);
+#else
+    assert(strstr(s_output, "require('pwm')") == NULL);
+#endif
+#if MCUJS_FEATURE_I2C
+    assert(strstr(s_output, "require('i2c')") != NULL);
+#else
+    assert(strstr(s_output, "require('i2c')") == NULL);
+#endif
+#if MCUJS_FEATURE_SPI
+    assert(strstr(s_output, "require('spi')") != NULL);
+#else
+    assert(strstr(s_output, "require('spi')") == NULL);
+#endif
+#if MCUJS_FEATURE_ADC
+    assert(strstr(s_output, "require('adc')") != NULL);
+#else
+    assert(strstr(s_output, "require('adc')") == NULL);
+#endif
+#ifdef MCUJS_PLATFORM_ESP32
+    assert(strstr(s_output, "safeMode(), storageReady()") != NULL);
+#else
+    assert(strstr(s_output, "safeMode(), storageReady()") == NULL);
+#endif
+}
+
+static void test_ls_hides_dot_entries(void) {
+    reset_io();
+    repl_init();
+    feed_bytes(".ls\r");
+    assert(strstr(s_output, "index.js") != NULL);
+    assert(strstr(s_output, ".Trash-1000") == NULL);
+}
+
 int main(void) {
     test_crlf_is_one_enter();
     test_tab_completion_with_crlf();
@@ -221,6 +271,8 @@ int main(void) {
     test_uart_input_without_usb();
     test_usb_reconnect_redraws_prompt();
     test_info_reports_host_ownership();
+    test_help_matches_build_features();
+    test_ls_hides_dot_entries();
     puts("REPL input tests passed");
     return 0;
 }

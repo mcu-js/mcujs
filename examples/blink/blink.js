@@ -1,12 +1,14 @@
-// Simple LED Blink Demo for Pico 2
-// The onboard LED is on GPIO 25 (Pico 2, not Pico 2 W)
+// Blink the onboard LED on any MCU.js board.
+// Re-running this file replaces the previous blink interval.
+if (globalThis.blinkTimer !== undefined) {
+    clearInterval(globalThis.blinkTimer);
+}
 
-const LED_PIN = 25;
+globalThis.ledOn = false;
+board.led(globalThis.ledOn);
 
-GPIO.init(LED_PIN, GPIO.OUTPUT);
-
-console.log("Blinking LED on GPIO", LED_PIN);
-
-setInterval(() => {
-    GPIO.toggle(LED_PIN);
+console.log("Blinking onboard LED every 500 ms.");
+globalThis.blinkTimer = setInterval(() => {
+    globalThis.ledOn = !globalThis.ledOn;
+    board.led(globalThis.ledOn);
 }, 500);

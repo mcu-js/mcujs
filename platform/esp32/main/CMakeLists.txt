@@ -19,7 +19,13 @@ set(MCUJS_SOURCES
     usb_recovery.c
     filesystem.c
     bindings/board.c
+    bindings/pin_policy.c
     bindings/gpio.c
+    bindings/pwm.c
+    bindings/i2c.c
+    bindings/spi.c
+    bindings/adc.c
+    bindings/neopixel.c
     bindings/process.c
     bindings/timers.c
     ${MCUJS_ROOT}/host/engine.c
@@ -42,8 +48,9 @@ idf_component_register(
         ${MCUJS_ROOT}/src/filesystem
         ${MCUJS_ROOT}/src/usb
         ${JERRY_ROOT}/jerry-core/include
-    REQUIRES esp_driver_gpio esp_driver_uart esp_timer esp_system fatfs
-        wear_levelling nvs_flash heap log freertos vfs
+    REQUIRES driver esp_adc esp_driver_gpio esp_driver_i2c esp_driver_ledc
+        esp_driver_spi esp_driver_tsens esp_driver_uart esp_timer esp_system fatfs
+        wear_levelling nvs_flash heap log freertos vfs espressif__led_strip
 )
 
 # IDF evaluates component files once on the host to discover requirements and
@@ -111,11 +118,11 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MCUJS_FEATURE_TIMERS=1
     MCUJS_FEATURE_BOARD=1
     MCUJS_FEATURE_GPIO=1
-    MCUJS_FEATURE_PWM=0
-    MCUJS_FEATURE_I2C=0
-    MCUJS_FEATURE_SPI=0
-    MCUJS_FEATURE_ADC=0
-    MCUJS_FEATURE_NEOPIXEL=0
+    MCUJS_FEATURE_PWM=1
+    MCUJS_FEATURE_I2C=1
+    MCUJS_FEATURE_SPI=1
+    MCUJS_FEATURE_ADC=1
+    MCUJS_FEATURE_NEOPIXEL=1
     MCUJS_FEATURE_PROCESS=1
     MCUJS_FEATURE_REQUIRE=1
     MCUJS_FEATURE_FS=1

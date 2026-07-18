@@ -122,6 +122,22 @@ def verify_repl_crlf_and_completion(port: serial.Serial) -> None:
     print("PASS: tab completed board.name and CRLF submitted exactly one line")
 
 
+def verify_help_surface(port: serial.Serial) -> None:
+    port.reset_input_buffer()
+    port.write(b".help\r")
+    port.flush()
+    output = read_until(port, (PROMPT,), timeout=5.0)
+    for module in ("fs", "process", "gpio", "pwm", "i2c", "spi", "adc", "neopixel"):
+        if f"require('{module}')" not in output:
+            raise AssertionError(f".help omitted {module!r}: {output!r}")
+    for module in ("image", "keyboard", "mouse"):
+        if f"require('{module}')" in output:
+            raise AssertionError(f".help advertised unavailable {module!r}: {output!r}")
+    if "uniqueId()" not in output or " led, ids" in output:
+        raise AssertionError(f".help board API is inaccurate: {output!r}")
+    print("PASS: .help matches the ESP32 board and module surface")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", default="/dev/mcujs-dev")
@@ -132,6 +148,7 @@ def main() -> int:
     port = open_console(path)
     try:
         verify_repl_crlf_and_completion(port)
+        verify_help_surface(port)
         evaluate(port, "2 + 2", "4")
         evaluate(port, "board.name + ':' + board.chip", "'seeed_xiao_esp32s3:ESP32-S3'")
         evaluate(port, "board.millis() > 0", "true")
@@ -146,6 +163,89 @@ def main() -> int:
             "'unsafe-rejected'",
         )
         evaluate(port, "board.led(true); board.led()", "true")
+        evaluate(
+            port,
+            "require('mcujs:module').builtinModules.join(',')",
+            "'fs,process,gpio,pwm,i2c,spi,adc,neopixel,mcujs:module,node:module'",
+        )
+        evaluate(
+            port,
+            "typeof board.uniqueId==='function'&&typeof board.ids==='undefined'&&board.uniqueId().length===12",
+            "true",
+        )
+        evaluate(
+            port,
+            "var adc=require('adc'),raw=adc.readPin(1),volts=adc.readVoltageChannel(0);"
+            "raw>=0&&raw<=4095&&volts>=0&&volts<=3.3",
+            "true",
+        )
+        evaluate(port, "var temp=adc.readTempC();temp>-40&&temp<125", "true")
+        evaluate(port, "var raw8=adc.readChannel(8);raw8>=0&&raw8<=4095", "true")
+        evaluate(
+            port,
+            "try{adc.readPin(10);false}catch(e){true}",
+            "true",
+        )
+        evaluate(
+            port,
+            "var pwm=require('pwm');pwm.init(1,1000);pwm.setDuty(1,0.5);"
+            "var busy=false;try{GPIO.init(1,GPIO.OUTPUT)}catch(e){busy=true}"
+            "pwm.stop(1);GPIO.init(1,GPIO.OUTPUT);busy",
+            "true",
+        )
+        evaluate(
+            port,
+            "try{pwm.init(43,1000);false}catch(e){true}",
+            "true",
+        )
+        evaluate(
+            port,
+            "var ps=[[1,1000],[3,2000],[4,3000],[5,4000]];"
+            "ps.forEach(function(x){pwm.init(x[0],x[1])});"
+            "var exhausted=false;try{pwm.init(6,5000)}catch(e){exhausted=true}exhausted",
+            "true",
+        )
+        evaluate(
+            port,
+            "pwm.init(6,1000);[1,3,4,5,6].forEach(function(p){pwm.stop(p)});true",
+            "true",
+        )
+        evaluate(port, "try{pwm.init(3,NaN);false}catch(e){true}", "true")
+        evaluate(
+            port,
+            "var neo=require('neopixel');neo.init({pin:2,length:1,order:'GRB'});"
+            "neo.setPixel(0,1,2,3);neo.show();neo.clear();"
+            "try{GPIO.init(2,GPIO.OUTPUT);false}catch(e){true}",
+            "true",
+        )
+        evaluate(
+            port,
+            "try{neo.init({pin:21,length:1});false}catch(e){true}",
+            "true",
+        )
+        evaluate(
+            port,
+            "neo.init({pin:2,length:256,order:'RGB'});neo.setPixel(255,3,2,1);"
+            "neo.show();neo.clear();true",
+            "true",
+        )
+        evaluate(
+            port,
+            "try{neo.init({pin:3,length:257});false}catch(e){true}",
+            "true",
+        )
+        evaluate(
+            port,
+            "var i2c=require('i2c');i2c.init(0,5,6,100000);typeof i2c.read==='function'",
+            "true",
+        )
+        evaluate(
+            port,
+            "var spi=require('spi');spi.init(0,7,9,8,1000000);typeof spi.transfer(0,0x55)==='number'",
+            "true",
+        )
+        evaluate(port, "spi.transfer(0,Array(64).fill(0)).length", "64")
+        evaluate(port, "try{spi.transfer(0,Array(65).fill(0));false}catch(e){true}", "true")
         timer_output = evaluate(
             port,
             "setTimeout(function(){ GPIO.set(21, true); console.log('M2_TIMER_OK'); }, 50)",

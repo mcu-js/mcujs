@@ -9,6 +9,7 @@
 #include "fs.h"
 #include "board.h"
 #include "board_config.h"
+#include "runtime_features.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -561,6 +562,9 @@ static void repl_process_line(void) {
  */
 static bool repl_ls_callback(const fs_entry_t *entry, void *user_data) {
     (void)user_data;
+    if (entry->name[0] == '.') {
+        return true;
+    }
     if (entry->is_dir) {
         usb_cdc_puts("  <DIR>  ");
     } else {
@@ -572,6 +576,12 @@ static bool repl_ls_callback(const fs_entry_t *entry, void *user_data) {
     usb_cdc_puts(entry->name);
     usb_cdc_puts("\r\n");
     return true;  /* Continue iteration */
+}
+
+static void repl_help_module(const char *name) {
+    usb_cdc_puts("  require('");
+    usb_cdc_puts(name);
+    usb_cdc_puts("')\r\n");
 }
 
 /**
@@ -844,9 +854,50 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("JavaScript APIs:\r\n");
         usb_cdc_puts("  console.log(), console.warn(), console.error()\r\n");
         usb_cdc_puts("  setTimeout(), clearTimeout(), setInterval(), clearInterval()\r\n");
-        usb_cdc_puts("  board (reset, enterUf2, millis, led, ids)\r\n");
-        usb_cdc_puts("Runtime Module APIs:\r\n");
-        usb_cdc_puts("  require('fs'), require('gpio'), require('pwm'), require('i2c'), require('spi'), require('adc'), require('neopixel')\r\n");
+        usb_cdc_puts("  board: name, chip, version, flashSize, ramSize, cpuFreq, ledPin\r\n");
+        usb_cdc_puts("  board methods: freeMemory(), uniqueId(), reset(), enterUf2(), millis(), delay(), led()\r\n");
+#ifdef MCUJS_PLATFORM_ESP32
+        usb_cdc_puts("  board ESP32 methods: safeMode(), storageReady()\r\n");
+#endif
+#if MCUJS_HAS_NEOPIXEL
+        usb_cdc_puts("  board NeoPixel method: neopixel()\r\n");
+#endif
+        usb_cdc_puts("Built-in modules for this board:\r\n");
+#if MCUJS_FEATURE_FS
+        repl_help_module("fs");
+#endif
+#if MCUJS_FEATURE_PROCESS
+        repl_help_module("process");
+#endif
+#if MCUJS_FEATURE_GPIO
+        repl_help_module("gpio");
+#endif
+#if MCUJS_FEATURE_PWM
+        repl_help_module("pwm");
+#endif
+#if MCUJS_FEATURE_I2C
+        repl_help_module("i2c");
+#endif
+#if MCUJS_FEATURE_SPI
+        repl_help_module("spi");
+#endif
+#if MCUJS_FEATURE_ADC
+        repl_help_module("adc");
+#endif
+#if MCUJS_FEATURE_NEOPIXEL
+        repl_help_module("neopixel");
+#endif
+#if MCUJS_FEATURE_IMAGE
+        repl_help_module("image");
+#endif
+#if MCUJS_FEATURE_KEYBOARD
+        repl_help_module("keyboard");
+#endif
+#if MCUJS_FEATURE_MOUSE
+        repl_help_module("mouse");
+#endif
+        repl_help_module("mcujs:module");
+        repl_help_module("node:module");
         usb_cdc_puts("Runtime APIs:\r\n");
         usb_cdc_puts("  process.version, process.versions, process.arch, process.platform\r\n");
         usb_cdc_puts("  require('mcujs:module').builtinModules\r\n");

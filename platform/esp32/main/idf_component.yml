@@ -1,3 +1,4 @@
 dependencies:
   espressif/esp_tinyusb: "1.7.6~2"
+  espressif/led_strip: "3.0.3"
   idf: "5.3.2"

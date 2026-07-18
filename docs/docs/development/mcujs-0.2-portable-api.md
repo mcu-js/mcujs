@@ -1,0 +1,472 @@
+# MCU.js 0.2 portable API and capability-discovery design
+
+Status: proposed
+Target: MCU.js 0.2.x development series
+Goal: make ordinary JavaScript portable across shipping boards without pretending unavailable hardware exists.
+
+## Design principles
+
+1. **One portable contract, multiple honest capability sets.**
+   Shared APIs have identical names, argument types, units, return values, and error behavior on every board that exposes them.
+2. **Feature-detect; do not board-sniff.**
+   Code should ask whether a module/capability exists, not compare `board.name` or `board.chip`.
+3. **Unsupported APIs are absent.**
+   A module or optional operation that the firmware cannot implement must not be registered as a stub.
+4. **Supported APIs throw for operational failure.**
+   Invalid arguments, resource conflicts, temporary unavailability, missing external devices, and native driver errors are failures of a real API and should throw typed errors.
+5. **Static capabilities and dynamic state are separate.**
+   Limits such as transfer size and valid routes are immutable capability metadata. State such as filesystem ownership or an occupied PWM timer is queried from the module or represented by errors.
+6. **External-driver capability is not onboard-device presence.**
+   A board can support the `neopixel` module without having an onboard NeoPixel.
+7. **Numeric limits are part of the API.**
+   Embedded code needs discoverable transfer, channel, frequency, allocation, and buffer limits; method-existence checks alone are insufficient.
+8. **No silent truncation, wrapping, coercion, or clamping.**
+   Portable code must get the requested operation or a clear exception.
+9. **One descriptor source drives registration, introspection, help, docs tests, and conformance tests.**
+10. **Pre-1.0 minor versions may break deliberately, but each shipped minor has a documented contract.**
+
+## Browser analogy
+
+Use the web-platform split:
+
+- An unimplemented optional browser API is absent and detected by property existence.
+- An implemented API remains present when permission, runtime state, or a particular external device prevents an operation; the operation then rejects/throws a meaningful error.
+
+MCU.js equivalent:
+
+| Situation | Runtime behavior |
+|---|---|
+| Firmware has no SPI implementation | `spi` absent from `builtinModules`; `require('spi')` throws module-not-found |
+| SPI exists but DMA is unsupported | `spi.writeBufferDMA` absent; capability says `dma: false` |
+| SPI exists but requested mode is unsupported | `spi.open/init` throws `NotSupportedError` / `ERR_NOT_SUPPORTED` |
+| SPI route is already owned | operation throws `ResourceBusyError` / `EBUSY` |
+| I2C controller exists but external device NACKs | read/write throws `EIO` or `ENXIO` |
+| Filesystem exists but MSC host owns it | filesystem calls throw `EBUSY` |
+| Board has no onboard NeoPixel | `neopixel` module may still exist; `board.devices.neopixel` is absent |
+
+Do not expose success-returning no-op methods for absent hardware.
+
+## Public discovery API
+
+### Canonical board module
+
+Add `require('board')` as the canonical API. Preserve the existing `board` global as a compatibility alias during the 0.x series.
+
+```js
+const board = require('board');
+
+board.name;                 // 'seeed_xiao_esp32s3'
+board.chip;                 // 'ESP32-S3'
+board.version;              // firmware version
+board.apiVersion;           // '0.2'
+board.pins;                 // semantic aliases for this board
+board.devices;              // physically onboard devices only
+board.capability('spi');    // descriptor or undefined
+board.capabilities();       // complete snapshot for tooling/REPL
+```
+
+`board.capability(name)` should build only one descriptor, avoiding the heap cost of eagerly materializing the complete map. `board.capabilities()` is for diagnostics/tooling and may allocate a larger snapshot.
+
+### Module detection
+
+Keep `require('mcujs:module').builtinModules` authoritative and add a convenience predicate:
+
+```js
+const modules = require('mcujs:module');
+
+modules.has('spi'); // true/false
+
+if (modules.has('spi')) {
+  const spi = require('spi');
+}
+```
+
+`builtinModules`, `modules.has()`, native registration, `.help`, and `board.capability(name)` must all derive from the same registry.
+
+Do not add `require.optional()`: it is nonstandard, conceals spelling mistakes, and duplicates explicit feature detection.
+
+### Human and host-tool discovery
+
+Programmatic metadata should also improve the immediate REPL and editor experience:
+
+- Add `.capabilities` for a compact board/module summary.
+- Add `.capabilities spi` (or `.help spi`) for routes, limits, modes, and examples.
+- Keep `.help` concise and board-accurate; do not dump the complete descriptor on every help call.
+- Publish a board-qualified JSON capability manifest beside each release artifact, generated from the same registry.
+- Generate/check JavaScript documentation and optional `.d.ts` declarations from the stable API schema; runtime capability checks still decide what this particular board exposes.
+
+The release manifest lets installers, documentation sites, and IDE tooling explain a firmware image before a user flashes it. Runtime introspection remains authoritative for the firmware actually running.
+
+### Capability descriptor shape
+
+Descriptors contain only stable firmware/board facts. Omit irrelevant fields rather than filling them with magic values.
+
+```js
+board.capability('spi');
+// {
+//   buses: [0, 1],
+//   routes: [
+//     { bus: 0, sck: 7, mosi: 9, miso: 8 }
+//   ],
+//   defaultBus: 0,
+//   maxTransferBytes: 64,
+//   modes: [0],
+//   bitsPerWord: [8],
+//   bitOrders: ['msb'],
+//   fullDuplex: true,
+//   dma: false
+// }
+```
+
+```js
+board.capability('adc');
+// {
+//   resolutionBits: 12,
+//   pins: [1,2,3,4,5,6,7,8,9],
+//   channels: [
+//     { channel: 0, pin: 1, aliases: ['A0'] },
+//     ...
+//   ],
+//   voltage: {
+//     supported: true,
+//     calibrated: true,
+//     minVolts: 0,
+//     maxVolts: 3.3
+//   },
+//   temperature: {
+//     supported: true,
+//     rawChannel: false
+//   },
+//   vsys: false
+// }
+```
+
+```js
+board.capability('pwm');
+// {
+//   pins: [...],
+//   maxOutputs: 8,
+//   timerCount: 4,
+//   duty: { min: 0, max: 1, unit: 'ratio' },
+//   frequency: { minHz: ..., maxHz: ..., resolutionVaries: true }
+// }
+```
+
+Capability field names and units are public API and require conformance tests.
+
+### Pin aliases
+
+Expose semantic aliases so portable programs do not embed board GPIO numbers:
+
+```js
+board.pins = {
+  D0: 1,
+  D1: 2,
+  A0: 1,
+  SDA: 5,
+  SCL: 6,
+  SCK: 7,
+  MISO: 8,
+  MOSI: 9,
+  LED: 21
+};
+```
+
+Only expose aliases that physically exist. Do not expose internal/reserved GPIO in `board.pins` or GPIO capability lists.
+
+Aliases improve source portability, while capability route maps support boards with multiple valid routes.
+
+### Onboard devices
+
+Keep onboard inventory separate from external peripheral drivers:
+
+```js
+board.devices;
+// {
+//   led: { type: 'gpio', pin: 21, activeLow: true }
+//   // neopixel absent on XIAO ESP32-S3
+// }
+```
+
+On a board with an onboard NeoPixel:
+
+```js
+board.devices.neopixel;
+// { pin: 16, length: 1, order: 'GRB' }
+```
+
+`board.led()` and `board.neopixel()` must be absent when the corresponding onboard device is absent. A no-op method is a discoverability bug.
+
+## Shared API contract rules
+
+### Naming and imports
+
+- Canonical documentation uses lower-case CommonJS modules: `require('gpio')`, `require('pwm')`, etc.
+- Existing globals (`GPIO`, `PWM`, `I2C`, and others) remain compatibility aliases through 0.x but are not the portable API.
+- Add `require('board')`; preserve global `board` as an alias.
+- Module and method names are identical on every board that exposes them.
+
+### Arguments
+
+- Required arguments must be present.
+- Numbers must be finite.
+- Integer fields must be integral before conversion.
+- Booleans must be booleans unless the contract explicitly accepts another type.
+- Enum strings are explicit and case-normalized only when documented.
+- Arrays and buffers exceeding limits throw; they are never truncated.
+- Values outside ranges throw; they are never clamped or wrapped.
+
+### Units
+
+Choose one portable unit per operation:
+
+- PWM duty: ratio `0.0..1.0` only.
+- Frequency: Hz.
+- Delay/time: milliseconds.
+- ADC voltage: volts.
+- Transfer sizes: bytes.
+- Temperature: degrees Celsius.
+
+If raw hardware units are useful, expose an explicitly named operation such as `setDutyRaw()` only when its semantics can be defined portably; do not overload one numeric range with two meanings.
+
+### Errors
+
+Use JavaScript built-ins for programming errors and stable `.code` values for operational errors.
+
+| Failure | Error |
+|---|---|
+| Missing/wrong argument type | `TypeError` |
+| Finite integer/range violation | `RangeError` |
+| API exists but requested mode/config cannot be implemented | `Error`, `name='NotSupportedError'`, `code='ERR_NOT_SUPPORTED'` |
+| Pin/bus/timer/channel is owned or temporarily unavailable | `Error`, `name='ResourceBusyError'`, `code='EBUSY'` |
+| Finite hardware pool exhausted | `Error`, `name='ResourceExhaustedError'`, `code='ERR_RESOURCE_EXHAUSTED'` |
+| External bus device absent/NACK | `Error`, `code='ENXIO'` when distinguishable, otherwise `EIO` |
+| Native driver failure | `Error`, stable mapped code, optional native detail |
+| Module unavailable in this firmware | normal CommonJS module-not-found error |
+
+Errors may include diagnostic properties such as `resource`, `pin`, `owner`, `bus`, and `limit`, but portable code should branch primarily on `.code`.
+
+## Module-specific 0.2 normalization
+
+### GPIO
+
+- Keep `init`, `set`, `get`, and `toggle` for 0.2.
+- Require successful initialization before access on every backend.
+- Adopt shared pin ownership on RP as well as ESP.
+- Use strict booleans for writes.
+- Expose only board-safe pins.
+- Consider resource handles later; do not block the capability contract on a native-object redesign.
+
+### PWM
+
+- Keep `init(pin, frequency)`, `setDuty(pin, ratio)`, and `stop(pin)` for 0.2.
+- Duty is only `0..1`; remove ambiguous `0..65535` overloading.
+- Reject unsupported frequencies rather than silently changing them.
+- Model and report timer/channel exhaustion consistently.
+- Capability metadata reports output/timer limits and frequency constraints.
+
+### ADC
+
+- Keep the five cross-board methods.
+- `readVoltage*()` always returns volts.
+- `readTempC()` remains the portable temperature operation when supported.
+- Do not expose `TEMP`/`VSYS` magic constants as portable API.
+- Board-specific channel aliases belong in capability metadata and `board.pins`.
+- If raw temperature-channel access is retained for RP compatibility, mark it board-specific and deprecated during 0.x.
+
+### I2C
+
+- Keep `init`, `write`, and `read` initially.
+- Add a preferred options form that selects the board's declared default route when pins are omitted: `i2c.init({ bus: 0, frequency: 400000 })`.
+- Retain the positional form through 0.x for migration, but document the options form for portable code.
+- Use strict addresses, bytes, lengths, and baud rates.
+- Reject oversize transfers on every backend.
+- Expose buses, routes, default route, baud limits, and max transfer size.
+- No attached device is an operational error, not lack of I2C capability.
+
+### SPI
+
+- Keep `init` and `transfer` as the portable core.
+- Add a preferred options form with board defaults: `spi.init({ bus: 0, frequency: 1000000, mode: 0 })`; explicit route pins remain available for advanced wiring.
+- Retain the positional form through 0.x for migration.
+- Reject oversize transfers on every backend.
+- Expose modes, word sizes, bit order, duplex, routes, transfer maximum, and DMA availability.
+- `writeBufferDMA` remains absent where unsupported and should not be part of the portable core. Evaluate a portable buffer-transfer API later rather than standardizing a graphics-handle accident.
+
+### NeoPixel
+
+- Keep `init`, `setPixel`, `show`, and `clear`.
+- Use strict RGB byte values and known order strings.
+- Reject unsupported strip lengths and orders.
+- Capability metadata reports valid pins, maximum length, and orders.
+- Onboard presence remains under `board.devices`, not module availability.
+
+### Board/storage/USB
+
+- Core board identity methods are common.
+- Optional onboard shortcuts are omitted when absent.
+- Storage support is static capability; `storageReady()` is dynamic state.
+- USB descriptors distinguish CDC, MSC, keyboard HID, mouse HID, and other configured classes.
+- Silicon potential that is not enabled in the current firmware is not advertised as a runtime capability.
+
+## Dynamic state
+
+Do not mix current state into immutable capability descriptors.
+
+Examples:
+
+```js
+board.capability('fs'); // static: filesystem implementation exists
+board.storageReady();   // dynamic: device currently owns/mounted storage
+
+pwm.status();            // possible later addition: allocations/timers
+```
+
+A supported operation may become temporarily unavailable and throw `EBUSY`; it must not disappear while the program is running.
+
+## Single source of truth
+
+Introduce a shared capability registry with platform/board descriptors. The registry should drive:
+
+1. native module registration;
+2. `builtinModules` and `modules.has()`;
+3. `.help` output;
+4. `board.capability()` and `board.capabilities()`;
+5. board pin/device metadata;
+6. generated or test-validated documentation;
+7. native full/constrained feature tests;
+8. hardware conformance probes.
+
+Do not maintain a C feature macro, help list, JavaScript capability object, and documentation table independently.
+
+Build-time feature switches describe the current firmware image, not everything the silicon could theoretically do.
+
+## Portable examples
+
+### Optional module
+
+```js
+const board = require('board');
+const modules = require('mcujs:module');
+
+if (modules.has('spi')) {
+  const spi = require('spi');
+  const caps = board.capability('spi');
+  const payload = data.slice(0, caps.maxTransferBytes);
+  // Initialize using a listed/default route, then transfer.
+}
+```
+
+### Onboard LED with fallback
+
+```js
+const board = require('board');
+const gpio = require('gpio');
+
+if (board.devices.led) {
+  gpio.init(board.devices.led.pin, gpio.OUTPUT);
+  gpio.set(board.devices.led.pin, !board.devices.led.activeLow);
+} else {
+  console.log('This board has no onboard LED');
+}
+```
+
+### ADC without board sniffing
+
+```js
+const board = require('board');
+const adc = require('adc');
+const caps = board.capability('adc');
+
+const channel = caps.channels.find(entry => entry.aliases.includes('A0'));
+if (!channel) throw new Error('Board has no A0 input');
+console.log(adc.readVoltageChannel(channel.channel));
+```
+
+## Version plan
+
+### 0.2.0 — portable contract foundation
+
+- Add `require('board')`, `board.apiVersion`, `board.pins`, `board.devices`, and capability queries.
+- Add `modules.has()`.
+- Create the single capability registry.
+- Normalize strict argument/range/error semantics across RP and ESP.
+- Remove silent truncation/clamping/wrapping.
+- Make unsupported modules/methods absent and remove no-op onboard shortcuts.
+- Normalize PWM duty to `0..1`.
+- Deprecate RP-only ADC magic constants as portable API.
+- Add dual-platform conformance tests and update examples/docs.
+
+This is intentionally breaking and warrants 0.2.0.
+
+### 0.3.x — resource-lifecycle API spike
+
+Evaluate handle-based APIs without committing blindly:
+
+```js
+const bus = i2c.open({ bus: 0, frequency: 400000 });
+bus.read(address, length);
+bus.close();
+```
+
+Compare code size, Jerry heap use, deterministic cleanup, finalizer safety, and DX against the current flat APIs. Explicit `close()` would be mandatory; GC finalizers can only be a backstop. Adopt only if the spike materially improves correctness and ergonomics.
+
+### Later 0.x
+
+- Portable buffer types and DMA-aware transfers.
+- USB HID capability and API normalization.
+- Image/graphics/display capability layering.
+- Event-driven input APIs where hardware supports them.
+- Compatibility removals with explicit migration notes.
+
+### 1.0.0 gate
+
+Do not call the API stable until:
+
+- capability schema is frozen and documented;
+- all shipping boards pass the same contract suite;
+- every advertised API is backed by hardware tests appropriate to its capability;
+- unsupported APIs are consistently absent;
+- shared errors/units/types are stable;
+- examples contain no board-name branching for ordinary capability differences;
+- release/docs tooling verifies the registry, help, module list, and firmware agree.
+
+## Implementation sequence
+
+1. Freeze a machine-readable 0.2 API/capability schema in docs/tests.
+2. Add RED native tests for `board`, capability lookup, module presence, and constrained builds.
+3. Implement the shared registry and board/module discovery APIs.
+4. Add explicit RP board feature maps; stop relying on “full RP defaults” as implicit truth.
+5. Normalize GPIO ownership and validation across backends.
+6. Normalize PWM duty/frequency/resource behavior.
+7. Normalize ADC constants/channel discovery.
+8. Normalize I2C/SPI limits and error behavior.
+9. Normalize NeoPixel validation and onboard/external separation.
+10. Generate/validate `.help`, `builtinModules`, examples, and docs from the registry.
+11. Run native conformance, every RP release board, ESP clean/repro builds, and target hardware tests.
+12. Obtain exact-index review, bump to 0.2.0 with migration notes, then commit locally unless push is explicitly requested.
+
+## Acceptance tests
+
+For every shipping board:
+
+- `builtinModules` exactly equals registered/require-able modules.
+- `.help` exactly matches that list and optional board methods.
+- `modules.has(name)` agrees with `builtinModules`.
+- `board.capability(name)` exists exactly when the module/capability is advertised.
+- Capability limits match boundary behavior: max succeeds, max+1 throws.
+- Unsupported methods are absent, not stubs.
+- Valid shared calls return the same JavaScript types and units.
+- Invalid shared calls throw the same error class/code.
+- No backend silently truncates, clamps, wraps, or coerces.
+- Pin aliases resolve to board-safe exposed pins.
+- Onboard device inventory matches physical hardware.
+- Dynamic unavailability preserves API existence and throws the documented operational error.
+
+## Explicit non-goals for 0.2.0
+
+- Pretending every board supports every module.
+- Advertising latent silicon features not enabled in the firmware.
+- Detecting whether an arbitrary external I2C/SPI/NeoPixel device is connected as static capability.
+- Standardizing RP graphics-buffer handles as a generic DMA API.
+- Rewriting every peripheral around native JS resource objects before the capability foundation is proven.

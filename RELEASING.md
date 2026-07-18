@@ -2,6 +2,18 @@
 
 This repository ships firmware as UF2 files. Release artifacts should be produced by scripts so the board list, checksums, and manifests stay deterministic.
 
+## Release branch policy
+
+- `main` is the protected release branch (not `master`) and is release-only.
+- Feature branches start from the latest approved `development` tip.
+- Each implementation requires independent review before integration.
+- Release candidates are immutable.
+- Physical QA gates the `development` to `main` pull request.
+- The pull request must precede the merge.
+- Release tags and publishing happen only after the merge.
+
+Normal implementation work lands on `development` only after review. A release candidate is a specific, immutable `development` commit: any code, documentation, metadata, or test change creates a new candidate and restarts candidate verification. After physical QA passes, open and approve the `development` to `main` pull request before merging it. Tag and publish the resulting `main` commit; never tag or publish the candidate before merge.
+
 ## Before release
 
 1. Update `version.txt`.
@@ -29,16 +41,16 @@ This builds every board with Docker, then writes:
 
 Use `scripts/release.sh --rebuild-image` after Dockerfile or dependency changes.
 
-## Tagging
+## Tagging and publishing
 
-Use a `v<version>` tag, matching `version.txt`:
+Only after the approved `development` to `main` pull request has merged, use a `v<version>` tag matching `version.txt` on the resulting `main` commit:
 
 ```bash
 git tag -a v0.1.0 -m "mcujs v0.1.0"
 git push origin v0.1.0
 ```
 
-The release workflow can build and upload artifacts from the tag.
+The release workflow can build and upload artifacts from the tag. Publishing before the merge is prohibited because the protected release branch must contain the exact released commit.
 
 ## Manual upload checklist
 

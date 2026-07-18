@@ -24,6 +24,7 @@ Checks:
   - board registry matches board/ configuration directories
   - every board has required CMake/header files
   - public docs mention every release board ID
+  - contributor and release docs share the development/release policy
   - shell entrypoints parse cleanly
 EOF
 }
@@ -134,6 +135,37 @@ check_docs_board_coverage() {
     pass 'hardware board docs cover every release board ID'
 }
 
+check_development_policy() {
+    local doc
+    local phrase
+    local docs=(
+        "${ROOT_DIR}/CONTRIBUTING.md"
+        "${ROOT_DIR}/RELEASING.md"
+        "${ROOT_DIR}/docs/docs/contributing.md"
+        "${ROOT_DIR}/docs/docs/releasing.md"
+    )
+    local required_phrases=(
+        '`main` is the protected release branch (not `master`) and is release-only.'
+        'Feature branches start from the latest approved `development` tip.'
+        'Each implementation requires independent review before integration.'
+        'Release candidates are immutable.'
+        'Physical QA gates the `development` to `main` pull request.'
+        'The pull request must precede the merge.'
+        'Release tags and publishing happen only after the merge.'
+    )
+
+    require_file "${ROOT_DIR}/docs/docs/development/mcujs-0.2-portable-api.md"
+
+    for doc in "${docs[@]}"; do
+        require_file "${doc}"
+        for phrase in "${required_phrases[@]}"; do
+            grep -Fq "${phrase}" "${doc}" || fail "Development/release policy missing from ${doc}: ${phrase}"
+        done
+    done
+
+    pass 'development and release policy is consistent across contributor docs'
+}
+
 check_shell_syntax() {
     local script
     local scripts=(
@@ -203,6 +235,7 @@ check_clean_tree
 check_version
 check_board_registry
 check_docs_board_coverage
+check_development_policy
 check_shell_syntax
 check_repl_input
 check_python_syntax

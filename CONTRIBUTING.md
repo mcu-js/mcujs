@@ -12,6 +12,18 @@ bun run e2e
 
 The hardware test harness expects a connected Pico-compatible board. If you cannot run hardware tests, include that in your pull request notes.
 
+## Branch and review policy
+
+- `main` is the protected release branch (not `master`) and is release-only.
+- Feature branches start from the latest approved `development` tip.
+- Each implementation requires independent review before integration.
+- Release candidates are immutable.
+- Physical QA gates the `development` to `main` pull request.
+- The pull request must precede the merge.
+- Release tags and publishing happen only after the merge.
+
+Do not develop directly on `main`. Integrate reviewed feature branches into `development`, then follow [RELEASING.md](RELEASING.md) when promoting an immutable release candidate. Runtime API work should also follow the tracked [MCU.js 0.2 portable API design](docs/docs/development/mcujs-0.2-portable-api.md).
+
 ## Runtime boundaries
 
 - `javascript/` and `host/engine.*` contain JerryScript-specific integration.

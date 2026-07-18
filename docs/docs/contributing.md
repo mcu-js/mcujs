@@ -6,14 +6,27 @@ sidebar_position: 16
 
 Contributions are welcome. The easiest way to help is to keep changes small, run the deterministic checks, and explain which board or runtime surface you tested.
 
+## Branch and review policy
+
+- `main` is the protected release branch (not `master`) and is release-only.
+- Feature branches start from the latest approved `development` tip.
+- Each implementation requires independent review before integration.
+- Release candidates are immutable.
+- Physical QA gates the `development` to `main` pull request.
+- The pull request must precede the merge.
+- Release tags and publishing happen only after the merge.
+
+Reviewed feature work integrates into `development`; contributors do not develop directly on `main`. See [Releasing](./releasing.md) for the candidate, QA, pull request, merge, tag, and publish sequence.
+
 ## Development flow
 
-1. Create a branch from the current default branch.
+1. Create a feature branch from the latest approved `development` tip.
 2. Run `scripts/verify-release.sh --allow-dirty` before editing release metadata or board support.
 3. Build a [UF2](./glossary.md#uf2) for the board you are changing.
 4. Flash and test on hardware when behavior touches firmware, board config, USB, filesystem, or a hardware API.
 5. Run `bun run e2e` when you can test with a connected Pico.
-6. Include the board ID, firmware build ID, and test notes in the pull request.
+6. Obtain independent review of the implementation.
+7. Include the board ID, firmware build ID, and test notes in the pull request.
 
 GitHub issue and pull request templates collect the board, runtime boundary, and test evidence reviewers need. Use the board support template for new boards so the release registry, docs, and CMake config stay aligned.
 
@@ -35,6 +48,8 @@ GitHub issue and pull request templates collect the board, runtime boundary, and
 4. Use `\r\n` for any text written to USB CDC serial.
 5. Document the API in `docs/docs/built-in-modules.md` or `docs/docs/runtime-javascript.md`.
 6. Add an example that exits cleanly or can be interrupted from the REPL.
+
+Portable API changes must follow the [MCU.js 0.2 portable API and capability-discovery design](./development/mcujs-0.2-portable-api.md). Feature-detect capabilities instead of branching on board names, omit unsupported APIs, and use stable errors for failures from supported APIs.
 
 ## Adding a board
 

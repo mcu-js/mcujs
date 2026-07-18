@@ -90,6 +90,9 @@ uint32_t fs_get_total_sectors(void);
  */
 uint32_t fs_get_free_space(void);
 
+/* True while USB MSC exclusively owns the filesystem. */
+bool fs_host_owned(void);
+
 /*
  * Low-level sector access for USB MSC
  */

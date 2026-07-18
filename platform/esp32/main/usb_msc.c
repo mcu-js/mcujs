@@ -122,11 +122,11 @@ bool tud_msc_test_unit_ready_cb(uint8_t lun) {
 void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count,
                          uint16_t *block_size) {
     (void)lun;
-    bool ready = atomic_load(&s_media_ready) &&
-                 atomic_load(&s_owner_request) != MSC_OWNER_REQUEST_DEVICE &&
-                 mcujs_filesystem_host_owned();
-    *block_count = ready ? fs_get_total_sectors() : 0;
-    uint32_t sector_size = ready ? mcujs_filesystem_sector_size() : 0;
+    /* Geometry is stable once FFAT initializes, even while TEST UNIT READY
+     * reports no media during an ownership transition. Returning zero here
+     * lets some hosts cache a permanent 0-byte disk after boot. */
+    *block_count = fs_get_total_sectors();
+    uint32_t sector_size = mcujs_filesystem_sector_size();
     *block_size = (uint16_t)(sector_size == 0 ? CONFIG_WL_SECTOR_SIZE : sector_size);
 }
 

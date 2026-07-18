@@ -37,13 +37,12 @@ static bool run_smoke(const char *name, const char *source, const char *expected
 
 void app_main(void) {
     mcujs_usb_recovery_start();
+    mcujs_boot_init();
     usb_cdc_init();
     usb_cdc_task();
     mcujs_usb_recovery_mark_healthy();
     usb_cdc_puts("\r\nMCU.js ESP32-S3 headless runtime\r\n");
     usb_cdc_puts("Build: " MCUJS_BUILD_ID "\r\n");
-
-    mcujs_boot_init();
 
     if (js_engine_init() != JS_OK) {
         ESP_LOGE(TAG, "MCUJS_SMOKE_ENGINE_FAIL");

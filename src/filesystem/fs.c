@@ -318,6 +318,10 @@ uint32_t fs_get_free_space(void) {
     return free_clusters * fs->csize * FS_SECTOR_SIZE;
 }
 
+bool fs_host_owned(void) {
+    return false;
+}
+
 /*
  * Read sector directly (for USB MSC)
  * Bypasses FatFs and reads directly from flash

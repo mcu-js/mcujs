@@ -21,6 +21,7 @@ static int s_exec_count;
 static int s_format_count;
 static int s_reset_count;
 static bool s_cdc_connected;
+static bool s_fs_host_owned;
 
 static void reset_io(void) {
     memset(s_input, 0, sizeof(s_input));
@@ -33,6 +34,7 @@ static void reset_io(void) {
     s_format_count = 0;
     s_reset_count = 0;
     s_cdc_connected = true;
+    s_fs_host_owned = false;
 }
 
 static void feed_bytes(const char *bytes) {
@@ -101,6 +103,7 @@ fs_result_t fs_sync(void) { return FS_OK; }
 fs_result_t fs_invalidate(void) { return FS_OK; }
 void fs_notify_host(void) {}
 uint32_t fs_get_free_space(void) { return 4096; }
+bool fs_host_owned(void) { return s_fs_host_owned; }
 fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     (void)file; (void)path; (void)mode;
     return FS_ERROR_NOT_FOUND;
@@ -200,6 +203,15 @@ static void test_usb_reconnect_redraws_prompt(void) {
     assert(strcmp(s_output, "> ") == 0);
 }
 
+static void test_info_reports_host_ownership(void) {
+    reset_io();
+    s_fs_host_owned = true;
+    repl_init();
+    feed_bytes(".info\r");
+    assert(strstr(s_output, "FS Free: host-owned (eject MCUJS)\r\n") != NULL);
+    assert(strstr(s_output, "FS Free: 0 B") == NULL);
+}
+
 int main(void) {
     test_crlf_is_one_enter();
     test_tab_completion_with_crlf();
@@ -208,6 +220,7 @@ int main(void) {
     test_reset_alias();
     test_uart_input_without_usb();
     test_usb_reconnect_redraws_prompt();
+    test_info_reports_host_ownership();
     puts("REPL input tests passed");
     return 0;
 }

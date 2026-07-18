@@ -113,7 +113,8 @@ validate_runtime_config() {
         'CONFIG_COMPILER_HIDE_PATHS_MACROS=y' \
         'CONFIG_FATFS_LFN_HEAP=y' \
         'CONFIG_FATFS_MAX_LFN=255' \
-        'CONFIG_FATFS_API_ENCODING_UTF_8=y'; do
+        'CONFIG_FATFS_API_ENCODING_UTF_8=y' \
+        'CONFIG_FATFS_USE_LABEL=y'; do
         found=0
         while IFS= read -r line; do
             if [[ "${line}" == "${required}" ]]; then

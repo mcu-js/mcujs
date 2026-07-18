@@ -27,6 +27,8 @@
 #define MCUJS_FS_PARTITION_OFFSET 0x450000u
 #define MCUJS_FS_PARTITION_SIZE 0x3b0000u
 #define MCUJS_FS_PATH_MAX 192
+#define MCUJS_FS_VOLUME_LABEL "MCUJS"
+#define MCUJS_FS_VOLUME_LABEL_UTF8_MAX (11u * 3u + 1u)
 
 typedef struct {
     FILE *stream;
@@ -177,6 +179,26 @@ static void drive_name(BYTE pdrv, char drive[3]) {
     drive[2] = '\0';
 }
 
+static void ensure_volume_label(const char drive[3]) {
+    char current[MCUJS_FS_VOLUME_LABEL_UTF8_MAX] = {0};
+    DWORD serial = 0;
+    if (f_getlabel(drive, current, &serial) != FR_OK) {
+        return;
+    }
+    if (current[0] != '\0') {
+        return;
+    }
+
+    char requested[3 + sizeof(MCUJS_FS_VOLUME_LABEL)];
+    int written = snprintf(requested, sizeof(requested), "%s%s",
+                           drive, MCUJS_FS_VOLUME_LABEL);
+    if (written >= 0 && (size_t)written < sizeof(requested)) {
+        /* A full FAT12/16 fixed root can reject a volume-label entry. Label
+         * migration is cosmetic and must never disable a healthy filesystem. */
+        (void)f_setlabel(requested);
+    }
+}
+
 static fs_result_t attach_fatfs(void) {
     if (s_wl_handle == WL_INVALID_HANDLE) {
         return FS_ERROR_IO;
@@ -210,6 +232,7 @@ static fs_result_t attach_fatfs(void) {
         ff_diskio_unregister(pdrv);
         return FS_ERROR_IO;
     }
+    ensure_volume_label(drive);
 
     s_pdrv = pdrv;
     s_fatfs = fatfs;
@@ -432,6 +455,10 @@ uint32_t fs_get_free_space(void) {
         return 0;
     }
     return free_bytes > UINT32_MAX ? UINT32_MAX : (uint32_t)free_bytes;
+}
+
+bool fs_host_owned(void) {
+    return mcujs_filesystem_host_owned();
 }
 
 fs_result_t fs_read_sector(uint32_t sector, uint32_t offset,

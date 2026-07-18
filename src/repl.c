@@ -872,11 +872,17 @@ static void repl_handle_command(const char* cmd) {
         snprintf(buf, sizeof(buf), "RAM: %lu KB\r\n", (unsigned long)(info->ram_size / 1024));
         usb_cdc_puts(buf);
         
-        uint32_t free_space = fs_get_free_space();
-        if (free_space < 1000) {
-            snprintf(buf, sizeof(buf), "FS Free: %lu B\r\n", (unsigned long)free_space);
+        if (fs_host_owned()) {
+            snprintf(buf, sizeof(buf), "FS Free: host-owned (eject MCUJS)\r\n");
         } else {
-            snprintf(buf, sizeof(buf), "FS Free: %lu KB\r\n", (unsigned long)(free_space / 1024));
+            uint32_t free_space = fs_get_free_space();
+            if (free_space < 1000) {
+                snprintf(buf, sizeof(buf), "FS Free: %lu B\r\n",
+                         (unsigned long)free_space);
+            } else {
+                snprintf(buf, sizeof(buf), "FS Free: %lu KB\r\n",
+                         (unsigned long)(free_space / 1024));
+            }
         }
         usb_cdc_puts(buf);
     }

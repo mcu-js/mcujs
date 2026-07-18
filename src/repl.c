@@ -53,6 +53,8 @@ typedef struct {
     uint8_t bracket_depth;
     bool prompt_shown;
     bool initialized;
+    bool cdc_connected;
+    bool ignore_lf_after_cr;
     esc_state_t esc_state;
 
     bool paste_mode;
@@ -121,10 +123,12 @@ void repl_task(void) {
         return;
     }
     
-    // Don't process if CDC not connected
-    if (!usb_cdc_connected()) {
+    /* UART recovery input remains usable without a USB host. Track CDC only
+     * to redraw the prompt when USB connects or disconnects. */
+    bool cdc_connected = usb_cdc_connected();
+    if (cdc_connected != repl_state.cdc_connected) {
+        repl_state.cdc_connected = cdc_connected;
         repl_state.prompt_shown = false;
-        return;
     }
     
     // Show prompt if needed
@@ -334,6 +338,16 @@ static void repl_history_next(void) {
  * Handle a single character input
  */
 static void repl_handle_char(char c) {
+    /* Most serial terminals send CRLF for Enter. Treat that pair as one line
+     * submission while continuing to accept CR-only and LF-only clients. */
+    if (c == CHAR_ENTER_LF && repl_state.ignore_lf_after_cr) {
+        repl_state.ignore_lf_after_cr = false;
+        return;
+    }
+    if (c != CHAR_ENTER_LF) {
+        repl_state.ignore_lf_after_cr = false;
+    }
+
     // Handle escape sequences
     if (repl_state.esc_state == ESC_START) {
         if (c == '[') {
@@ -375,6 +389,8 @@ static void repl_handle_char(char c) {
     
     switch (c) {
         case CHAR_ENTER_CR:
+            repl_state.ignore_lf_after_cr = true;
+            __attribute__((fallthrough));
         case CHAR_ENTER_LF:
             usb_cdc_puts("\r\n");
             repl_process_line();
@@ -523,7 +539,9 @@ static void repl_process_line(void) {
                 } else {
                     /* No stack trace, append suggestion */
                     char enhanced[512];
-                    snprintf(enhanced, sizeof(enhanced), "%s. Did you mean '%s'?", error_buf, suggestion);
+                    snprintf(enhanced, sizeof(enhanced),
+                             "%.350s. Did you mean '%.128s'?",
+                             error_buf, suggestion);
                     repl_print_error(enhanced);
                 }
             } else {
@@ -543,13 +561,16 @@ static void repl_process_line(void) {
  */
 static bool repl_ls_callback(const fs_entry_t *entry, void *user_data) {
     (void)user_data;
-    char buf[64];
     if (entry->is_dir) {
-        snprintf(buf, sizeof(buf), "  <DIR>  %s\r\n", entry->name);
+        usb_cdc_puts("  <DIR>  ");
     } else {
-        snprintf(buf, sizeof(buf), "  %5lu  %s\r\n", (unsigned long)entry->size, entry->name);
+        char size_buf[16];
+        snprintf(size_buf, sizeof(size_buf), "  %5lu  ",
+                 (unsigned long)entry->size);
+        usb_cdc_puts(size_buf);
     }
-    usb_cdc_puts(buf);
+    usb_cdc_puts(entry->name);
+    usb_cdc_puts("\r\n");
     return true;  /* Continue iteration */
 }
 
@@ -563,7 +584,12 @@ static bool repl_wait_for_keypress(uint32_t timeout_ms) {
     while (elapsed < timeout_ms) {
         usb_cdc_task();
         if (usb_cdc_available()) {
-            usb_cdc_getchar();
+            int key = usb_cdc_getchar();
+            if (key == CHAR_ENTER_LF && repl_state.ignore_lf_after_cr) {
+                repl_state.ignore_lf_after_cr = false;
+                continue;
+            }
+            repl_state.ignore_lf_after_cr = false;
             return true;
         }
         board_delay_ms(step_ms);
@@ -812,6 +838,7 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  .format!    - Format filesystem immediately\r\n");
         usb_cdc_puts("  .uf2        - Reboot into UF2 mode (prompted)\r\n");
         usb_cdc_puts("  .uf2!       - Reboot into UF2 mode immediately\r\n");
+        usb_cdc_puts("  .reset      - Reset the board\r\n");
         usb_cdc_puts("  .usbreset   - Reset USB connection (reboot)\r\n");
         usb_cdc_puts("\r\n");
         usb_cdc_puts("JavaScript APIs:\r\n");
@@ -951,6 +978,11 @@ static void repl_handle_command(const char* cmd) {
         if (!board_enter_uf2()) {
             usb_cdc_puts("UF2 boot not supported on this board.\r\n");
         }
+    }
+    else if (strcmp(cmd, "reset") == 0) {
+        usb_cdc_puts("Resetting...\r\n");
+        usb_cdc_flush();
+        usb_cdc_reset_usb(250);
     }
     else if (strcmp(cmd, "usbreset") == 0) {
         usb_cdc_puts("Resetting USB connection...\r\n");

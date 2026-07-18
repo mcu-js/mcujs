@@ -1,4 +1,4 @@
-/* Persistent TinyUSB startup crash-loop recovery for buttonless boards. */
+/* Persistent TinyUSB startup crash-loop recovery without requiring buttons. */
 
 #include "usb_recovery.h"
 

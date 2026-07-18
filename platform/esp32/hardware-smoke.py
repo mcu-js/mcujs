@@ -108,6 +108,20 @@ def reset_and_reconnect(port: serial.Serial, path: Path) -> serial.Serial:
     return open_console(path)
 
 
+def verify_repl_crlf_and_completion(port: serial.Serial) -> None:
+    port.reset_input_buffer()
+    port.write(b"boa\t.name\r\n")
+    port.flush()
+    output = read_until(port, (PROMPT,), timeout=5.0)
+    time.sleep(0.1)
+    output += port.read(4096).decode("utf-8", errors="replace")
+    if "board.name" not in output or "'seeed_xiao_esp32s3'" not in output:
+        raise AssertionError(f"tab completion did not produce board.name: {output!r}")
+    if output.count(PROMPT) != 1:
+        raise AssertionError(f"CRLF produced more than one prompt: {output!r}")
+    print("PASS: tab completed board.name and CRLF submitted exactly one line")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", default="/dev/mcujs-dev")
@@ -117,6 +131,7 @@ def main() -> int:
     path = Path(args.port)
     port = open_console(path)
     try:
+        verify_repl_crlf_and_completion(port)
         evaluate(port, "2 + 2", "4")
         evaluate(port, "board.name + ':' + board.chip", "'seeed_xiao_esp32s3:ESP32-S3'")
         evaluate(port, "board.millis() > 0", "true")

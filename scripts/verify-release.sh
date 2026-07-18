@@ -145,6 +145,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/finalize-pages-cutover.sh"
         "${ROOT_DIR}/scripts/package-release.sh"
         "${ROOT_DIR}/scripts/release.sh"
+        "${ROOT_DIR}/scripts/test-repl.sh"
         "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"
         "${ROOT_DIR}/platform/esp32/build.sh"
@@ -159,6 +160,11 @@ check_shell_syntax() {
         bash -n "${script}"
     done
     pass 'shell entrypoints parse cleanly'
+}
+
+check_repl_input() {
+    "${ROOT_DIR}/scripts/test-repl.sh"
+    pass 'REPL CRLF and tab-completion tests passed'
 }
 
 check_python_syntax() {
@@ -198,6 +204,7 @@ check_version
 check_board_registry
 check_docs_board_coverage
 check_shell_syntax
+check_repl_input
 check_python_syntax
 check_platform_boundaries
 check_docs_build

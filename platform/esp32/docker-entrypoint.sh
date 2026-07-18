@@ -6,6 +6,8 @@ ROOT=/tmp/mcujs-workspace
 ESP_DIR="${ROOT}/platform/esp32"
 BUILD_DIR=/tmp/mcujs-build
 OUTPUT_DIR=/output
+VERSION="$(tr -d '[:space:]' < "${SOURCE_ROOT}/version.txt")"
+UF2_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.uf2"
 
 if [[ "${1:-build}" != "build" || $# -gt 1 ]]; then
     printf 'The ESP32 Docker lane supports only a non-flashing build action.\n' >&2
@@ -45,15 +47,15 @@ python3 "${ESP_DIR}/verify-component-lock.py" \
 "${ESP_DIR}/build.sh" build
 python3 "${ESP_DIR}/make-uf2.py" \
     --input "${BUILD_DIR}/mcujs-esp32s3.bin" \
-    --output "${BUILD_DIR}/mcujs-esp32s3.uf2"
+    --output "${BUILD_DIR}/${UF2_NAME}"
 
 install -m 0644 \
     "${BUILD_DIR}/mcujs-esp32s3.bin" \
-    "${BUILD_DIR}/mcujs-esp32s3.uf2" \
+    "${BUILD_DIR}/${UF2_NAME}" \
     "${BUILD_DIR}/mcujs-esp32s3.elf" \
     "${BUILD_DIR}/mcujs-esp32s3.map" \
     "${OUTPUT_DIR}/"
 
 sha256sum \
     "${OUTPUT_DIR}/mcujs-esp32s3.bin" \
-    "${OUTPUT_DIR}/mcujs-esp32s3.uf2"
+    "${OUTPUT_DIR}/${UF2_NAME}"

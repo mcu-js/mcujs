@@ -6,6 +6,8 @@ ESP_ROOT="$(realpath -e "${ROOT}/platform/esp32")"
 IMAGE="${MCUJS_ESP32_DOCKER_IMAGE:-mcujs-esp32-builder:v5.3.2-amd64}"
 BUILD_ABS="${ESP_ROOT}/build-docker"
 PLATFORM=linux/amd64
+VERSION="$(tr -d '[:space:]' < "${ROOT}/version.txt")"
+UF2_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.uf2"
 
 usage() {
     cat <<'EOF'
@@ -36,13 +38,66 @@ if [[ "$(realpath -e "${BUILD_ABS}")" != "${BUILD_ABS}" ]]; then
     printf 'Docker output directory escaped its fixed path: %s\n' "${BUILD_ABS}" >&2
     exit 1
 fi
-for artifact in mcujs-esp32s3.bin mcujs-esp32s3.uf2 \
-                mcujs-esp32s3.elf mcujs-esp32s3.map; do
-    if [[ -L "${BUILD_ABS}/${artifact}" ]]; then
-        printf 'Refusing symlinked Docker output artifact: %s\n' "${BUILD_ABS}/${artifact}" >&2
+ARTIFACTS=(
+    mcujs-esp32s3.bin
+    "${UF2_NAME}"
+    mcujs-esp32s3.elf
+    mcujs-esp32s3.map
+)
+declare -A CLEANUP_SEEN=()
+CLEANUP_PATHS=()
+add_cleanup_path() {
+    local path="$1"
+    if [[ -z "${CLEANUP_SEEN[${path}]:-}" ]]; then
+        CLEANUP_SEEN["${path}"]=1
+        CLEANUP_PATHS+=("${path}")
+    fi
+}
+for artifact in "${ARTIFACTS[@]}" mcujs-esp32s3.uf2; do
+    add_cleanup_path "${BUILD_ABS}/${artifact}"
+done
+shopt -s nullglob
+for artifact_path in "${BUILD_ABS}"/mcujs-*-seeed_xiao_esp32s3.uf2; do
+    add_cleanup_path "${artifact_path}"
+done
+shopt -u nullglob
+
+for artifact_path in "${CLEANUP_PATHS[@]}"; do
+    if [[ -L "${artifact_path}" ]]; then
+        printf 'Refusing symlinked Docker output artifact: %s\n' "${artifact_path}" >&2
+        exit 1
+    fi
+    if [[ -e "${artifact_path}" && ! -f "${artifact_path}" ]]; then
+        printf 'Refusing non-regular Docker output artifact: %s\n' "${artifact_path}" >&2
         exit 1
     fi
 done
+
+cleanup_outputs() {
+    local path
+    local failed=0
+    for path in "${CLEANUP_PATHS[@]}"; do
+        if [[ -e "${path}" || -L "${path}" ]]; then
+            if ! unlink "${path}"; then
+                printf 'Could not remove incomplete Docker artifact: %s\n' "${path}" >&2
+                failed=1
+            fi
+        fi
+    done
+    return "${failed}"
+}
+
+cleanup_armed=1
+cleanup_on_exit() {
+    local status=$?
+    trap - EXIT
+    if [[ "${cleanup_armed}" -eq 1 ]] && ! cleanup_outputs; then
+        status=1
+    fi
+    exit "${status}"
+}
+trap cleanup_on_exit EXIT
+cleanup_outputs
 
 docker build --platform "${PLATFORM}" \
     -f "${ROOT}/platform/esp32/Dockerfile" \
@@ -55,3 +110,13 @@ docker run --rm --init \
     -v "${ROOT}:/source:ro" \
     -v "${BUILD_ABS}:/output" \
     "${IMAGE}" build
+
+for artifact in "${ARTIFACTS[@]}"; do
+    artifact_path="${BUILD_ABS}/${artifact}"
+    if [[ ! -f "${artifact_path}" || -L "${artifact_path}" ]]; then
+        printf 'Docker build did not produce a regular artifact: %s\n' "${artifact_path}" >&2
+        exit 1
+    fi
+done
+cleanup_armed=0
+trap - EXIT

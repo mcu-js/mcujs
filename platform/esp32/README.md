@@ -92,8 +92,12 @@ The normal Milestone 4 update path is application-only UF2:
 board.enterUf2()
 
 # Then copy the generated file to the XIAOS3BOOT volume:
-cp platform/esp32/build/mcujs-esp32s3.uf2 /path/to/XIAOS3BOOT/
+cp platform/esp32/build/mcujs-0.1.0-seeed_xiao_esp32s3.uf2 /path/to/XIAOS3BOOT/
 ```
+
+The UF2 filename follows the release convention
+`mcujs-<version>-<board-id>.uf2`; the XIAO board ID intentionally includes its
+manufacturer as `seeed_xiao_esp32s3`.
 
 `app-flash` remains available only when an esptool-compatible ROM or fixed USB
 Serial/JTAG transport is already active; TinyUSB CDC is not an esptool port.
@@ -125,6 +129,11 @@ NVS. TinyUSB is serviced from the task-watchdog-supervised main task rather than
 an independent task. A reset before the first service pass leaves the marker;
 the next boot clears it and enters TinyUF2. NVS failures also enter TinyUF2 and
 never erase NVS automatically.
+
+The XIAO ESP32-S3 also has physical BOOT and RESET buttons. They are extremely
+small and recessed, but can be pressed with a pen tip or fingernail when direct
+hardware recovery is needed. The software recovery paths above remain the
+normal first choice.
 
 ## Filesystem and modules
 

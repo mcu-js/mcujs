@@ -12,7 +12,8 @@ set(MCUJS_SOURCES
     main.c
     boot.c
     jerry_port.c
-    repl.c
+    board_services.c
+    ${MCUJS_ROOT}/src/repl.c
     usb_cdc.c
     usb_msc.c
     usb_recovery.c
@@ -36,6 +37,7 @@ idf_component_register(
         bindings
         ${MCUJS_ROOT}/host
         ${MCUJS_ROOT}/host/bindings
+        ${MCUJS_ROOT}/board
         ${MCUJS_ROOT}/src
         ${MCUJS_ROOT}/src/filesystem
         ${MCUJS_ROOT}/src/usb

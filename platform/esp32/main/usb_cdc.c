@@ -13,6 +13,7 @@
 #include "driver/uart.h"
 #include "esp_check.h"
 #include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/stream_buffer.h"
 #include "freertos/task.h"
@@ -110,7 +111,7 @@ void usb_cdc_init(void) {
 
 void usb_cdc_task(void) {
     /* TinyUSB runs on the watched MCU.js main task so USB stalls participate
-     * in the buttonless crash-loop recovery contract. */
+     * in the button-independent crash-loop recovery contract. */
     tud_task_ext(0, false);
     if (!s_initialized || !tud_cdc_connected()) {
         return;
@@ -199,46 +200,84 @@ size_t usb_cdc_read(char *buffer, size_t length) {
     return used;
 }
 
+static size_t usb_write_once(const char *buffer, size_t length) {
+    if (!s_initialized || !tud_cdc_connected()) {
+        return 0;
+    }
+
+    size_t accepted = 0;
+    if (s_tx_pending_offset == s_tx_pending_length &&
+        xStreamBufferBytesAvailable(s_cdc_tx_backlog) == 0) {
+        accepted = tinyusb_cdcacm_write_queue(
+            TINYUSB_CDC_ACM_0, (const uint8_t *)buffer, length);
+        if (accepted > 0) {
+            (void)tinyusb_cdcacm_write_flush(TINYUSB_CDC_ACM_0, 0);
+        }
+    }
+
+    if (accepted < length) {
+        accepted += xStreamBufferSend(s_cdc_tx_backlog,
+                                      buffer + accepted,
+                                      length - accepted, 0);
+    }
+    return accepted;
+}
+
+static size_t uart_write_once(const char *buffer, size_t length) {
+    if (!s_uart_initialized) {
+        return 0;
+    }
+    int count = uart_write_bytes(MCUJS_UART, buffer, length);
+    return count > 0 ? (size_t)count : 0;
+}
+
+static void service_output_wait(void) {
+    usb_cdc_task();
+    if (esp_task_wdt_status(NULL) == ESP_OK) {
+        (void)esp_task_wdt_reset();
+    }
+}
+
 size_t usb_cdc_write(const char *buffer, size_t length) {
     if (buffer == NULL || length == 0) {
         return 0;
     }
 
-    size_t uart_written = 0;
-    if (s_uart_initialized) {
-        int count = uart_write_bytes(MCUJS_UART, buffer, length);
-        if (count > 0) {
-            uart_written = (size_t)count;
-        }
-    }
-
-    size_t usb_accepted = 0;
-    if (s_initialized && tud_cdc_connected() &&
-        s_tx_pending_offset == s_tx_pending_length &&
-        xStreamBufferBytesAvailable(s_cdc_tx_backlog) == 0) {
-        usb_accepted = tinyusb_cdcacm_write_queue(
-            TINYUSB_CDC_ACM_0, (const uint8_t *)buffer, length);
-        if (usb_accepted > 0) {
-            (void)tinyusb_cdcacm_write_flush(TINYUSB_CDC_ACM_0, 0);
-        }
-    }
-
-    if (usb_accepted < length && s_cdc_tx_backlog != NULL) {
-        usb_accepted += xStreamBufferSend(s_cdc_tx_backlog,
-                                           buffer + usb_accepted,
-                                           length - usb_accepted, 0);
-    }
+    size_t uart_written = uart_write_once(buffer, length);
+    size_t usb_accepted = usb_write_once(buffer, length);
 
     return uart_written > usb_accepted ? uart_written : usb_accepted;
 }
 
 void usb_cdc_putchar(char c) {
-    (void)usb_cdc_write(&c, 1);
+    char text[2] = {c, '\0'};
+    usb_cdc_puts(text);
 }
 
 void usb_cdc_puts(const char *str) {
-    if (str != NULL) {
-        (void)usb_cdc_write(str, strlen(str));
+    if (str == NULL) {
+        return;
+    }
+
+    size_t length = strlen(str);
+    size_t uart_offset = 0;
+    while (uart_offset < length) {
+        size_t written = uart_write_once(str + uart_offset, length - uart_offset);
+        if (written == 0) {
+            break;
+        }
+        uart_offset += written;
+        service_output_wait();
+    }
+
+    size_t usb_offset = 0;
+    while (usb_offset < length && s_initialized && tud_cdc_connected()) {
+        service_output_wait();
+        size_t accepted = usb_write_once(str + usb_offset, length - usb_offset);
+        usb_offset += accepted;
+        if (accepted == 0) {
+            vTaskDelay(1);
+        }
     }
 }
 

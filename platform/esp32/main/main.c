@@ -77,7 +77,7 @@ void app_main(void) {
     if (!mcujs_usb_msc_expose()) {
         ESP_LOGE(TAG, "USB MSC storage ownership transfer failed");
     }
-    usb_cdc_puts("MCU.js ready; press Enter for the prompt.\r\n");
+    usb_cdc_puts("MCU.js ready.\r\n");
     repl_init();
 
     while (true) {

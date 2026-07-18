@@ -28,7 +28,7 @@ void usb_cdc_task(void);
 size_t usb_cdc_write(const char *data, size_t len);
 
 /*
- * Write a string to CDC (convenience function)
+ * Write a complete string, applying transport backpressure as needed.
  */
 void usb_cdc_puts(const char *str);
 

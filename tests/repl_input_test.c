@@ -1,0 +1,213 @@
+#include "repl.h"
+#include "usb_cdc.h"
+#include "engine.h"
+#include "fs.h"
+#include "board.h"
+
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+static char s_input[512];
+static size_t s_input_len;
+static size_t s_input_pos;
+static char s_output[8192];
+static size_t s_output_len;
+static char s_executed[256];
+static int s_exec_count;
+static int s_format_count;
+static int s_reset_count;
+static bool s_cdc_connected;
+
+static void reset_io(void) {
+    memset(s_input, 0, sizeof(s_input));
+    s_input_len = 0;
+    s_input_pos = 0;
+    memset(s_output, 0, sizeof(s_output));
+    s_output_len = 0;
+    memset(s_executed, 0, sizeof(s_executed));
+    s_exec_count = 0;
+    s_format_count = 0;
+    s_reset_count = 0;
+    s_cdc_connected = true;
+}
+
+static void feed_bytes(const char *bytes) {
+    size_t len = strlen(bytes);
+    assert(len <= sizeof(s_input));
+    memcpy(s_input, bytes, len);
+    s_input_len = len;
+    s_input_pos = 0;
+    repl_task();
+}
+
+void usb_cdc_task(void) {}
+bool usb_cdc_connected(void) { return s_cdc_connected; }
+bool usb_cdc_available(void) { return s_input_pos < s_input_len; }
+int usb_cdc_getchar(void) {
+    return s_input_pos < s_input_len ? (unsigned char)s_input[s_input_pos++] : -1;
+}
+void usb_cdc_puts(const char *str) {
+    size_t len = strlen(str);
+    assert(s_output_len + len < sizeof(s_output));
+    memcpy(s_output + s_output_len, str, len);
+    s_output_len += len;
+    s_output[s_output_len] = '\0';
+}
+void usb_cdc_flush(void) {}
+void usb_cdc_reset_usb(uint32_t delay_ms) {
+    (void)delay_ms;
+    s_reset_count++;
+}
+
+js_result_t js_engine_exec(const char *code, size_t code_len,
+                           char *result_buf, size_t result_buf_len) {
+    assert(code_len < sizeof(s_executed));
+    memcpy(s_executed, code, code_len);
+    s_executed[code_len] = '\0';
+    s_exec_count++;
+    snprintf(result_buf, result_buf_len, "'ok'");
+    return JS_OK;
+}
+js_result_t js_engine_exec_file(const char *filename) {
+    (void)filename;
+    return JS_OK;
+}
+size_t js_engine_get_error(char *buf, size_t buf_len) {
+    if (buf_len > 0) buf[0] = '\0';
+    return 0;
+}
+int js_engine_get_completions(const char *partial,
+                              js_completion_callback_t callback,
+                              void *user_data) {
+    if (strcmp(partial, "boa") == 0) {
+        callback("board", user_data);
+        return 1;
+    }
+    return 0;
+}
+void js_engine_register_global_identifier(const char *name) { (void)name; }
+bool js_engine_suggest_method(const char *source, char *suggestion,
+                              size_t suggestion_len) {
+    (void)source; (void)suggestion; (void)suggestion_len;
+    return false;
+}
+
+fs_result_t fs_format(void) { s_format_count++; return FS_OK; }
+fs_result_t fs_sync(void) { return FS_OK; }
+fs_result_t fs_invalidate(void) { return FS_OK; }
+void fs_notify_host(void) {}
+uint32_t fs_get_free_space(void) { return 4096; }
+fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
+    (void)file; (void)path; (void)mode;
+    return FS_ERROR_NOT_FOUND;
+}
+fs_result_t fs_close(fs_file_t *file) { (void)file; return FS_OK; }
+fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_read) {
+    (void)file; (void)buffer; (void)size;
+    *bytes_read = 0;
+    return FS_OK;
+}
+fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
+                     size_t *bytes_written) {
+    (void)file; (void)buffer;
+    *bytes_written = size;
+    return FS_OK;
+}
+fs_result_t fs_remove(const char *path) { (void)path; return FS_OK; }
+fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback,
+                        void *user_data) {
+    (void)path; (void)callback; (void)user_data;
+    return FS_OK;
+}
+
+static const board_info_t s_board = {
+    .name = "test_board",
+    .chip = "test_chip",
+    .flash_size = 1024,
+    .ram_size = 512,
+    .cpu_freq = 1,
+    .led_pin = 1,
+    .neopixel_pin = 255,
+};
+const board_info_t *board_get_info(void) { return &s_board; }
+void board_delay_ms(uint32_t ms) { (void)ms; }
+bool board_enter_uf2(void) { return true; }
+
+static void test_crlf_is_one_enter(void) {
+    reset_io();
+    repl_init();
+    feed_bytes("\r\n");
+    assert(strcmp(s_output, "> \r\n> ") == 0);
+    assert(s_exec_count == 0);
+}
+
+static void test_tab_completion_with_crlf(void) {
+    reset_io();
+    repl_init();
+    feed_bytes("boa\t.name\r\n");
+    assert(s_exec_count == 1);
+    assert(strcmp(s_executed, "board.name") == 0);
+    assert(strcmp(s_output, "> board.name\r\n'ok'\r\n> ") == 0);
+}
+
+static void test_lf_only_client(void) {
+    reset_io();
+    repl_init();
+    feed_bytes("2+2\n");
+    assert(s_exec_count == 1);
+    assert(strcmp(s_executed, "2+2") == 0);
+}
+
+static void test_prompted_command_ignores_paired_lf(void) {
+    reset_io();
+    repl_init();
+    feed_bytes(".format\r\n");
+    assert(s_format_count == 1);
+    assert(strstr(s_output, "Filesystem formatted successfully.") != NULL);
+}
+
+static void test_reset_alias(void) {
+    reset_io();
+    repl_init();
+    feed_bytes(".reset\r\n");
+    assert(s_reset_count == 1);
+    assert(strstr(s_output, "Resetting...\r\n") != NULL);
+}
+
+static void test_uart_input_without_usb(void) {
+    reset_io();
+    s_cdc_connected = false;
+    repl_init();
+    feed_bytes("2+2\r");
+    assert(s_exec_count == 1);
+    assert(strcmp(s_executed, "2+2") == 0);
+}
+
+static void test_usb_reconnect_redraws_prompt(void) {
+    reset_io();
+    s_cdc_connected = false;
+    repl_init();
+    feed_bytes("");
+    assert(strcmp(s_output, "> ") == 0);
+    s_output[0] = '\0';
+    s_output_len = 0;
+    s_cdc_connected = true;
+    feed_bytes("");
+    assert(strcmp(s_output, "> ") == 0);
+}
+
+int main(void) {
+    test_crlf_is_one_enter();
+    test_tab_completion_with_crlf();
+    test_lf_only_client();
+    test_prompted_command_ignores_paired_lf();
+    test_reset_alias();
+    test_uart_input_without_usb();
+    test_usb_reconnect_redraws_prompt();
+    puts("REPL input tests passed");
+    return 0;
+}

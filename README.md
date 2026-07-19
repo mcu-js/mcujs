@@ -287,7 +287,8 @@ neopixel.show();
 ```javascript
 const { builtinModules } = require('mcujs:module');
 // alias: require('node:module')
-// builtinModules includes: fs, process, gpio, pwm, i2c, spi, adc, neopixel
+// This frozen list is board-dependent. Inspect it, or call
+// require('mcujs:module').has(name), before requiring an optional module.
 ```
 
 ## Known Limitations

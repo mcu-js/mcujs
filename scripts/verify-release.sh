@@ -26,7 +26,7 @@ Checks:
   - public docs mention every release board ID
   - contributor and release docs share the development/release policy
   - MCU.js 0.2 portable API schema and docs remain consistent
-  - generated runtime registry, manifests, and full/constrained native maps agree
+  - generated runtime registry, manifests, native maps, and Jerry bindings agree
   - shell entrypoints parse cleanly
 EOF
 }
@@ -180,6 +180,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/package-release.sh"
         "${ROOT_DIR}/scripts/release.sh"
         "${ROOT_DIR}/scripts/test-repl.sh"
+        "${ROOT_DIR}/scripts/test-runtime-bindings.sh"
         "${ROOT_DIR}/scripts/test-runtime-registry.sh"
         "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"
@@ -227,7 +228,8 @@ check_runtime_registry() {
     node "${ROOT_DIR}/scripts/generate-runtime-registry.js" --check
     node --test "${ROOT_DIR}/tests/runtime-registry.test.js"
     "${ROOT_DIR}/scripts/test-runtime-registry.sh"
-    pass 'runtime registry and full/constrained native maps are consistent'
+    "${ROOT_DIR}/scripts/test-runtime-bindings.sh"
+    pass 'runtime registry and full/constrained native maps and Jerry bindings are consistent'
 }
 
 check_release_artifacts() {

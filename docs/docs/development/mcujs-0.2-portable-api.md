@@ -84,6 +84,12 @@ if (modules.has('spi')) {
 
 `builtinModules`, `modules.has()`, native registration, `.help`, and `board.capability(name)` must all derive from the same registry.
 
+Static registry projections are immutable. `builtinModules`, `board.apiVersion`,
+`board.exposedPins`, `board.pins`, and `board.devices` are non-writable and
+non-configurable; arrays and nested maps are frozen so mutation cannot make
+discovery disagree with native lookup. `modules.has(name)` throws `TypeError`
+for missing/non-string input and `RangeError` for invalid string lengths.
+
 Do not add `require.optional()`: it is nonstandard, conceals spelling mistakes, and duplicates explicit feature detection.
 
 ### Human and host-tool discovery

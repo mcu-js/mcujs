@@ -139,6 +139,14 @@ void js_set_string(jerry_value_t object, const char *name, const char *value);
 void js_set_boolean(jerry_value_t object, const char *name, bool value);
 void js_register_global(const char *name, jerry_value_t object);
 
+/* Freeze an object and every enumerable object nested beneath it. */
+jerry_value_t js_deep_freeze(jerry_value_t value);
+
+/* Define an enumerable, non-writable, non-configurable data property. */
+jerry_value_t js_define_immutable_property(jerry_value_t object,
+                                           const char *name,
+                                           jerry_value_t value);
+
 double js_get_number_arg(const jerry_value_t args[], jerry_length_t argc,
                          jerry_length_t index, double default_value);
 bool js_get_boolean_arg(const jerry_value_t args[], jerry_length_t argc,

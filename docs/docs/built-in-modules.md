@@ -10,6 +10,11 @@ firmware enables them. `require('mcujs:module').builtinModules`,
 come from the same board registry. Acronyms are explained in the
 [Glossary](./glossary.md).
 
+The returned `builtinModules` array is a frozen registry snapshot exposed
+through a non-writable, non-configurable property. `has(name)` requires one
+non-empty string shorter than the module-path limit: missing or non-string
+arguments throw `TypeError`, while invalid string lengths throw `RangeError`.
+
 ```javascript
 const boardApi = require('board');
 const modules = require('mcujs:module');

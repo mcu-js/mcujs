@@ -599,12 +599,22 @@ static jerry_value_t module_has_handler(const jerry_call_info_t *call_info,
                                         const jerry_value_t args[],
                                         jerry_length_t argc) {
     (void)call_info;
-    if (argc < 1 || !jerry_value_is_string(args[0])) return jerry_boolean(false);
+    if (argc < 1 || !jerry_value_is_string(args[0])) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE,
+                              "module.has() name must be a string");
+    }
     char name[MAX_MODULE_PATH];
     jerry_size_t length = jerry_string_size(args[0], JERRY_ENCODING_UTF8);
-    if (length == 0 || length >= sizeof(name)) return jerry_boolean(false);
+    if (length == 0 || length >= sizeof(name)) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "module.has() name length is invalid");
+    }
     jerry_string_to_buffer(args[0], JERRY_ENCODING_UTF8,
                            (jerry_char_t *)name, length);
+    if (memchr(name, '\0', length) != NULL) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "module.has() name contains a null byte");
+    }
     name[length] = '\0';
     return jerry_boolean(mcujs_runtime_has_module(name));
 }
@@ -612,10 +622,21 @@ static jerry_value_t module_has_handler(const jerry_call_info_t *call_info,
 static jerry_value_t create_module_module(void) {
     jerry_value_t module = jerry_object();
     jerry_value_t list = create_builtin_modules_list();
-    jerry_value_t key = jerry_string_sz("builtinModules");
-    set_property_value(module, key, list);
-    jerry_value_free(key);
+    jerry_value_t result = js_deep_freeze(list);
+    if (jerry_value_is_exception(result)) {
+        jerry_value_free(list);
+        jerry_value_free(module);
+        return result;
+    }
+    jerry_value_free(result);
+
+    result = js_define_immutable_property(module, "builtinModules", list);
     jerry_value_free(list);
+    if (jerry_value_is_exception(result) || !jerry_value_is_true(result)) {
+        jerry_value_free(module);
+        return result;
+    }
+    jerry_value_free(result);
     js_set_function(module, "has", module_has_handler);
     return module;
 }

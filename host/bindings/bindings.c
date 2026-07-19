@@ -64,6 +64,77 @@ void js_register_global(const char *name, jerry_value_t object) {
     jerry_value_free(global);
 }
 
+static jerry_value_t js_freeze_object(jerry_value_t object) {
+    jerry_value_t global = jerry_current_realm();
+    jerry_value_t object_constructor = jerry_object_get_sz(global, "Object");
+    jerry_value_free(global);
+    if (jerry_value_is_exception(object_constructor)) return object_constructor;
+
+    jerry_value_t freeze = jerry_object_get_sz(object_constructor, "freeze");
+    if (jerry_value_is_exception(freeze)) {
+        jerry_value_free(object_constructor);
+        return freeze;
+    }
+
+    jerry_value_t result = jerry_call(freeze, object_constructor, &object, 1);
+    jerry_value_free(freeze);
+    jerry_value_free(object_constructor);
+    return result;
+}
+
+jerry_value_t js_deep_freeze(jerry_value_t value) {
+    if (!jerry_value_is_object(value)) return jerry_undefined();
+
+    jerry_value_t keys = jerry_object_keys(value);
+    if (jerry_value_is_exception(keys)) return keys;
+
+    jerry_length_t length = jerry_array_length(keys);
+    for (jerry_length_t i = 0; i < length; i++) {
+        jerry_value_t key = jerry_object_get_index(keys, i);
+        if (jerry_value_is_exception(key)) {
+            jerry_value_free(keys);
+            return key;
+        }
+
+        jerry_value_t child = jerry_object_get(value, key);
+        jerry_value_free(key);
+        if (jerry_value_is_exception(child)) {
+            jerry_value_free(keys);
+            return child;
+        }
+
+        jerry_value_t frozen = js_deep_freeze(child);
+        jerry_value_free(child);
+        if (jerry_value_is_exception(frozen)) {
+            jerry_value_free(keys);
+            return frozen;
+        }
+        jerry_value_free(frozen);
+    }
+    jerry_value_free(keys);
+
+    return js_freeze_object(value);
+}
+
+jerry_value_t js_define_immutable_property(jerry_value_t object,
+                                           const char *name,
+                                           jerry_value_t value) {
+    jerry_value_t key = jerry_string_sz(name);
+    jerry_property_descriptor_t descriptor = jerry_property_descriptor();
+    descriptor.flags |= JERRY_PROP_IS_VALUE_DEFINED |
+                        JERRY_PROP_IS_WRITABLE_DEFINED |
+                        JERRY_PROP_IS_ENUMERABLE_DEFINED |
+                        JERRY_PROP_IS_ENUMERABLE |
+                        JERRY_PROP_IS_CONFIGURABLE_DEFINED |
+                        JERRY_PROP_SHOULD_THROW;
+    descriptor.value = jerry_value_copy(value);
+
+    jerry_value_t result = jerry_object_define_own_prop(object, key, &descriptor);
+    jerry_property_descriptor_free(&descriptor);
+    jerry_value_free(key);
+    return result;
+}
+
 /*
  * Helper: Get a number argument with default value
  */

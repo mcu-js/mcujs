@@ -18,5 +18,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch pinned JerryScript test dependency
+        run: |
+          git init "${RUNNER_TEMP}/jerryscript"
+          git -C "${RUNNER_TEMP}/jerryscript" remote add origin https://github.com/pando-project/jerryscript.git
+          git -C "${RUNNER_TEMP}/jerryscript" fetch --depth 1 origin 50200152feb724a74a5f64e44d7885151537cfad
+          git -C "${RUNNER_TEMP}/jerryscript" checkout --detach FETCH_HEAD
+
       - name: Verify release metadata and scripts
+        env:
+          JERRYSCRIPT_PATH: ${{ runner.temp }}/jerryscript
         run: scripts/verify-release.sh

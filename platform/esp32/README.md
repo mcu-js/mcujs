@@ -152,7 +152,7 @@ const config = require('/config.json');
 The XIAO build exposes these native modules:
 
 ```text
-fs, process, gpio, pwm, i2c, spi, adc, neopixel, mcujs:module, node:module
+board, fs, process, gpio, pwm, i2c, spi, adc, neopixel, mcujs:module, node:module
 ```
 
 `require('mcujs:module').builtinModules` and `.help` are generated from the

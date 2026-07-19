@@ -22,6 +22,22 @@ static jerry_value_t parse_json(const char *json) {
                             (jerry_size_t)strlen(json));
 }
 
+static bool freeze_and_publish(jerry_value_t object, const char *name,
+                               jerry_value_t value) {
+    jerry_value_t result = js_deep_freeze(value);
+    if (jerry_value_is_exception(result)) {
+        jerry_value_free(result);
+        return false;
+    }
+    jerry_value_free(result);
+
+    result = js_define_immutable_property(object, name, value);
+    bool success = !jerry_value_is_exception(result) &&
+                   jerry_value_is_true(result);
+    jerry_value_free(result);
+    return success;
+}
+
 static jerry_value_t board_capability_handler(const jerry_call_info_t *call_info,
                                                const jerry_value_t args[],
                                                jerry_length_t argc) {
@@ -102,10 +118,18 @@ bool js_board_apply_registry(jerry_value_t board,
     jerry_value_t pins = object_get(identity, "pins");
     jerry_value_t devices = object_get(identity, "devices");
 
-    js_set_property(board, "apiVersion", api_version);
-    js_set_property(board, "exposedPins", exposed_pins);
-    js_set_property(board, "pins", pins);
-    js_set_property(board, "devices", devices);
+    bool published = freeze_and_publish(board, "apiVersion", api_version) &&
+                     freeze_and_publish(board, "exposedPins", exposed_pins) &&
+                     freeze_and_publish(board, "pins", pins) &&
+                     freeze_and_publish(board, "devices", devices);
+    if (!published) {
+        jerry_value_free(devices);
+        jerry_value_free(pins);
+        jerry_value_free(exposed_pins);
+        jerry_value_free(api_version);
+        jerry_value_free(identity);
+        return false;
+    }
     js_set_function(board, "capability", board_capability_handler);
     js_set_function(board, "capabilities", board_capabilities_handler);
 

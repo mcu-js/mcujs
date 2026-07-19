@@ -20,17 +20,14 @@ compile_repl_test() {
         -I"${ROOT}/platform/esp32/main" \
         "${ROOT}/tests/repl_input_test.c" \
         "${ROOT}/src/repl.c" \
+        "${ROOT}/host/runtime_registry.c" \
         -o "${output}"
 }
 
-compile_repl_test "${BINARY_RP}"
+compile_repl_test "${BINARY_RP}" -DMCUJS_BOARD_PICO=1
 "${BINARY_RP}"
 
 compile_repl_test "${BINARY_ESP}" \
     -DMCUJS_PLATFORM_ESP32=1 \
-    -DMCUJS_FEATURE_IMAGE=0 \
-    -DMCUJS_FEATURE_KEYBOARD=0 \
-    -DMCUJS_FEATURE_MOUSE=0 \
-    -DMCUJS_FEATURE_GRAPHICS=0 \
-    -DMCUJS_FEATURE_SCREEN=0
+    -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1
 "${BINARY_ESP}"

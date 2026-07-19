@@ -30,7 +30,9 @@ set(MCUJS_SOURCES
     bindings/timers.c
     ${MCUJS_ROOT}/host/engine.c
     ${MCUJS_ROOT}/host/module_loader.c
+    ${MCUJS_ROOT}/host/runtime_registry.c
     ${MCUJS_ROOT}/host/bindings/bindings.c
+    ${MCUJS_ROOT}/host/bindings/board_registry.c
     ${MCUJS_ROOT}/host/bindings/console.c
     ${MCUJS_ROOT}/host/bindings/fs.c
     ${MCUJS_ROOT}/host/bindings/require.c
@@ -110,25 +112,8 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MCUJS_VERSION="${MCUJS_VERSION}"
     MCUJS_BUILD_ID="${MCUJS_BUILD_ID}"
     MCUJS_BOARD="seeed_xiao_esp32s3"
+    MCUJS_BOARD_SEEED_XIAO_ESP32S3=1
     MCUJS_PLATFORM_NAME="esp32"
     MCUJS_PLATFORM_ESP32=1
     JERRYSCRIPT_VERSION="3.0.0"
-    MCUJS_FEATURE_MODULE_LOADER=1
-    MCUJS_FEATURE_CONSOLE=1
-    MCUJS_FEATURE_TIMERS=1
-    MCUJS_FEATURE_BOARD=1
-    MCUJS_FEATURE_GPIO=1
-    MCUJS_FEATURE_PWM=1
-    MCUJS_FEATURE_I2C=1
-    MCUJS_FEATURE_SPI=1
-    MCUJS_FEATURE_ADC=1
-    MCUJS_FEATURE_NEOPIXEL=1
-    MCUJS_FEATURE_PROCESS=1
-    MCUJS_FEATURE_REQUIRE=1
-    MCUJS_FEATURE_FS=1
-    MCUJS_FEATURE_IMAGE=0
-    MCUJS_FEATURE_KEYBOARD=0
-    MCUJS_FEATURE_MOUSE=0
-    MCUJS_FEATURE_GRAPHICS=0
-    MCUJS_FEATURE_SCREEN=0
 )

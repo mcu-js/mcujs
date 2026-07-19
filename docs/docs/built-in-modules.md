@@ -4,7 +4,26 @@ sidebar_position: 6
 
 # Built-in Modules
 
-These modules are available with `require()` out of the box. Acronyms are explained in the [Glossary](./glossary.md).
+These modules are available with `require()` out of the box when the selected
+firmware enables them. `require('mcujs:module').builtinModules`,
+`require('mcujs:module').has(name)`, `.help`, and `board.capability(name)` all
+come from the same board registry. Acronyms are explained in the
+[Glossary](./glossary.md).
+
+```javascript
+const boardApi = require('board');
+const modules = require('mcujs:module');
+
+if (modules.has('spi')) {
+  const spi = require('spi');
+  const limits = boardApi.capability('spi');
+  console.log(limits.defaultRoute, limits.maxTransferBytes);
+}
+```
+
+Do not branch on `board.name` to select an API. An unavailable module is absent;
+a present module throws a typed error when a requested route is invalid or a
+live resource is busy.
 
 ## Core modules
 
@@ -23,6 +42,10 @@ These modules are available with `require()` out of the box. Acronyms are explai
 - `neopixel` for WS2812 LEDs ([NeoPixel](./glossary.md#neopixel))
 - `keyboard` for USB HID keyboard emulation
 - `mouse` for USB HID mouse emulation
+
+External-driver support and onboard hardware are separate. For example, every
+current target can enable the external `neopixel` module even when
+`board.devices.neopixel` is absent.
 
 ## Example usage
 

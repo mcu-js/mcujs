@@ -1,0 +1,307 @@
+{
+  "formatVersion": 1,
+  "apiVersion": "0.2",
+  "board": {
+    "name": "seeed_xiao_esp32s3",
+    "chip": "ESP32-S3",
+    "firmwareVersion": "0.1.0",
+    "exposedPins": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      21
+    ],
+    "pins": {
+      "D0": 1,
+      "D1": 2,
+      "D2": 3,
+      "D3": 4,
+      "D4": 5,
+      "D5": 6,
+      "D8": 7,
+      "D9": 8,
+      "D10": 9,
+      "A0": 1,
+      "A1": 2,
+      "A2": 3,
+      "A3": 4,
+      "A4": 5,
+      "A5": 6,
+      "A6": 7,
+      "A7": 8,
+      "A8": 9,
+      "SDA": 5,
+      "SCL": 6,
+      "SCK": 7,
+      "MISO": 8,
+      "MOSI": 9,
+      "LED": 21
+    },
+    "devices": {
+      "led": {
+        "type": "gpio",
+        "pin": 21,
+        "activeLow": true
+      }
+    }
+  },
+  "capabilities": {
+    "gpio": {
+      "pins": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        21
+      ],
+      "outputPins": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        21
+      ],
+      "modes": [
+        "input",
+        "output",
+        "inputPullup",
+        "inputPulldown"
+      ]
+    },
+    "pwm": {
+      "pins": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "maxOutputs": 8,
+      "timerCount": 4,
+      "duty": {
+        "min": 0,
+        "max": 1,
+        "unit": "ratio"
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 1000000,
+        "resolutionVaries": true
+      }
+    },
+    "adc": {
+      "resolutionBits": 12,
+      "pins": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "channels": [
+        {
+          "channel": 0,
+          "pin": 1,
+          "aliases": [
+            "A0"
+          ]
+        },
+        {
+          "channel": 1,
+          "pin": 2,
+          "aliases": [
+            "A1"
+          ]
+        },
+        {
+          "channel": 2,
+          "pin": 3,
+          "aliases": [
+            "A2"
+          ]
+        },
+        {
+          "channel": 3,
+          "pin": 4,
+          "aliases": [
+            "A3"
+          ]
+        },
+        {
+          "channel": 4,
+          "pin": 5,
+          "aliases": [
+            "A4"
+          ]
+        },
+        {
+          "channel": 5,
+          "pin": 6,
+          "aliases": [
+            "A5"
+          ]
+        },
+        {
+          "channel": 6,
+          "pin": 7,
+          "aliases": [
+            "A6"
+          ]
+        },
+        {
+          "channel": 7,
+          "pin": 8,
+          "aliases": [
+            "A7"
+          ]
+        },
+        {
+          "channel": 8,
+          "pin": 9,
+          "aliases": [
+            "A8"
+          ]
+        }
+      ],
+      "voltage": {
+        "supported": true,
+        "calibrated": true,
+        "minVolts": 0,
+        "maxVolts": 3.3
+      },
+      "temperature": {
+        "supported": true,
+        "rawChannel": false
+      },
+      "vsys": false
+    },
+    "boot": {
+      "safeMode": true
+    },
+    "i2c": {
+      "buses": [
+        0,
+        1
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sda": 5,
+          "scl": 6
+        },
+        {
+          "bus": 1,
+          "sda": 3,
+          "scl": 4
+        }
+      ],
+      "defaultBus": 0,
+      "defaultRoute": {
+        "bus": 0,
+        "sda": 5,
+        "scl": 6
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 1000000
+      },
+      "maxTransferBytes": 256
+    },
+    "spi": {
+      "buses": [
+        0,
+        1
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sck": 7,
+          "mosi": 9,
+          "miso": 8
+        },
+        {
+          "bus": 1,
+          "sck": 4,
+          "mosi": 6,
+          "miso": 5
+        }
+      ],
+      "defaultBus": 0,
+      "defaultRoute": {
+        "bus": 0,
+        "sck": 7,
+        "mosi": 9,
+        "miso": 8
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 40000000
+      },
+      "maxTransferBytes": 64,
+      "modes": [
+        0
+      ],
+      "bitsPerWord": [
+        8
+      ],
+      "bitOrders": [
+        "msb"
+      ],
+      "fullDuplex": true,
+      "dma": false
+    },
+    "neopixel": {
+      "pins": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "maxLength": 256,
+      "orders": [
+        "RGB",
+        "GRB"
+      ]
+    },
+    "fs": {
+      "implementation": "fat",
+      "writable": true,
+      "hostTransfer": true
+    },
+    "usb": {
+      "classes": [
+        "cdc",
+        "msc"
+      ]
+    }
+  }
+}

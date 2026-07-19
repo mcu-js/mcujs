@@ -1,0 +1,278 @@
+{
+  "formatVersion": 1,
+  "apiVersion": "0.2",
+  "board": {
+    "name": "waveshare_rp2040_pizero",
+    "chip": "RP2040",
+    "firmwareVersion": "0.1.0",
+    "exposedPins": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21
+    ],
+    "pins": {
+      "D0": 0,
+      "D1": 1,
+      "D2": 2,
+      "D3": 3,
+      "D4": 4,
+      "D5": 5,
+      "D6": 6,
+      "D7": 7,
+      "D8": 8,
+      "D9": 9,
+      "D10": 10,
+      "D11": 11,
+      "D12": 12,
+      "D13": 13,
+      "D14": 14,
+      "D15": 15,
+      "D16": 16,
+      "D17": 17,
+      "D18": 18,
+      "D19": 19,
+      "D20": 20,
+      "D21": 21,
+      "SDA": 2,
+      "SCL": 3,
+      "SCK": 18,
+      "MOSI": 19,
+      "MISO": 16
+    },
+    "devices": {}
+  },
+  "capabilities": {
+    "gpio": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "outputPins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "modes": [
+        "input",
+        "output",
+        "inputPullup",
+        "inputPulldown"
+      ]
+    },
+    "pwm": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "maxOutputs": 16,
+      "timerCount": 8,
+      "duty": {
+        "min": 0,
+        "max": 1,
+        "unit": "ratio"
+      },
+      "frequency": {
+        "minHz": 8,
+        "maxHz": 1907,
+        "resolutionVaries": false
+      }
+    },
+    "fs": {
+      "implementation": "fat",
+      "writable": true,
+      "hostTransfer": true
+    },
+    "usb": {
+      "classes": [
+        "cdc",
+        "msc",
+        "keyboardHid",
+        "mouseHid"
+      ]
+    },
+    "i2c": {
+      "buses": [
+        0,
+        1
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sda": 0,
+          "scl": 1
+        },
+        {
+          "bus": 1,
+          "sda": 2,
+          "scl": 3
+        }
+      ],
+      "defaultBus": 1,
+      "defaultRoute": {
+        "bus": 1,
+        "sda": 2,
+        "scl": 3
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 1000000
+      },
+      "maxTransferBytes": 256
+    },
+    "spi": {
+      "buses": [
+        0,
+        1
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sck": 18,
+          "mosi": 19,
+          "miso": 16
+        },
+        {
+          "bus": 1,
+          "sck": 10,
+          "mosi": 11,
+          "miso": 12
+        }
+      ],
+      "defaultBus": 0,
+      "defaultRoute": {
+        "bus": 0,
+        "sck": 18,
+        "mosi": 19,
+        "miso": 16
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 62500000
+      },
+      "maxTransferBytes": 256,
+      "modes": [
+        0
+      ],
+      "bitsPerWord": [
+        8
+      ],
+      "bitOrders": [
+        "msb"
+      ],
+      "fullDuplex": true,
+      "dma": true,
+      "compatibilityExtensions": [
+        "writeBufferDMA"
+      ]
+    },
+    "neopixel": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "maxLength": 256,
+      "orders": [
+        "RGB",
+        "GRB"
+      ]
+    }
+  }
+}

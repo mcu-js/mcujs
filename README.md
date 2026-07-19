@@ -1,12 +1,13 @@
 # mcujs
 
-A JavaScript runtime for RP2040 and RP2350 microcontrollers, in the same spirit as Node.js for servers.
+A JavaScript runtime for microcontrollers, currently shipping for RP2040,
+RP2350, and ESP32-S3 boards, in the same spirit as Node.js for servers.
 
 Docs: https://mcujs.org/
 
 ## Features
 
-- **USB Flash Drive**: Mount your Pico as a USB drive and drop in your `index.js`
+- **USB Flash Drive**: Mount your board as a USB drive and drop in your `index.js`
 - **Serial REPL**: Interactive JavaScript console over USB serial
 - **Hardware APIs**: GPIO, PWM, I2C, SPI, ADC, and NeoPixel
 - **CommonJS Modules**: Use `require()` for modular code with `/lib/` module resolution
@@ -14,7 +15,7 @@ Docs: https://mcujs.org/
 
 ## Supported Boards
 
-Run `scripts/boards.sh --table` for the release board list. Current board IDs are:
+Current release board IDs are:
 
 - `pico`
 - `pico2`
@@ -25,40 +26,70 @@ Run `scripts/boards.sh --table` for the release board list. Current board IDs ar
 - `waveshare_rp2350_lcd_1.47_a`
 - `waveshare_rp2350_touch_lcd_1.69`
 - `adafruit_feather_rp2040`
+- `seeed_xiao_esp32s3`
 
 ## Quick Start
 
-1. Download the latest `.uf2` file for your board from [Releases](https://github.com/mcu-js/mcujs/releases)
-2. Hold BOOTSEL and connect your board via USB
-3. Drag the `.uf2` file to the `RPI-RP2` drive on RP2040 boards or the `RP2350` drive on RP2350 boards
-4. The board will reboot and appear as a USB drive named "MCUJS"
-5. Create an `index.js` file on the drive:
+Download the latest `.uf2` file for your board from
+[Releases](https://github.com/mcu-js/mcujs/releases), then follow the matching
+update flow.
+
+### RP2040 and RP2350 install or update
+
+1. Hold **BOOTSEL** and connect the board via USB.
+2. Copy the `.uf2` to the `RPI-RP2` drive on RP2040 boards or the `RP2350`
+   drive on RP2350 boards.
+3. The board reboots and appears as a USB drive named `MCUJS`.
+
+### XIAO ESP32-S3 update
+
+The release UF2 is application-only and requires an existing compatible TinyUF2
+baseline. Initial provisioning or recovery is an engineering operation; follow
+the preservation requirements in
+[`platform/esp32/README.md`](platform/esp32/README.md) instead of attempting a
+full flash.
+
+1. In the running MCU.js CDC REPL, enter `board.enterUf2()`.
+2. Wait for the `XIAOS3BOOT` drive, then copy
+   `mcujs-<version>-seeed_xiao_esp32s3.uf2` to it.
+3. The board reboots and appears as a USB drive named `MCUJS`.
+
+### Run JavaScript
+
+Create an `index.js` file on the `MCUJS` drive. This portable example uses the
+declared onboard-device API rather than a board-specific GPIO number:
 
 ```javascript
-// Blink the onboard LED
-const LED = 25;
+const board = require('board');
 
-GPIO.init(LED, GPIO.OUTPUT);
+if (!board.devices.led) {
+    console.log('This board has no onboard LED');
+} else {
+    let ledOn = false;
+    board.led(ledOn);
 
-setInterval(() => {
-    GPIO.toggle(LED);
-}, 500);
+    setInterval(() => {
+        ledOn = !ledOn;
+        board.led(ledOn);
+    }, 500);
 
-console.log('Blinking!');
+    console.log('Blinking!');
+}
 ```
 
-6. Reset the board - your code runs automatically!
+Eject the drive, then reset the board. Your code runs automatically.
 
 ## Serial REPL
 
-Connect to the Pico's serial port (115200 baud) for an interactive JavaScript console:
+Connect to the board's serial port (115200 baud) for an interactive JavaScript
+console. For example, on a Pico:
 
 ```
 mcujs v0.1.0 on pico
 > console.log('Hello!')
 Hello!
 undefined
-> GPIO.set(25, true)
+> board.led(true)
 undefined
 > 2 + 2
 4
@@ -90,7 +121,10 @@ The `.info` command includes the current build ID (version + git SHA).
 ### Safe Mode
 
 
-Hold the **BOOTSEL** button during power-on to skip `index.js` auto-run. This allows recovery from scripts with infinite loops without reflashing.
+On RP2040 and RP2350 boards, hold **BOOTSEL** during power-on to skip
+`index.js` auto-run. The XIAO ESP32-S3 records failed boot scripts and enters
+persistent safe mode on the next reset; see its
+[recovery documentation](platform/esp32/README.md#indexjs-and-persistent-safe-mode).
 
 `index.js` runs immediately on boot; the REPL banner prints the first time a CDC serial connection is opened.
 
@@ -315,14 +349,14 @@ Files written from JavaScript are always persisted to flash immediately - they w
 
 Output files are written to `build/` as `mcujs-<version>-<board>.uf2`.
 
-### Experimental ESP32-S3 Headless Build
+### XIAO ESP32-S3 Release Build
 
-The Milestone 2 XIAO ESP32-S3 backend uses pinned ESP-IDF 5.3.2 and fixed USB
-Serial/JTAG. It is intentionally not part of the release board matrix yet.
+The Seeed Studio XIAO ESP32-S3 is part of the mandatory release board matrix.
+Build its application-only UF2 and capability manifest with the pinned ESP-IDF
+5.3.2 Docker lane:
 
 ```bash
-platform/esp32/build.sh build
-platform/esp32/make-uf2.py
+platform/esp32/docker-build.sh
 ```
 
 See [`platform/esp32/README.md`](platform/esp32/README.md) for dependency pins,
@@ -363,6 +397,7 @@ make -j$(nproc)
 | `waveshare_rp2350_lcd_1.47_a` | Waveshare RP2350-LCD-1.47-A | RP2350 | 16MB | LCD, NeoPixel |
 | `waveshare_rp2350_touch_lcd_1.69` | Waveshare RP2350-Touch-LCD-1.69 | RP2350 | 16MB | LCD, touch, IMU, buzzer |
 | `adafruit_feather_rp2040` | Adafruit Feather RP2040 | RP2040 | 8MB | NeoPixel, STEMMA QT |
+| `seeed_xiao_esp32s3` | Seeed Studio XIAO ESP32-S3 | ESP32-S3 | 8MB | Native USB, onboard LED |
 
 ## Architecture
 

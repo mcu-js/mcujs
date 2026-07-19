@@ -8,6 +8,12 @@ BUILD_ABS="${ESP_ROOT}/build-docker"
 PLATFORM=linux/amd64
 VERSION="$(tr -d '[:space:]' < "${ROOT}/version.txt")"
 UF2_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.uf2"
+CAPABILITY_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.capabilities.json"
+GIT_SHA="$(git -C "${ROOT}" rev-parse --short HEAD)"
+if [[ ! "${GIT_SHA}" =~ ^[0-9a-f]{7,40}$ ]]; then
+    printf 'Could not determine a valid source Git SHA for Docker build identity.\n' >&2
+    exit 1
+fi
 
 usage() {
     cat <<'EOF'
@@ -43,6 +49,7 @@ ARTIFACTS=(
     "${UF2_NAME}"
     mcujs-esp32s3.elf
     mcujs-esp32s3.map
+    "${CAPABILITY_NAME}"
 )
 declare -A CLEANUP_SEEN=()
 CLEANUP_PATHS=()
@@ -58,6 +65,9 @@ for artifact in "${ARTIFACTS[@]}" mcujs-esp32s3.uf2; do
 done
 shopt -s nullglob
 for artifact_path in "${BUILD_ABS}"/mcujs-*-seeed_xiao_esp32s3.uf2; do
+    add_cleanup_path "${artifact_path}"
+done
+for artifact_path in "${BUILD_ABS}"/mcujs-*-seeed_xiao_esp32s3.capabilities.json; do
     add_cleanup_path "${artifact_path}"
 done
 shopt -u nullglob
@@ -107,6 +117,7 @@ docker run --rm --init \
     --network none \
     -u "$(id -u):$(id -g)" \
     -e HOME=/tmp/mcujs-home \
+    -e MCUJS_BUILD_GIT_SHA="${GIT_SHA}" \
     -v "${ROOT}:/source:ro" \
     -v "${BUILD_ABS}:/output" \
     "${IMAGE}" build

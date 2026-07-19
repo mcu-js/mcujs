@@ -4,6 +4,7 @@
 #include "fs.h"
 #include "board.h"
 #include "runtime_features.h"
+#include "runtime_registry.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -223,6 +224,7 @@ static void test_help_matches_build_features(void) {
     feed_bytes(".help\r");
     assert(strstr(s_output, "uniqueId()") != NULL);
     assert(strstr(s_output, " led, ids") == NULL);
+    assert(strstr(s_output, "require('board')") != NULL);
     assert(strstr(s_output, "require('fs')") != NULL);
     assert(strstr(s_output, "require('gpio')") != NULL);
     assert(strstr(s_output, "require('mcujs:module')") != NULL);
@@ -247,10 +249,65 @@ static void test_help_matches_build_features(void) {
 #else
     assert(strstr(s_output, "require('adc')") == NULL);
 #endif
-#ifdef MCUJS_PLATFORM_ESP32
+#if MCUJS_REGISTRY_SAFE_MODE && MCUJS_REGISTRY_STORAGE_READY
     assert(strstr(s_output, "safeMode(), storageReady()") != NULL);
+#elif MCUJS_REGISTRY_SAFE_MODE
+    assert(strstr(s_output, "board recovery method: safeMode()") != NULL);
+    assert(strstr(s_output, "storageReady()") == NULL);
+#elif MCUJS_REGISTRY_STORAGE_READY
+    assert(strstr(s_output, "safeMode()") == NULL);
+    assert(strstr(s_output, "board storage method: storageReady()") != NULL);
 #else
     assert(strstr(s_output, "safeMode(), storageReady()") == NULL);
+#endif
+}
+
+static void test_capability_discovery_uses_registry(void) {
+    reset_io();
+    repl_init();
+    feed_bytes(".capabilities\r");
+    assert(strstr(s_output, "Board: ") != NULL);
+    assert(strstr(s_output, "Modules: board fs process gpio") != NULL);
+
+    reset_io();
+    repl_init();
+    feed_bytes(".capabilities spi\r");
+    const mcujs_runtime_capability_t *spi = mcujs_runtime_find_capability("spi");
+    assert(spi != NULL);
+    assert(s_exec_count == 0);
+    assert(strstr(s_output, spi->json) != NULL);
+
+    reset_io();
+    repl_init();
+    feed_bytes(".capabilities spi');board.reset();//\r");
+    assert(s_exec_count == 0);
+    assert(s_executed[0] == '\0');
+    assert(strstr(s_output, "Invalid capability name.\r\n") != NULL);
+
+    reset_io();
+    repl_init();
+    feed_bytes(".capabilities aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r");
+    assert(s_exec_count == 0);
+    assert(s_executed[0] == '\0');
+    assert(strstr(s_output, "Invalid capability name.\r\n") != NULL);
+}
+
+static void test_largest_capability_is_complete_and_crlf_framed(void) {
+#if defined(MCUJS_BOARD_SEEED_XIAO_ESP32S3)
+    const mcujs_runtime_capability_t *adc = mcujs_runtime_find_capability("adc");
+    assert(adc != NULL);
+    assert(strlen(adc->json) == 552);
+
+    reset_io();
+    repl_init();
+    feed_bytes(".capabilities adc\r");
+
+    char expected[8192];
+    int written = snprintf(expected, sizeof(expected),
+                           "> .capabilities adc\r\n%s\r\n> ", adc->json);
+    assert(written > 0 && (size_t)written < sizeof(expected));
+    assert(strcmp(s_output, expected) == 0);
+    assert(s_exec_count == 0);
 #endif
 }
 
@@ -272,6 +329,8 @@ int main(void) {
     test_usb_reconnect_redraws_prompt();
     test_info_reports_host_ownership();
     test_help_matches_build_features();
+    test_capability_discovery_uses_registry();
+    test_largest_capability_is_complete_and_crlf_framed();
     test_ls_hides_dot_entries();
     puts("REPL input tests passed");
     return 0;

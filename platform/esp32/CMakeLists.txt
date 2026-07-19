@@ -3,17 +3,25 @@ cmake_minimum_required(VERSION 3.16)
 get_filename_component(MCUJS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
 file(READ "${MCUJS_ROOT}/version.txt" MCUJS_VERSION)
 string(STRIP "${MCUJS_VERSION}" MCUJS_VERSION)
-execute_process(
-    COMMAND git rev-parse --short HEAD
-    WORKING_DIRECTORY "${MCUJS_ROOT}"
-    OUTPUT_VARIABLE MCUJS_GIT_SHA
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-)
+# A Docker snapshot of a linked worktree cannot resolve its external .git file,
+# so the non-flashing container lane passes the already-validated source SHA.
+set(MCUJS_GIT_SHA "$ENV{MCUJS_BUILD_GIT_SHA}")
+if(NOT MCUJS_GIT_SHA)
+    execute_process(
+        COMMAND git rev-parse --short HEAD
+        WORKING_DIRECTORY "${MCUJS_ROOT}"
+        OUTPUT_VARIABLE MCUJS_GIT_SHA
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+endif()
 if(NOT MCUJS_GIT_SHA)
     set(MCUJS_GIT_SHA "unknown")
 endif()
 set(MCUJS_BUILD_ID "${MCUJS_VERSION}+${MCUJS_GIT_SHA}")
+# Keep ESP-IDF's application descriptor independent of Git worktree shape and
+# aligned with the build identity printed by the runtime.
+set(PROJECT_VER "${MCUJS_BUILD_ID}")
 
 if(DEFINED IDF_TARGET AND NOT IDF_TARGET STREQUAL "esp32s3")
     message(FATAL_ERROR "The Milestone 2 backend supports only IDF_TARGET=esp32s3")

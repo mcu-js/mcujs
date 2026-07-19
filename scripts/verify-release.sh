@@ -26,6 +26,7 @@ Checks:
   - public docs mention every release board ID
   - contributor and release docs share the development/release policy
   - MCU.js 0.2 portable API schema and docs remain consistent
+  - generated runtime registry, manifests, and full/constrained native maps agree
   - shell entrypoints parse cleanly
 EOF
 }
@@ -128,7 +129,7 @@ check_docs_board_coverage() {
     local doc="${ROOT_DIR}/docs/docs/hardware-boards.md"
     local board
     require_file "${doc}"
-    for board in "${MCUJS_BOARDS[@]}"; do
+    for board in "${MCUJS_RELEASE_BOARDS[@]}"; do
         if ! grep -Fq "\`${board}\`" "${doc}"; then
             fail "hardware board docs do not mention ${board}"
         fi
@@ -179,6 +180,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/package-release.sh"
         "${ROOT_DIR}/scripts/release.sh"
         "${ROOT_DIR}/scripts/test-repl.sh"
+        "${ROOT_DIR}/scripts/test-runtime-registry.sh"
         "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"
         "${ROOT_DIR}/platform/esp32/build.sh"
@@ -221,6 +223,18 @@ check_api_schema() {
     pass 'MCU.js 0.2 portable API schema and docs are consistent'
 }
 
+check_runtime_registry() {
+    node "${ROOT_DIR}/scripts/generate-runtime-registry.js" --check
+    node --test "${ROOT_DIR}/tests/runtime-registry.test.js"
+    "${ROOT_DIR}/scripts/test-runtime-registry.sh"
+    pass 'runtime registry and full/constrained native maps are consistent'
+}
+
+check_release_artifacts() {
+    node --test "${ROOT_DIR}/tests/release-artifacts.test.js"
+    pass 'release orchestration and XIAO artifact freshness checks passed'
+}
+
 check_platform_boundaries() {
     "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
     pass 'platform boundary checks passed'
@@ -246,6 +260,8 @@ check_shell_syntax
 check_repl_input
 check_python_syntax
 check_api_schema
+check_runtime_registry
+check_release_artifacts
 check_platform_boundaries
 check_docs_build
 

@@ -1,6 +1,7 @@
 /* MCU.js board binding for Seeed XIAO ESP32-S3. */
 
 #include "bindings.h"
+#include "runtime_features.h"
 #include "board_config.h"
 #include "boot.h"
 #include "jerryscript.h"
@@ -132,9 +133,13 @@ void js_bind_board(void) {
     js_set_function(board, "millis", board_millis);
     js_set_function(board, "delay", board_delay);
     js_set_function(board, "enterUf2", board_enter_uf2);
-    js_set_function(board, "safeMode", board_safe_mode);
-    js_set_function(board, "storageReady", board_storage_ready);
+#if MCUJS_REGISTRY_ONBOARD_LED
     js_set_function(board, "led", board_led);
+#endif
+    if (!js_board_apply_registry(board, board_safe_mode, board_storage_ready)) {
+        jerry_value_free(board);
+        return;
+    }
     js_register_global("board", board);
     jerry_value_free(board);
 }

@@ -1,0 +1,191 @@
+const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
+const { readFileSync } = require("node:fs");
+const { join } = require("node:path");
+const test = require("node:test");
+
+const root = join(__dirname, "..");
+const {
+  boardDescriptors,
+  featureNames,
+  shippingBoardIds,
+  manifestFor,
+} = require("../runtime/board-registry.js");
+const {
+  generateRuntimeRegistryHeader,
+  generatedHeaderPath,
+} = require("../scripts/generate-runtime-registry.js");
+const {
+  validatePortableApiManifest,
+} = require("../scripts/validate-portable-api-manifest.js");
+
+const expectedBoards = [
+  "pico",
+  "pico2",
+  "pico2_w",
+  "waveshare_rp2040_zero",
+  "waveshare_rp2040_pizero",
+  "waveshare_rp2040_touch_lcd_1.28",
+  "waveshare_rp2350_lcd_1.47_a",
+  "waveshare_rp2350_touch_lcd_1.69",
+  "adafruit_feather_rp2040",
+  "seeed_xiao_esp32s3",
+];
+
+const moduleCapability = {
+  fs: "fs",
+  gpio: "gpio",
+  pwm: "pwm",
+  i2c: "i2c",
+  spi: "spi",
+  adc: "adc",
+  neopixel: "neopixel",
+};
+
+const capabilityGatedBoardExports = {
+  safeMode: (descriptor) => descriptor.capabilities.boot?.safeMode === true,
+  storageReady: (descriptor) => Object.hasOwn(descriptor.capabilities, "fs"),
+};
+
+test("all shipping boards have explicit, closed feature maps", () => {
+  assert.deepEqual(shippingBoardIds, expectedBoards);
+  assert.deepEqual(Object.keys(boardDescriptors), expectedBoards);
+
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    assert.equal(descriptor.board.name, boardId);
+    assert.deepEqual(
+      Object.keys(descriptor.features).sort(),
+      [...featureNames].sort(),
+      `${boardId} must explicitly select every firmware feature`,
+    );
+    for (const [name, enabled] of Object.entries(descriptor.features)) {
+      assert.equal(typeof enabled, "boolean", `${boardId}.${name}`);
+    }
+  }
+});
+
+test("release packaging covers every shipping capability descriptor", () => {
+  const releaseBoardIds = execFileSync(
+    "bash",
+    ["-c", `source "${join(root, "scripts/lib/boards.sh")}"; printf '%s\\n' "\${MCUJS_RELEASE_BOARDS[@]}"`],
+    { encoding: "utf8" },
+  ).trim().split("\n");
+  assert.deepEqual(releaseBoardIds, shippingBoardIds);
+});
+
+test("every descriptor produces a strict, semantically valid release manifest", () => {
+  for (const boardId of shippingBoardIds) {
+    const manifest = manifestFor(boardId);
+    const result = validatePortableApiManifest(manifest);
+    assert.equal(result.valid, true, `${boardId}: ${JSON.stringify(result.errors)}`);
+    assert.equal(manifest.board.name, boardId);
+    assert.equal(manifest.apiVersion, "0.2");
+    assert.equal("features" in manifest, false);
+  }
+});
+
+test("module availability, capabilities, and onboard inventory cannot contradict", () => {
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    const modules = new Set(descriptor.modules);
+    assert.ok(modules.has("board"));
+    assert.ok(modules.has("mcujs:module"));
+    assert.ok(modules.has("node:module"));
+
+    for (const [moduleName, capabilityName] of Object.entries(moduleCapability)) {
+      assert.equal(
+        modules.has(moduleName),
+        Object.hasOwn(descriptor.capabilities, capabilityName),
+        `${boardId}.${moduleName}`,
+      );
+    }
+    assert.equal(modules.has("process"), descriptor.features.process);
+    assert.equal(modules.has("image"), descriptor.features.image);
+    assert.equal(modules.has("keyboard"), descriptor.features.keyboard);
+    assert.equal(modules.has("mouse"), descriptor.features.mouse);
+
+    assert.equal(
+      Object.hasOwn(descriptor.board.devices, "neopixel"),
+      descriptor.features.onboardNeopixel,
+      `${boardId} onboard NeoPixel inventory`,
+    );
+    assert.equal(
+      Object.hasOwn(descriptor.board.devices, "led"),
+      descriptor.features.onboardLed,
+      `${boardId} onboard LED inventory`,
+    );
+  }
+});
+
+test("capability-gated board exports exactly match their advertised gates", () => {
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    for (const [exportName, gateAdvertised] of Object.entries(capabilityGatedBoardExports)) {
+      assert.equal(
+        descriptor.features[exportName],
+        gateAdvertised(descriptor),
+        `${boardId}.board.${exportName}`,
+      );
+    }
+  }
+});
+
+test("full and constrained feature maps remain intentionally different", () => {
+  const full = boardDescriptors.pico;
+  assert.equal(full.features.image, true);
+  assert.equal(full.features.keyboard, true);
+  assert.equal(full.features.mouse, true);
+  assert.deepEqual(full.capabilities.usb.classes, [
+    "cdc",
+    "msc",
+    "keyboardHid",
+    "mouseHid",
+  ]);
+
+  const constrained = boardDescriptors.seeed_xiao_esp32s3;
+  assert.equal(constrained.features.image, false);
+  assert.equal(constrained.features.keyboard, false);
+  assert.equal(constrained.features.mouse, false);
+  assert.equal(constrained.features.graphics, false);
+  assert.equal(constrained.features.screen, false);
+  assert.equal(constrained.features.onboardNeopixel, false);
+  assert.equal("neopixel" in constrained.board.devices, false);
+  assert.deepEqual(constrained.board.exposedPins, [1, 2, 3, 4, 5, 6, 7, 8, 9, 21]);
+  assert.deepEqual(constrained.capabilities.usb.classes, ["cdc", "msc"]);
+});
+
+test("XIAO ESP32-S3 pin aliases exactly match the exposed header", () => {
+  const xiao = boardDescriptors.seeed_xiao_esp32s3;
+  assert.deepEqual(xiao.board.pins, {
+    D0: 1, D1: 2, D2: 3, D3: 4, D4: 5, D5: 6,
+    D8: 7, D9: 8, D10: 9,
+    A0: 1, A1: 2, A2: 3, A3: 4, A4: 5, A5: 6, A6: 7, A7: 8, A8: 9,
+    SDA: 5, SCL: 6, SCK: 7, MISO: 8, MOSI: 9, LED: 21,
+  });
+  assert.equal(Object.hasOwn(xiao.board.pins, "D6"), false);
+  assert.equal(Object.hasOwn(xiao.board.pins, "D7"), false);
+  assert.equal(Object.hasOwn(xiao.board.pins, "D21"), false);
+});
+
+test("reserved implementation pins are absent from public RP maps", () => {
+  for (const boardId of ["pico", "pico2", "pico2_w"]) {
+    const pins = boardDescriptors[boardId].board.exposedPins;
+    assert.equal(pins.includes(23), false, `${boardId} internal SMPS pin`);
+    assert.equal(pins.includes(24), false, `${boardId} internal VBUS sense pin`);
+    assert.equal(pins.includes(29), false, `${boardId} internal VSYS/wireless pin`);
+  }
+
+  const piZero = boardDescriptors.waveshare_rp2040_pizero;
+  for (let pin = 22; pin <= 29; pin += 1) {
+    assert.equal(piZero.board.exposedPins.includes(pin), false, `DVI pin ${pin}`);
+  }
+  assert.equal(piZero.features.adc, false);
+  assert.equal("adc" in piZero.capabilities, false);
+});
+
+test("the checked-in C registry is generated exactly from board descriptors", () => {
+  const generated = generateRuntimeRegistryHeader();
+  const checkedIn = readFileSync(join(root, generatedHeaderPath), "utf8");
+  assert.equal(checkedIn, generated);
+});

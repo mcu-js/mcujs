@@ -60,13 +60,16 @@ bun run e2e
 
 ## Release build
 
-Use the release script to verify metadata, build every board from a clean CMake directory, and package deterministic release assets:
+Use the release script to verify metadata, build every RP board from a clean
+CMake directory, freshly build the XIAO ESP32-S3 with its pinned Docker lane,
+and package deterministic release assets:
 
 ```bash
 scripts/release.sh
 ```
 
-The package step writes:
+The package step preflights every source, rejects unsupported XIAO UF2 flags or
+an `ota_0` payload overrun, then privately stages and atomically replaces:
 
 - `dist/mcujs-<version>-<git-sha>/` with every UF2, `RELEASE_MANIFEST.txt`, and `SHA256SUMS.txt`
 - `dist/mcujs-<version>-<git-sha>.tar.gz`
@@ -77,6 +80,12 @@ If CI already built the UF2 files, package them without rebuilding:
 ```bash
 scripts/release.sh --skip-build
 ```
+
+`--no-docker` selects the local Pico toolchain only for RP boards; the XIAO
+release artifact always uses its pinned Docker lane. Even with `--skip-build`,
+packaging verifies that the XIAO UF2 matches its adjacent binary, embeds the
+current source build ID, and carries the generated capability manifest, so a
+stale image cannot be relabelled as the current release.
 
 ## Source verification
 

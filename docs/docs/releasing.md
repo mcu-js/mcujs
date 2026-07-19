@@ -35,7 +35,11 @@ scripts/verify-release.sh --docs
 scripts/release.sh
 ```
 
-The build writes board-qualified UF2 files plus checksums and a release manifest. See [Advanced: Building from Source](./advanced-building.md#release-build) for the artifact layout.
+The build uses the RP builder plus the pinned XIAO ESP32-S3 Docker lane, verifies
+the XIAO UF2 against its current build ID, binary payload, supported flashing
+flags, `ota_0` partition limit, and capability manifest, then privately stages
+and atomically replaces the board-qualified UF2 files, checksums, and release
+manifest. See [Advanced: Building from Source](./advanced-building.md#release-build) for the artifact layout.
 
 ## Physical QA and promotion
 

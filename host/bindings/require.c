@@ -23,6 +23,7 @@
 #include "bindings.h"
 #include "../module_loader.h"
 #include "../runtime_features.h"
+#include "../runtime_registry.h"
 #include "jerryscript.h"
 #include "fs.h"
 
@@ -86,8 +87,6 @@ static void set_property_value(jerry_value_t object, jerry_value_t property,
     jerry_value_free(result);
 }
 
-/* Forward declaration for module suggestions */
-static const char *s_builtin_module_names[];
 
 /* Module cache entry */
 typedef struct {
@@ -370,15 +369,17 @@ static jerry_value_t load_module(const char *resolved_path) {
         /* Search builtin modules for similar names */
         int best_dist = 3;  /* Max distance to suggest */
         const char *suggestion = NULL;
-        
-        for (int i = 0; s_builtin_module_names[i] != NULL; i++) {
+        const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
+
+        for (size_t i = 0; i < registry->builtin_module_count; i++) {
+            const char *module_name = registry->builtin_modules[i];
             /* Skip special module names with colons */
-            if (strchr(s_builtin_module_names[i], ':') != NULL) continue;
+            if (strchr(module_name, ':') != NULL) continue;
             
-            int dist = levenshtein(name_without_ext, s_builtin_module_names[i], best_dist);
+            int dist = levenshtein(name_without_ext, module_name, best_dist);
             if (dist < best_dist) {
                 best_dist = dist;
-                suggestion = s_builtin_module_names[i];
+                suggestion = module_name;
             }
         }
         
@@ -577,53 +578,14 @@ static jerry_value_t create_process_module(void) {
     return module;
 }
 
-static const char *s_builtin_module_names[] = {
-#if MCUJS_FEATURE_FS
-    "fs",
-#endif
-#if MCUJS_FEATURE_PROCESS
-    "process",
-#endif
-#if MCUJS_FEATURE_GPIO
-    "gpio",
-#endif
-#if MCUJS_FEATURE_PWM
-    "pwm",
-#endif
-#if MCUJS_FEATURE_I2C
-    "i2c",
-#endif
-#if MCUJS_FEATURE_SPI
-    "spi",
-#endif
-#if MCUJS_FEATURE_ADC
-    "adc",
-#endif
-#if MCUJS_FEATURE_NEOPIXEL
-    "neopixel",
-#endif
-#if MCUJS_FEATURE_IMAGE
-    "image",
-#endif
-#if MCUJS_FEATURE_KEYBOARD
-    "keyboard",
-#endif
-#if MCUJS_FEATURE_MOUSE
-    "mouse",
-#endif
-    "mcujs:module",
-    "node:module",
-    NULL
-};
-
 static jerry_value_t create_builtin_modules_list(void) {
     jerry_value_t array = jerry_array(0);
-    uint32_t index = 0;
+    const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
 
-    for (int i = 0; s_builtin_module_names[i] != NULL; i++) {
-        char index_str[8];
-        snprintf(index_str, sizeof(index_str), "%" PRIu32, index++);
-        jerry_value_t entry = jerry_string_sz(s_builtin_module_names[i]);
+    for (uint32_t i = 0; i < registry->builtin_module_count; i++) {
+        char index_str[11];
+        snprintf(index_str, sizeof(index_str), "%" PRIu32, i);
+        jerry_value_t entry = jerry_string_sz(registry->builtin_modules[i]);
         jerry_value_t idx = jerry_string_sz(index_str);
         set_property_value(array, idx, entry);
         jerry_value_free(entry);
@@ -633,6 +595,20 @@ static jerry_value_t create_builtin_modules_list(void) {
     return array;
 }
 
+static jerry_value_t module_has_handler(const jerry_call_info_t *call_info,
+                                        const jerry_value_t args[],
+                                        jerry_length_t argc) {
+    (void)call_info;
+    if (argc < 1 || !jerry_value_is_string(args[0])) return jerry_boolean(false);
+    char name[MAX_MODULE_PATH];
+    jerry_size_t length = jerry_string_size(args[0], JERRY_ENCODING_UTF8);
+    if (length == 0 || length >= sizeof(name)) return jerry_boolean(false);
+    jerry_string_to_buffer(args[0], JERRY_ENCODING_UTF8,
+                           (jerry_char_t *)name, length);
+    name[length] = '\0';
+    return jerry_boolean(mcujs_runtime_has_module(name));
+}
+
 static jerry_value_t create_module_module(void) {
     jerry_value_t module = jerry_object();
     jerry_value_t list = create_builtin_modules_list();
@@ -640,10 +616,14 @@ static jerry_value_t create_module_module(void) {
     set_property_value(module, key, list);
     jerry_value_free(key);
     jerry_value_free(list);
+    js_set_function(module, "has", module_has_handler);
     return module;
 }
 
 static const builtin_module_t s_builtin_modules[] = {
+#if MCUJS_FEATURE_BOARD
+    {"board", js_create_board_module},
+#endif
 #if MCUJS_FEATURE_FS
     {"fs", js_create_fs_module},
 #endif
@@ -689,6 +669,7 @@ static bool s_builtin_cached[16];
  * Returns the module object if it is, or undefined if not
  */
 static jerry_value_t get_builtin_module(const char *specifier) {
+    if (!mcujs_runtime_has_module(specifier)) return jerry_undefined();
     const char *lookup = specifier;
     if (strcmp(specifier, "node:module") == 0) {
         lookup = "mcujs:module";

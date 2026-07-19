@@ -8,6 +8,7 @@ BUILD_DIR=/tmp/mcujs-build
 OUTPUT_DIR=/output
 VERSION="$(tr -d '[:space:]' < "${SOURCE_ROOT}/version.txt")"
 UF2_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.uf2"
+CAPABILITY_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.capabilities.json"
 
 if [[ "${1:-build}" != "build" || $# -gt 1 ]]; then
     printf 'The ESP32 Docker lane supports only a non-flashing build action.\n' >&2
@@ -55,7 +56,11 @@ install -m 0644 \
     "${BUILD_DIR}/mcujs-esp32s3.elf" \
     "${BUILD_DIR}/mcujs-esp32s3.map" \
     "${OUTPUT_DIR}/"
+install -m 0644 \
+    "${ROOT}/runtime/manifests/seeed_xiao_esp32s3.json" \
+    "${OUTPUT_DIR}/${CAPABILITY_NAME}"
 
 sha256sum \
     "${OUTPUT_DIR}/mcujs-esp32s3.bin" \
-    "${OUTPUT_DIR}/${UF2_NAME}"
+    "${OUTPUT_DIR}/${UF2_NAME}" \
+    "${OUTPUT_DIR}/${CAPABILITY_NAME}"

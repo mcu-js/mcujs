@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.13)
 add_library(mcujs_host STATIC
     engine.c
     module_loader.c
+    runtime_registry.c
 )
 
 target_link_libraries(mcujs_host PUBLIC

@@ -11,6 +11,8 @@ This section covers how you interact with the runtime day to day: the [REPL](./g
 | Command | Description |
 | --- | --- |
 | `.help` | Show available commands |
+| `.capabilities` | Show the selected board and firmware-enabled modules |
+| `.capabilities NAME` | Show one capability descriptor, such as `spi` |
 | `.info` | Show board info (chip, memory, filesystem) |
 | `.ls` | List files on the device |
 | `.cat FILE` | Display file contents |
@@ -48,6 +50,11 @@ If you want a quick refresher on REPL terms, check the [Glossary](./glossary.md)
 - If you're just getting started, scan the examples below and then follow the links
 
 ## Module loading
+
+The built-in module list is board-accurate. Use `require('mcujs:module').has(name)`
+before loading an optional module, and use `require('board').capability(name)` for
+its routes and limits. Unsupported modules are absent rather than registered as
+throwing stubs.
 
 - Relative paths (`./`, `../`) resolve from the current file
 - Absolute paths (`/`) resolve from the filesystem root

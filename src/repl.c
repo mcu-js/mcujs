@@ -10,6 +10,7 @@
 #include "board.h"
 #include "board_config.h"
 #include "runtime_features.h"
+#include "runtime_registry.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -838,6 +839,7 @@ static void repl_handle_command(const char* cmd) {
     if (strcmp(cmd, "help") == 0) {
         usb_cdc_puts("mcujs REPL Commands:\r\n");
         usb_cdc_puts("  .help     - Show this help message\r\n");
+        usb_cdc_puts("  .capabilities [NAME] - Show board capabilities\r\n");
         usb_cdc_puts("  .info     - Show system information\r\n");
         usb_cdc_puts("  .ls       - List files on the device\r\n");
         usb_cdc_puts("  .cat FILE - Display contents of a file\r\n");
@@ -855,52 +857,62 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  console.log(), console.warn(), console.error()\r\n");
         usb_cdc_puts("  setTimeout(), clearTimeout(), setInterval(), clearInterval()\r\n");
         usb_cdc_puts("  board: name, chip, version, flashSize, ramSize, cpuFreq, ledPin\r\n");
-        usb_cdc_puts("  board methods: freeMemory(), uniqueId(), reset(), enterUf2(), millis(), delay(), led()\r\n");
-#ifdef MCUJS_PLATFORM_ESP32
-        usb_cdc_puts("  board ESP32 methods: safeMode(), storageReady()\r\n");
-#endif
-#if MCUJS_HAS_NEOPIXEL
-        usb_cdc_puts("  board NeoPixel method: neopixel()\r\n");
-#endif
+        usb_cdc_puts("  board methods: freeMemory(), uniqueId(), reset(), enterUf2(), millis(), delay(), capability(), capabilities()\r\n");
+        const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
+        if (registry->onboard_led) usb_cdc_puts("  board onboard method: led()\r\n");
+        if (registry->onboard_neopixel) usb_cdc_puts("  board onboard method: neopixel()\r\n");
+        if (registry->safe_mode && registry->storage_ready) {
+            usb_cdc_puts("  board recovery methods: safeMode(), storageReady()\r\n");
+        } else if (registry->safe_mode) {
+            usb_cdc_puts("  board recovery method: safeMode()\r\n");
+        } else if (registry->storage_ready) {
+            usb_cdc_puts("  board storage method: storageReady()\r\n");
+        }
         usb_cdc_puts("Built-in modules for this board:\r\n");
-#if MCUJS_FEATURE_FS
-        repl_help_module("fs");
-#endif
-#if MCUJS_FEATURE_PROCESS
-        repl_help_module("process");
-#endif
-#if MCUJS_FEATURE_GPIO
-        repl_help_module("gpio");
-#endif
-#if MCUJS_FEATURE_PWM
-        repl_help_module("pwm");
-#endif
-#if MCUJS_FEATURE_I2C
-        repl_help_module("i2c");
-#endif
-#if MCUJS_FEATURE_SPI
-        repl_help_module("spi");
-#endif
-#if MCUJS_FEATURE_ADC
-        repl_help_module("adc");
-#endif
-#if MCUJS_FEATURE_NEOPIXEL
-        repl_help_module("neopixel");
-#endif
-#if MCUJS_FEATURE_IMAGE
-        repl_help_module("image");
-#endif
-#if MCUJS_FEATURE_KEYBOARD
-        repl_help_module("keyboard");
-#endif
-#if MCUJS_FEATURE_MOUSE
-        repl_help_module("mouse");
-#endif
-        repl_help_module("mcujs:module");
-        repl_help_module("node:module");
+        for (size_t i = 0; i < registry->builtin_module_count; i++) {
+            repl_help_module(registry->builtin_modules[i]);
+        }
         usb_cdc_puts("Runtime APIs:\r\n");
         usb_cdc_puts("  process.version, process.versions, process.arch, process.platform\r\n");
         usb_cdc_puts("  require('mcujs:module').builtinModules\r\n");
+    }
+    else if (strcmp(cmd, "capabilities") == 0) {
+        const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
+        usb_cdc_puts("Board: ");
+        usb_cdc_puts(registry->board_id);
+        usb_cdc_puts("\r\nModules:");
+        for (size_t i = 0; i < registry->builtin_module_count; i++) {
+            usb_cdc_puts(" ");
+            usb_cdc_puts(registry->builtin_modules[i]);
+        }
+        usb_cdc_puts("\r\n");
+    }
+    else if (strncmp(cmd, "capabilities ", 13) == 0) {
+        const char *name = cmd + 13;
+        while (*name == ' ') name++;
+        char capability_name[MCUJS_RUNTIME_CAPABILITY_NAME_MAX + 1];
+        size_t capability_name_len = 0;
+        bool valid = *name != '\0';
+        for (const char *p = name; valid && *p; p++) {
+            if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9')) ||
+                capability_name_len >= MCUJS_RUNTIME_CAPABILITY_NAME_MAX) {
+                valid = false;
+            } else {
+                capability_name[capability_name_len++] = *p;
+            }
+        }
+        capability_name[capability_name_len] = '\0';
+        if (!valid) {
+            usb_cdc_puts("Invalid capability name.\r\n");
+        } else {
+            const mcujs_runtime_capability_t *capability =
+                mcujs_runtime_find_capability(capability_name);
+            if (capability != NULL) {
+                repl_print_result(capability->json);
+            } else {
+                usb_cdc_puts("Capability is not available in this firmware.\r\n");
+            }
+        }
     }
     else if (strcmp(cmd, "info") == 0) {
         const board_info_t *info = board_get_info();

@@ -1,0 +1,274 @@
+{
+  "formatVersion": 1,
+  "apiVersion": "0.2",
+  "board": {
+    "name": "waveshare_rp2040_touch_lcd_1.28",
+    "chip": "RP2040",
+    "firmwareVersion": "0.1.0",
+    "exposedPins": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      26,
+      27,
+      28
+    ],
+    "pins": {
+      "D0": 0,
+      "D1": 1,
+      "D2": 2,
+      "D3": 3,
+      "D4": 4,
+      "D5": 5,
+      "D14": 14,
+      "D15": 15,
+      "D16": 16,
+      "D17": 17,
+      "D18": 18,
+      "D19": 19,
+      "D20": 20,
+      "D26": 26,
+      "D27": 27,
+      "D28": 28,
+      "A0": 26,
+      "A1": 27,
+      "A2": 28,
+      "SDA": 4,
+      "SCL": 5,
+      "SCK": 18,
+      "MOSI": 19,
+      "MISO": 16
+    },
+    "devices": {}
+  },
+  "capabilities": {
+    "gpio": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        26,
+        27,
+        28
+      ],
+      "outputPins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        26,
+        27,
+        28
+      ],
+      "modes": [
+        "input",
+        "output",
+        "inputPullup",
+        "inputPulldown"
+      ]
+    },
+    "pwm": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        26,
+        27,
+        28
+      ],
+      "maxOutputs": 16,
+      "timerCount": 8,
+      "duty": {
+        "min": 0,
+        "max": 1,
+        "unit": "ratio"
+      },
+      "frequency": {
+        "minHz": 8,
+        "maxHz": 1907,
+        "resolutionVaries": false
+      }
+    },
+    "fs": {
+      "implementation": "fat",
+      "writable": true,
+      "hostTransfer": true
+    },
+    "usb": {
+      "classes": [
+        "cdc",
+        "msc",
+        "keyboardHid",
+        "mouseHid"
+      ]
+    },
+    "adc": {
+      "resolutionBits": 12,
+      "pins": [
+        26,
+        27,
+        28
+      ],
+      "channels": [
+        {
+          "channel": 0,
+          "pin": 26,
+          "aliases": [
+            "A0"
+          ]
+        },
+        {
+          "channel": 1,
+          "pin": 27,
+          "aliases": [
+            "A1"
+          ]
+        },
+        {
+          "channel": 2,
+          "pin": 28,
+          "aliases": [
+            "A2"
+          ]
+        }
+      ],
+      "voltage": {
+        "supported": true,
+        "calibrated": false,
+        "minVolts": 0,
+        "maxVolts": 3.3
+      },
+      "temperature": {
+        "supported": true,
+        "rawChannel": true
+      },
+      "vsys": false
+    },
+    "i2c": {
+      "buses": [
+        0
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sda": 4,
+          "scl": 5
+        }
+      ],
+      "defaultBus": 0,
+      "defaultRoute": {
+        "bus": 0,
+        "sda": 4,
+        "scl": 5
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 1000000
+      },
+      "maxTransferBytes": 256
+    },
+    "spi": {
+      "buses": [
+        0
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sck": 18,
+          "mosi": 19,
+          "miso": 16
+        }
+      ],
+      "defaultBus": 0,
+      "defaultRoute": {
+        "bus": 0,
+        "sck": 18,
+        "mosi": 19,
+        "miso": 16
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 62500000
+      },
+      "maxTransferBytes": 256,
+      "modes": [
+        0
+      ],
+      "bitsPerWord": [
+        8
+      ],
+      "bitOrders": [
+        "msb"
+      ],
+      "fullDuplex": true,
+      "dma": true,
+      "compatibilityExtensions": [
+        "writeBufferDMA"
+      ]
+    },
+    "neopixel": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        26,
+        27,
+        28
+      ],
+      "maxLength": 256,
+      "orders": [
+        "RGB",
+        "GRB"
+      ]
+    }
+  }
+}

@@ -12,6 +12,7 @@
     "release:package": "bash scripts/package-release.sh",
     "release:verify": "bash scripts/verify-release.sh",
     "test": "bun test",
+    "test:registry": "node --test tests/runtime-registry.test.js && bash scripts/test-runtime-registry.sh",
     "test:schema": "node --test tests/portable-api-schema.test.js",
     "validate:manifest": "node scripts/validate-portable-api-manifest.js",
     "verify": "bash scripts/verify-release.sh --docs"

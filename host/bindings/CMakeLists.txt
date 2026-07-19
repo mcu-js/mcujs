@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.13)
 # Base source files for JavaScript API bindings
 set(BINDINGS_SOURCES
     bindings.c
+    board_registry.c
     console.c
     ${MCUJS_PLATFORM_HARDWARE_BINDING_SOURCES}
     fs.c

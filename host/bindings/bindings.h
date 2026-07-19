@@ -89,6 +89,12 @@ jerry_value_t js_create_adc_module(void);
  */
 void js_bind_board(void);
 
+/* Apply the selected descriptor and exact capability-gated board methods. */
+bool js_board_apply_registry(jerry_value_t board,
+                             jerry_external_handler_t safe_mode_handler,
+                             jerry_external_handler_t storage_ready_handler);
+jerry_value_t js_create_board_module(void);
+
 /*
  * Register NeoPixel bindings
  * neopixel.init(), neopixel.setPixel(), neopixel.show(), neopixel.clear()

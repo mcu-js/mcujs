@@ -5,9 +5,11 @@
  */
 
 #include "bindings.h"
+#include "runtime_features.h"
 #include "jerryscript.h"
 #include "board_config.h"
 #include "board.h"
+#include "fs.h"
 #include "usb/usb_cdc.h"
 #include "neopixel.h"
 
@@ -136,6 +138,15 @@ static jerry_value_t board_delay_handler(const jerry_call_info_t *call_info_p,
     sleep_ms(ms);
     
     return jerry_undefined();
+}
+
+static jerry_value_t board_storage_ready_handler(const jerry_call_info_t *call_info_p,
+                                                  const jerry_value_t args[],
+                                                  const jerry_length_t argc) {
+    (void)call_info_p;
+    (void)args;
+    (void)argc;
+    return jerry_boolean(!fs_host_owned());
 }
 
 /*
@@ -378,9 +389,11 @@ void js_bind_board(void) {
     js_set_function(board, "millis", board_millis_handler);
     js_set_function(board, "enterUf2", board_enter_uf2_handler);
     js_set_function(board, "delay", board_delay_handler);
+#if MCUJS_REGISTRY_ONBOARD_LED
     js_set_function(board, "led", board_led_handler);
+#endif
 
-#if MCUJS_HAS_NEOPIXEL
+#if MCUJS_REGISTRY_ONBOARD_NEOPIXEL
     js_set_function(board, "neopixel", board_neopixel_handler);
 #endif
 
@@ -391,6 +404,10 @@ void js_bind_board(void) {
     js_set_string(board, "version", "0.0.0");
     #endif
 
+    if (!js_board_apply_registry(board, NULL, board_storage_ready_handler)) {
+        jerry_value_free(board);
+        return;
+    }
     js_register_global("board", board);
     jerry_value_free(board);
 }

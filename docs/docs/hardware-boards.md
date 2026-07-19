@@ -4,7 +4,9 @@ sidebar_position: 8
 
 # Hardware and Boards
 
-This page lists the boards that are part of the release build. The source of truth for the buildable board list is `scripts/lib/boards.sh`; run `scripts/boards.sh --table` before release docs changes and keep this table in sync.
+This page lists the boards that are part of the release build. `scripts/lib/boards.sh`
+keeps the nine RP build targets in `MCUJS_BOARDS` and the complete cross-platform
+package set in `MCUJS_RELEASE_BOARDS`; keep this table in sync with both lanes.
 
 ## Supported boards
 
@@ -19,6 +21,38 @@ This page lists the boards that are part of the release build. The source of tru
 | `waveshare_rp2350_lcd_1.47_a` | Waveshare RP2350-LCD-1.47-A | RP2350 | 16MB | LCD, NeoPixel |
 | `waveshare_rp2350_touch_lcd_1.69` | Waveshare RP2350-Touch-LCD-1.69 | RP2350 | 16MB | LCD, touch, IMU, buzzer |
 | `adafruit_feather_rp2040` | Adafruit Feather RP2040 | RP2040 | 8MB | NeoPixel, STEMMA QT |
+| `seeed_xiao_esp32s3` | Seeed Studio XIAO ESP32-S3 | ESP32-S3 | 8MB | Native USB, onboard LED |
+
+## Authoritative 0.2 runtime feature matrix
+
+The runtime descriptor in `runtime/board-registry.js` is authoritative for
+firmware-enabled modules and release capability manifests. A check means the
+module is registered in that image; it does not claim an external device is
+attached. `NeoPixel` describes the external driver, while the final column lists
+only physically onboard shortcuts.
+
+| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image/graphics | USB keyboard/mouse | Onboard shortcut |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `pico` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED |
+| `pico2` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED |
+| `pico2_w` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | managed LED |
+| `waveshare_rp2040_zero` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | NeoPixel |
+| `waveshare_rp2040_pizero` | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ + DVI | ✓ | — |
+| `waveshare_rp2040_touch_lcd_1.28` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| `waveshare_rp2350_lcd_1.47_a` | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | ✓ | NeoPixel |
+| `waveshare_rp2350_touch_lcd_1.69` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| `adafruit_feather_rp2040` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED + NeoPixel |
+| `seeed_xiao_esp32s3` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | LED |
+
+All targets also enable `board`, `fs`, `process`, `mcujs:module`, and the shared
+console/timer/module-loader runtime. XIAO ESP32-S3 is intentionally constrained:
+its current firmware exposes CDC+MSC but not image/graphics or USB HID. The
+RP2350-LCD-1.47-A reserves its internal display/storage routes, so its firmware
+does not advertise general SPI or ADC. Safe/exposed pin maps omit reserved DVI,
+wireless, display, storage, USB, flash, and PSRAM wiring. Every target with the
+`fs` capability exposes dynamic `board.storageReady()`. Only XIAO currently
+advertises persistent `boot.safeMode` and therefore exposes `board.safeMode()`;
+the RP BOOTSEL-at-reset gesture is not misreported as persistent safe-mode state.
 
 ## Build names
 
@@ -31,6 +65,9 @@ Use the board ID when building from source:
 ./build.sh waveshare_rp2040_pizero
 ./build.sh all --clean
 ```
+
+The XIAO image and its adjacent capability manifest are produced by the ESP32
+build/package lane under `platform/esp32/build-docker/`.
 
 ## Pin notes
 

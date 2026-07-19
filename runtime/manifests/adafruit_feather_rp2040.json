@@ -1,0 +1,340 @@
+{
+  "formatVersion": 1,
+  "apiVersion": "0.2",
+  "board": {
+    "name": "adafruit_feather_rp2040",
+    "chip": "RP2040",
+    "firmwareVersion": "0.1.0",
+    "exposedPins": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      16,
+      18,
+      19,
+      20,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+    ],
+    "pins": {
+      "D0": 0,
+      "D1": 1,
+      "D2": 2,
+      "D3": 3,
+      "D4": 4,
+      "D8": 8,
+      "D9": 9,
+      "D10": 10,
+      "D11": 11,
+      "D12": 12,
+      "D13": 13,
+      "D16": 16,
+      "D18": 18,
+      "D19": 19,
+      "D20": 20,
+      "D24": 24,
+      "D25": 25,
+      "D26": 26,
+      "D27": 27,
+      "D28": 28,
+      "D29": 29,
+      "A0": 26,
+      "A1": 27,
+      "A2": 28,
+      "A3": 29,
+      "SDA": 2,
+      "SCL": 3,
+      "SCK": 18,
+      "MOSI": 19,
+      "MISO": 20,
+      "LED": 13,
+      "NEOPIXEL": 16
+    },
+    "devices": {
+      "led": {
+        "type": "gpio",
+        "pin": 13,
+        "activeLow": false
+      },
+      "neopixel": {
+        "type": "neopixel",
+        "pin": 16,
+        "length": 1,
+        "order": "GRB"
+      }
+    }
+  },
+  "capabilities": {
+    "gpio": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        18,
+        19,
+        20,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "outputPins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        18,
+        19,
+        20,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "modes": [
+        "input",
+        "output",
+        "inputPullup",
+        "inputPulldown"
+      ]
+    },
+    "pwm": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        18,
+        19,
+        20,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "maxOutputs": 16,
+      "timerCount": 8,
+      "duty": {
+        "min": 0,
+        "max": 1,
+        "unit": "ratio"
+      },
+      "frequency": {
+        "minHz": 8,
+        "maxHz": 1907,
+        "resolutionVaries": false
+      }
+    },
+    "fs": {
+      "implementation": "fat",
+      "writable": true,
+      "hostTransfer": true
+    },
+    "usb": {
+      "classes": [
+        "cdc",
+        "msc",
+        "keyboardHid",
+        "mouseHid"
+      ]
+    },
+    "adc": {
+      "resolutionBits": 12,
+      "pins": [
+        26,
+        27,
+        28,
+        29
+      ],
+      "channels": [
+        {
+          "channel": 0,
+          "pin": 26,
+          "aliases": [
+            "A0"
+          ]
+        },
+        {
+          "channel": 1,
+          "pin": 27,
+          "aliases": [
+            "A1"
+          ]
+        },
+        {
+          "channel": 2,
+          "pin": 28,
+          "aliases": [
+            "A2"
+          ]
+        },
+        {
+          "channel": 3,
+          "pin": 29,
+          "aliases": [
+            "A3"
+          ]
+        }
+      ],
+      "voltage": {
+        "supported": true,
+        "calibrated": false,
+        "minVolts": 0,
+        "maxVolts": 3.3
+      },
+      "temperature": {
+        "supported": true,
+        "rawChannel": true
+      },
+      "vsys": false
+    },
+    "i2c": {
+      "buses": [
+        0,
+        1
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sda": 24,
+          "scl": 25
+        },
+        {
+          "bus": 1,
+          "sda": 2,
+          "scl": 3
+        }
+      ],
+      "defaultBus": 1,
+      "defaultRoute": {
+        "bus": 1,
+        "sda": 2,
+        "scl": 3
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 1000000
+      },
+      "maxTransferBytes": 256
+    },
+    "spi": {
+      "buses": [
+        0,
+        1
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sck": 18,
+          "mosi": 19,
+          "miso": 20
+        },
+        {
+          "bus": 1,
+          "sck": 10,
+          "mosi": 11,
+          "miso": 12
+        }
+      ],
+      "defaultBus": 0,
+      "defaultRoute": {
+        "bus": 0,
+        "sck": 18,
+        "mosi": 19,
+        "miso": 20
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 62500000
+      },
+      "maxTransferBytes": 256,
+      "modes": [
+        0
+      ],
+      "bitsPerWord": [
+        8
+      ],
+      "bitOrders": [
+        "msb"
+      ],
+      "fullDuplex": true,
+      "dma": true,
+      "compatibilityExtensions": [
+        "writeBufferDMA"
+      ]
+    },
+    "neopixel": {
+      "pins": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        16,
+        18,
+        19,
+        20,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "maxLength": 256,
+      "orders": [
+        "RGB",
+        "GRB"
+      ]
+    }
+  }
+}

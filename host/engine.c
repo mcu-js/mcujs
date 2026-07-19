@@ -810,7 +810,7 @@ void js_register_bindings(void) {
 #endif
     
     /* Register DVI module if available */
-#ifdef MCUJS_HAS_DVI
+#if MCUJS_HAS_DVI
     js_bind_dvi();
 #endif
 }

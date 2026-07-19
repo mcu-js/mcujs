@@ -31,7 +31,13 @@ scripts/verify-release.sh
 scripts/release.sh
 ```
 
-This builds every board with Docker, then writes:
+This builds all RP boards with the Pico builder and freshly builds the XIAO
+ESP32-S3 with its pinned Docker lane. Before packaging, the release gate checks
+that the XIAO UF2 reconstructs the adjacent binary, contains the current source
+build ID, uses only supported flashing flags, fits the authoritative `ota_0`
+partition, and has the generated capability manifest. The package step
+preflights and privately stages every output before atomically replacing the
+matching release assets in `dist/`. It then writes:
 
 - `dist/mcujs-<version>-<git-sha>/`
 - `dist/mcujs-<version>-<git-sha>.tar.gz`
@@ -39,7 +45,8 @@ This builds every board with Docker, then writes:
 - `dist/mcujs-<version>-<git-sha>-manifest.txt`
 - top-level `dist/mcujs-<version>-<board-id>.uf2` assets
 
-Use `scripts/release.sh --rebuild-image` after Dockerfile or dependency changes.
+Use `scripts/release.sh --rebuild-image` after RP Dockerfile or dependency
+changes. The XIAO Docker image build step always runs when builds are enabled.
 
 ## Tagging and publishing
 

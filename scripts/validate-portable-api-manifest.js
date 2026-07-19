@@ -425,30 +425,70 @@ function contractError(errors, location, constraint, message) {
   errors.push({ location, constraint, message });
 }
 
+function collectDeclaredArgumentConstraints(candidate) {
+  const declaredFields = new Set(
+    Object.keys(candidate.operationConstraints?.fields ?? {}),
+  );
+  const constraints = new Set();
+
+  function collect(value) {
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+      return;
+    }
+    if (value === null || typeof value !== "object") {
+      return;
+    }
+    for (const [field, entry] of Object.entries(value)) {
+      if (declaredFields.has(field) && !field.endsWith("Error")) {
+        constraints.add(field);
+      }
+      collect(entry);
+    }
+  }
+
+  for (const moduleContract of Object.values(candidate.modules ?? {})) {
+    for (const exported of Object.values(moduleContract.exports ?? {})) {
+      for (const signature of exported.signatures ?? []) {
+        for (const argument of signature.arguments ?? []) {
+          collect(argument);
+        }
+      }
+    }
+  }
+
+  return constraints;
+}
+
 function validatePortableApiContract(candidate) {
   const errors = [];
   const errorContract = candidate.errors ?? {};
   const operational = errorContract.operational ?? {};
   const conditionKinds = errorContract.operationalConditionKinds ?? {};
   const argumentConstraintErrors = errorContract.argumentConstraintErrors ?? {};
+  const declaredOperationConstraints = new Set(
+    Object.keys(candidate.operationConstraints?.fields ?? {}),
+  );
   const requiredModules = errorContract.operationalMappingsRequiredForModules ?? [];
   const requiredModuleNames = new Set(requiredModules);
 
-  for (const constraint of [
-    "allowedFromCapability",
-    "minimumFromCapability",
-    "maximumFromCapability",
-    "exclusiveMaximumFromConfiguration",
-    "minimumLength",
-    "maximumFromArgumentResource",
-    "routeFromCapability",
-  ]) {
+  for (const constraint of collectDeclaredArgumentConstraints(candidate)) {
     if (argumentConstraintErrors[constraint] !== "RangeError") {
       contractError(
         errors,
         `errors.argumentConstraintErrors.${constraint}`,
         "argumentBoundary.constraintMapping",
         "capability-derived and explicit argument constraints must map to RangeError",
+      );
+    }
+  }
+  for (const constraint of Object.keys(argumentConstraintErrors)) {
+    if (!declaredOperationConstraints.has(constraint)) {
+      contractError(
+        errors,
+        `errors.argumentConstraintErrors.${constraint}`,
+        "argumentBoundary.unknownConstraintMapping",
+        "argument error mappings must name a declared operation constraint",
       );
     }
   }

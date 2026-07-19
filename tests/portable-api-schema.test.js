@@ -696,6 +696,7 @@ test("the schema freezes stable operational errors", () => {
   });
   assert.deepEqual(contract.errors.argumentConstraintErrors, {
     allowedFromCapability: "RangeError",
+    conditionalAllowedFromCapability: "RangeError",
     minimumFromCapability: "RangeError",
     maximumFromCapability: "RangeError",
     exclusiveMaximumFromConfiguration: "RangeError",
@@ -809,6 +810,30 @@ test("every core peripheral signature has a complete operational-error mapping",
     ),
     JSON.stringify(contradictoryModeResult.errors),
   );
+
+  for (const invalidMapping of [undefined, "ERR_NOT_SUPPORTED"]) {
+    const invalidConditionalMapping = structuredClone(contract);
+    if (invalidMapping === undefined) {
+      delete invalidConditionalMapping.errors.argumentConstraintErrors
+        .conditionalAllowedFromCapability;
+    } else {
+      invalidConditionalMapping.errors.argumentConstraintErrors
+        .conditionalAllowedFromCapability = invalidMapping;
+    }
+    const invalidConditionalResult = validatePortableApiContract(
+      invalidConditionalMapping,
+    );
+    assert.equal(invalidConditionalResult.valid, false);
+    assert.ok(
+      invalidConditionalResult.errors.some(
+        (error) =>
+          error.location ===
+            "errors.argumentConstraintErrors.conditionalAllowedFromCapability" &&
+          error.constraint === "argumentBoundary.constraintMapping",
+      ),
+      JSON.stringify(invalidConditionalResult.errors),
+    );
+  }
 
   const prematureUnsupportedConfiguration = structuredClone(contract);
   delete prematureUnsupportedConfiguration.modules.spi.exports.init.signatures[0]
@@ -1625,6 +1650,16 @@ test("Docusaurus documents the frozen contract and 0.1 migration", () => {
   ]) {
     assert.ok(migration.includes(phrase), `migration docs are missing ${phrase}`);
   }
+
+  assert.match(
+    migration,
+    /Unlisted routes or modes and frequencies outside the advertised range throw `RangeError`/,
+  );
+  assert.match(
+    migration,
+    /`ERR_NOT_SUPPORTED` starts only after every explicit argument constraint passes/,
+  );
+  assert.doesNotMatch(migration, /Choose a listed route, mode, or frequency/);
 
   const spiExports = loadSchema()["x-mcujs-contract"].modules.spi.exports;
   assert.ok(spiExports.init);

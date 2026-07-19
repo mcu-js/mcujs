@@ -38,7 +38,8 @@ MCU.js equivalent:
 |---|---|
 | Firmware has no SPI implementation | `spi` absent from `builtinModules`; `require('spi')` throws module-not-found |
 | SPI exists but DMA is unsupported | `spi.writeBufferDMA` absent; capability says `dma: false` |
-| SPI exists but requested mode is unsupported | `spi.open/init` throws `NotSupportedError` / `ERR_NOT_SUPPORTED` |
+| SPI exists but requested mode is absent from advertised `spi.modes` | `spi.init` throws `RangeError` |
+| SPI exists and frequency is in range but not exactly representable | `spi.init` throws `NotSupportedError` / `ERR_NOT_SUPPORTED` |
 | SPI route is already owned | operation throws `ResourceBusyError` / `EBUSY` |
 | I2C controller exists but external device NACKs | read/write throws `EIO` or `ENXIO` |
 | Filesystem exists but MSC host owns it | filesystem calls throw `EBUSY` |
@@ -240,8 +241,8 @@ Use JavaScript built-ins for programming errors and stable `.code` values for op
 | Failure | Error |
 |---|---|
 | Missing/wrong argument type | `TypeError` |
-| Finite integer/range violation | `RangeError` |
-| API exists but requested mode/config cannot be implemented | `Error`, `name='NotSupportedError'`, `code='ERR_NOT_SUPPORTED'` |
+| Value violates an explicit type, range, length, route, enum, or capability-derived argument constraint | `RangeError` |
+| Every value passes those explicit constraints, but the requested valid combination or exact hardware representation cannot be implemented | `Error`, `name='NotSupportedError'`, `code='ERR_NOT_SUPPORTED'` |
 | Pin/bus/timer/channel is owned or temporarily unavailable | `Error`, `name='ResourceBusyError'`, `code='EBUSY'` |
 | Finite hardware pool exhausted | `Error`, `name='ResourceExhaustedError'`, `code='ERR_RESOURCE_EXHAUSTED'` |
 | External bus device absent/NACK | `Error`, `code='ENXIO'` when distinguishable, otherwise `EIO` |
@@ -249,6 +250,8 @@ Use JavaScript built-ins for programming errors and stable `.code` values for op
 | Module unavailable in this firmware | normal CommonJS module-not-found error |
 
 Errors may include diagnostic properties such as `resource`, `pin`, `owner`, `bus`, and `limit`, but portable code should branch primarily on `.code`.
+
+The boundary is deliberate: a frequency below `minHz` or above `maxHz` is a `RangeError`; an in-range frequency that the backend cannot represent exactly is `ERR_NOT_SUPPORTED`. The same rule applies to capability-listed routes, enums, lengths, and correlated option combinations. Each core peripheral signature maps its operational codes to machine-readable conditions in the schema; initialization-dependent methods map use-before-init to `EBUSY` with cause `uninitializedUse`.
 
 ## Module-specific 0.2 normalization
 
@@ -297,7 +300,7 @@ Errors may include diagnostic properties such as `resource`, `pin`, `owner`, `bu
 - Retain the positional form through 0.x for migration.
 - Reject oversize transfers on every backend.
 - Expose modes, duplex, routes, one complete listed `defaultRoute`, transfer maximum, DMA availability, and any explicitly capability-gated compatibility extensions. The byte-oriented 0.2 contract implicitly uses exactly 8-bit words and MSB-first order; manifests must advertise only those executable formats until initialization makes format selectable.
-- `writeBufferDMA` remains outside the portable core because its graphics handle is an RP display-stack accident. Preserve it only as a nonportable compatibility extension when `dma` is true and `compatibilityExtensions` contains `writeBufferDMA`; otherwise the method is absent. Its `byteLength` maximum comes from the selected handle, an invalid handle or oversize request throws `RangeError`, and DMA-channel exhaustion throws `ERR_RESOURCE_EXHAUSTED`. Evaluate a portable buffer-transfer API later.
+- `writeBufferDMA` remains outside the portable core because its graphics handle is an RP display-stack accident. Preserve it only as a nonportable compatibility extension when `dma` is true and `compatibilityExtensions` contains `writeBufferDMA`; otherwise the method is absent. Its `byteLength` maximum comes from the selected handle, an invalid handle or oversize request throws `RangeError`, use before `spi.init()` throws `EBUSY`, and DMA-channel exhaustion throws `ERR_RESOURCE_EXHAUSTED`. Evaluate a portable buffer-transfer API later.
 
 ### NeoPixel
 

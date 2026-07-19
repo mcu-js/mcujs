@@ -15,7 +15,7 @@ These states are deliberately different:
 | State | API shape | Runtime behavior |
 |---|---|---|
 | Unsupported | The module, method, or property is absent | Detect it with `builtinModules`, `modules.has()`, or property existence. `require()` uses the normal module-not-found path. |
-| Supported API, unsupported configuration | The API remains present | Throw `NotSupportedError` with `code === 'ERR_NOT_SUPPORTED'`. Examples include an unavailable SPI mode or an unrepresentable frequency. |
+| Supported API, unsupported configuration | The API remains present | Throw `NotSupportedError` with `code === 'ERR_NOT_SUPPORTED'`. Examples include an otherwise-valid SPI option combination or an in-range frequency that cannot be represented exactly. |
 | Supported API, temporarily unavailable or failed | The API remains present | Throw an operational error such as `EBUSY`, `ERR_RESOURCE_EXHAUSTED`, `ENXIO`, or `EIO`. |
 
 A supported operation never disappears because a pin becomes busy or an external device disconnects. An unsupported operation is never represented by a throwing stub or a success-returning no-op.
@@ -167,6 +167,8 @@ Programming mistakes use JavaScript built-ins:
 - `TypeError`: missing arguments, wrong types, and non-finite numbers;
 - `RangeError`: fractional integer inputs, out-of-range values, and oversized values.
 
+`RangeError` applies whenever a value violates an explicit type, range, length, route, enum, or capability-derived argument constraint. A requested SPI mode absent from advertised `spi.modes` therefore throws `RangeError`. `ERR_NOT_SUPPORTED` begins only after every supplied value passes those constraints but the backend cannot implement the requested valid combination or exact hardware representation. For example, a frequency outside advertised `minHz..maxHz` is a `RangeError`; an in-range frequency that cannot be represented exactly is `ERR_NOT_SUPPORTED`.
+
 Operational failures use a stable `.code`:
 
 | Code | Error name | Meaning |
@@ -179,6 +181,8 @@ Operational failures use a stable `.code`:
 
 Portable control flow should branch on `.code`. Optional fields such as `resource`, `pin`, `owner`, `bus`, `limit`, and `nativeCode` are diagnostic only.
 
+Every GPIO, PWM, ADC, I2C, SPI, and NeoPixel signature carries `operationalErrors` plus machine-readable `operationalErrorConditions`. The condition taxonomy fixes unsupported configuration, resource ownership, finite-pool exhaustion, external-device absence, native I/O failure, and `uninitializedUse` to their stable codes. Initialization-dependent operations use `EBUSY` for `uninitializedUse`; they never silently auto-initialize.
+
 ## Versioning and aliases
 
 `board.apiVersion` and release manifests use `major.minor`, here `0.2`. Before 1.0:
@@ -188,8 +192,8 @@ Portable control flow should branch on `.code`. Optional fields such as `resourc
 - aliases listed by the schema remain available through 0.x when their target capability exists;
 - those aliases may be removed no earlier than 1.0.
 
-Compatibility globals (`board`, `GPIO`, `PWM`, `adc`, `I2C`, `SPI`, and `neopixel`) are not canonical portable names. The positional `i2c.init(...)` and `spi.init(...)` forms remain compatibility overloads; new code uses options objects and board-declared defaults. See [Migrating from 0.1 to 0.2](../migration/0.2.md).
+Compatibility globals (`board`, `GPIO`, `PWM`, `adc`, `I2C`, `SPI`, and `neopixel`) are not canonical portable names. `require('node:module')` remains an alias of `require('mcujs:module')`. The positional `i2c.init(...)` and `spi.init(...)` forms remain compatibility overloads; new code uses options objects and board-declared defaults. The schema records every alias's kind, JavaScript type, capability/onboard gate, and removal policy. In particular, `board.ledPin` exists only for a GPIO-backed onboard LED, and RP compatibility constants `adc.TEMP` and `adc.VSYS` are gated by `adc.temperature.rawChannel === true` and `adc.vsys === true`. See [Migrating from 0.1 to 0.2](../migration/0.2.md).
 
-Two live 0.1 surfaces are retained as explicitly nonportable compatibility extensions rather than silently disappearing from the inventory. `spi.writeBufferDMA(bus, bufferHandle, byteLength)` exists only when `spi.compatibilityExtensions` contains `writeBufferDMA` and `spi.dma` is true; its opaque graphics handle prevents it from being portable SPI. A stale or unknown handle throws `RangeError`. `byteLength` may be zero and may equal the handle's byte length; maximum+1 throws `RangeError` rather than clamping. If no DMA channel is available, it throws `ERR_RESOURCE_EXHAUSTED`.
+Two live 0.1 surfaces are retained as explicitly nonportable compatibility extensions rather than silently disappearing from the inventory. `spi.writeBufferDMA(bus, bufferHandle, byteLength)` exists only when `spi.compatibilityExtensions` contains `writeBufferDMA` and `spi.dma` is true; its opaque graphics handle prevents it from being portable SPI. A stale or unknown handle throws `RangeError`. `byteLength` may be zero and may equal the handle's byte length; maximum+1 throws `RangeError` rather than clamping. Use before successful `spi.init()` throws `EBUSY`; if no DMA channel is available, it throws `ERR_RESOURCE_EXHAUSTED`.
 
 `board.safeMode()` and `board.safeMode(enabled)` exist only when `boot.safeMode` is true. The getter reports dynamic state. The setter persists it, but `board.safeMode(false)` during the active boot qualification window throws `EBUSY`; persistence failure throws `EIO`. Portable programs must feature-detect these methods and must not infer them from a board or chip name.

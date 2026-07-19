@@ -1,12 +1,13 @@
 const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
+const { readdirSync, readFileSync } = require("node:fs");
 const { createRequire } = require("node:module");
-const { join } = require("node:path");
+const { basename, join } = require("node:path");
 const test = require("node:test");
 
 const docsRequire = createRequire(join(__dirname, "../docs/package.json"));
 const Ajv2020 = docsRequire("ajv/dist/2020").default;
 const {
+  validatePortableApiContract,
   validatePortableApiManifest,
 } = require("../scripts/validate-portable-api-manifest.js");
 
@@ -22,6 +23,10 @@ const migrationUrl = join(
   __dirname,
   "../docs/docs/migration/0.2.md",
 );
+const portableApiDesignUrl = join(
+  __dirname,
+  "../docs/docs/development/mcujs-0.2-portable-api.md",
+);
 
 function loadSchema() {
   return JSON.parse(readFileSync(schemaUrl, "utf8"));
@@ -29,6 +34,68 @@ function loadSchema() {
 
 function sorted(values) {
   return [...values].sort();
+}
+
+function walkCFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return walkCFiles(path);
+    }
+    return entry.isFile() && entry.name.endsWith(".c") ? [path] : [];
+  });
+}
+
+function collectLiveCompatibilityAliasNames(contract) {
+  const names = new Set();
+  const platformDirectory = join(__dirname, "../platform");
+
+  for (const path of walkCFiles(platformDirectory)) {
+    const source = readFileSync(path, "utf8");
+    const moduleName = basename(path, ".c");
+    if (!contract.modules[moduleName]) {
+      continue;
+    }
+
+    for (const match of source.matchAll(/js_register_global\("([^"]+)"/g)) {
+      names.add(`global.${match[1]}`);
+    }
+
+    if (moduleName === "board" || moduleName === "adc") {
+      const objectName = moduleName;
+      for (const match of source.matchAll(
+        new RegExp(`js_set_(?:number|string|boolean)\\(${objectName}, \\"([^\\"]+)\\"`, "g"),
+      )) {
+        if (!contract.modules[moduleName].exports[match[1]]) {
+          names.add(`${moduleName}.${match[1]}`);
+        }
+      }
+    }
+  }
+
+  const requireSource = readFileSync(join(__dirname, "../host/bindings/require.c"), "utf8");
+  for (const match of requireSource.matchAll(
+    /strcmp\(specifier, "([^"]+)"\) == 0\) \{\s*lookup = "([^"]+)";/g,
+  )) {
+    names.add(`require('${match[1]}')`);
+  }
+
+  for (const [moduleName, moduleContract] of Object.entries(contract.modules)) {
+    for (const [exportName, exported] of Object.entries(moduleContract.exports)) {
+      for (const signature of exported.signatures ?? []) {
+        if (signature.compatibility) {
+          names.add(signature.compatibility);
+          assert.equal(
+            signature.compatibility,
+            `${moduleName}.${exportName}(positional)`,
+            `${moduleName}.${exportName} compatibility overload is not source-addressable`,
+          );
+        }
+      }
+    }
+  }
+
+  return names;
 }
 
 function validManifest() {
@@ -621,6 +688,30 @@ test("the schema freezes stable operational errors", () => {
     "temporarilyUnavailableOrFailed",
   );
 
+  assert.deepEqual(contract.errors.argumentBoundary, {
+    RangeError:
+      "The supplied value violates an explicit type, range, length, route, enum, or capability-derived argument constraint.",
+    ERR_NOT_SUPPORTED:
+      "Every supplied value passes its explicit argument constraints, but the advertised operation cannot implement the requested valid combination or exact hardware representation.",
+  });
+  assert.deepEqual(contract.errors.argumentConstraintErrors, {
+    allowedFromCapability: "RangeError",
+    minimumFromCapability: "RangeError",
+    maximumFromCapability: "RangeError",
+    exclusiveMaximumFromConfiguration: "RangeError",
+    minimumLength: "RangeError",
+    maximumFromArgumentResource: "RangeError",
+    routeFromCapability: "RangeError",
+  });
+  assert.deepEqual(contract.errors.operationalConditionKinds, {
+    unsupportedConfiguration: { code: "ERR_NOT_SUPPORTED" },
+    resourceBusy: { code: "EBUSY" },
+    uninitializedUse: { code: "EBUSY" },
+    resourceExhausted: { code: "ERR_RESOURCE_EXHAUSTED" },
+    externalDeviceUnavailable: { code: "ENXIO" },
+    nativeIoFailure: { code: "EIO" },
+  });
+
   for (const [moduleName, moduleContract] of Object.entries(contract.modules)) {
     for (const [exportName, exported] of Object.entries(moduleContract.exports)) {
       for (const [signatureIndex, signature] of (exported.signatures ?? []).entries()) {
@@ -631,21 +722,137 @@ test("the schema freezes stable operational errors", () => {
         }
         for (const condition of signature.operationalErrorConditions ?? []) {
           assert.ok(declaredErrors.includes(condition.code), `${location} condition omits ${condition.code}`);
+          assert.equal(
+            contract.errors.operationalConditionKinds[condition.cause]?.code,
+            condition.code,
+            `${location} has an invalid ${condition.cause} to ${condition.code} mapping`,
+          );
           if (condition.argument) {
             assert.ok(
               signature.arguments.some((argument) => argument.name === condition.argument.name),
               `${location} condition references unknown argument ${condition.argument.name}`,
             );
           }
-          assert.equal(
-            Boolean(condition.dynamicState) || Boolean(condition.nativeFailure),
-            true,
-            `${location} error condition has no cause`,
-          );
         }
       }
     }
   }
+});
+
+test("every core peripheral signature has a complete operational-error mapping", () => {
+  const contract = loadSchema()["x-mcujs-contract"];
+  const expected = {
+    "gpio.init#0": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED"],
+    "gpio.set#0": ["EBUSY", "EIO"],
+    "gpio.get#0": ["EBUSY", "EIO"],
+    "gpio.toggle#0": ["EBUSY", "EIO"],
+    "pwm.init#0": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED", "ERR_RESOURCE_EXHAUSTED"],
+    "pwm.setDuty#0": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED"],
+    "pwm.stop#0": ["EBUSY", "EIO"],
+    "adc.readPin#0": ["EBUSY", "EIO"],
+    "adc.readChannel#0": ["EBUSY", "EIO"],
+    "adc.readVoltagePin#0": ["EBUSY", "EIO"],
+    "adc.readVoltageChannel#0": ["EBUSY", "EIO"],
+    "adc.readTempC#0": ["EBUSY", "EIO"],
+    "i2c.init#0": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED", "ERR_RESOURCE_EXHAUSTED"],
+    "i2c.init#1": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED", "ERR_RESOURCE_EXHAUSTED"],
+    "i2c.write#0": ["EBUSY", "EIO", "ENXIO", "ERR_RESOURCE_EXHAUSTED"],
+    "i2c.read#0": ["EBUSY", "EIO", "ENXIO", "ERR_RESOURCE_EXHAUSTED"],
+    "spi.init#0": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED", "ERR_RESOURCE_EXHAUSTED"],
+    "spi.init#1": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED", "ERR_RESOURCE_EXHAUSTED"],
+    "spi.transfer#0": ["EBUSY", "EIO", "ERR_RESOURCE_EXHAUSTED"],
+    "neopixel.init#0": ["EBUSY", "EIO", "ERR_NOT_SUPPORTED", "ERR_RESOURCE_EXHAUSTED"],
+    "neopixel.setPixel#0": ["EBUSY", "EIO"],
+    "neopixel.show#0": ["EBUSY", "EIO", "ERR_RESOURCE_EXHAUSTED"],
+    "neopixel.clear#0": ["EBUSY", "EIO"],
+  };
+
+  for (const [location, errorCodes] of Object.entries(expected)) {
+    const [qualifiedName, indexText] = location.split("#");
+    const [moduleName, exportName] = qualifiedName.split(".");
+    const signature = contract.modules[moduleName].exports[exportName].signatures[Number(indexText)];
+    assert.deepEqual(sorted(signature.operationalErrors), errorCodes, `${location} error set drifted`);
+    assert.deepEqual(
+      sorted(new Set(signature.operationalErrorConditions.map(({ code }) => code))),
+      errorCodes,
+      `${location} has an error without a condition`,
+    );
+  }
+
+  const valid = validatePortableApiContract(contract);
+  assert.equal(valid.valid, true, JSON.stringify(valid.errors));
+
+  assert.equal(contract.types.spiOptions.fields.mode.allowedFromCapability, "spi.modes");
+  for (const signature of contract.modules.spi.exports.init.signatures) {
+    const unsupported = signature.operationalErrorConditions.find(
+      ({ code }) => code === "ERR_NOT_SUPPORTED",
+    );
+    assert.deepEqual(unsupported, {
+      code: "ERR_NOT_SUPPORTED",
+      cause: "unsupportedConfiguration",
+      afterArgumentValidation: true,
+      configuration: "inRangeFrequencyNotExactlyRepresentable",
+    });
+  }
+
+  const contradictoryModeMapping = structuredClone(contract);
+  contradictoryModeMapping.modules.spi.exports.init.signatures[0]
+    .operationalErrorConditions[0].argumentConstraint = {
+      path: "types.spiOptions.fields.mode",
+      kind: "allowedFromCapability",
+    };
+  const contradictoryModeResult = validatePortableApiContract(contradictoryModeMapping);
+  assert.equal(contradictoryModeResult.valid, false);
+  assert.ok(
+    contradictoryModeResult.errors.some(
+      (error) => error.constraint === "operationalErrors.argumentConstraintCode",
+    ),
+    JSON.stringify(contradictoryModeResult.errors),
+  );
+
+  const prematureUnsupportedConfiguration = structuredClone(contract);
+  delete prematureUnsupportedConfiguration.modules.spi.exports.init.signatures[0]
+    .operationalErrorConditions[0].afterArgumentValidation;
+  const prematureUnsupportedResult = validatePortableApiContract(
+    prematureUnsupportedConfiguration,
+  );
+  assert.equal(prematureUnsupportedResult.valid, false);
+  assert.ok(
+    prematureUnsupportedResult.errors.some(
+      (error) => error.constraint === "operationalErrors.afterArgumentValidation",
+    ),
+    JSON.stringify(prematureUnsupportedResult.errors),
+  );
+
+  const omitted = structuredClone(contract);
+  delete omitted.modules.gpio.exports.init.signatures[0].operationalErrors;
+  const missingMapping = validatePortableApiContract(omitted);
+  assert.equal(missingMapping.valid, false);
+  assert.ok(
+    missingMapping.errors.some((error) => error.constraint === "operationalErrors.required"),
+    JSON.stringify(missingMapping.errors),
+  );
+
+  const mismatched = structuredClone(contract);
+  mismatched.modules.pwm.exports.init.signatures[0].operationalErrorConditions[0].code = "EIO";
+  const invalidCause = validatePortableApiContract(mismatched);
+  assert.equal(invalidCause.valid, false);
+  assert.ok(
+    invalidCause.errors.some((error) => error.constraint === "operationalErrors.causeCode"),
+    JSON.stringify(invalidCause.errors),
+  );
+
+  const omittedCompatibilityError = structuredClone(contract);
+  delete omittedCompatibilityError.modules.spi.exports.writeBufferDMA.signatures[0]
+    .operationalErrors;
+  const missingCompatibilityMapping = validatePortableApiContract(omittedCompatibilityError);
+  assert.equal(missingCompatibilityMapping.valid, false);
+  assert.ok(
+    missingCompatibilityMapping.errors.some(
+      (error) => error.constraint === "operationalErrors.required",
+    ),
+    JSON.stringify(missingCompatibilityMapping.errors),
+  );
 });
 
 test("all contract modules, public names, types, and units are explicit", () => {
@@ -1121,11 +1328,13 @@ test("live nonportable compatibility extensions have explicit capability gates",
   assert.deepEqual(safeModeSetter.operationalErrorConditions, [
     {
       code: "EBUSY",
+      cause: "resourceBusy",
       argument: { name: "enabled", equals: false },
       dynamicState: "bootQualificationActive",
     },
     {
       code: "EIO",
+      cause: "nativeIoFailure",
       nativeFailure: "persistentBootStateWrite",
     },
   ]);
@@ -1146,9 +1355,17 @@ test("live nonportable compatibility extensions have explicit capability gates",
     ],
   );
   assert.deepEqual(dmaSignature.returns.types, ["undefined"]);
-  assert.deepEqual(dmaSignature.operationalErrors, ["ERR_RESOURCE_EXHAUSTED"]);
+  assert.deepEqual(dmaSignature.operationalErrors, ["EBUSY", "ERR_RESOURCE_EXHAUSTED"]);
   assert.deepEqual(dmaSignature.operationalErrorConditions, [
-    { code: "ERR_RESOURCE_EXHAUSTED", dynamicState: "dmaChannelUnavailable" },
+    {
+      code: "EBUSY",
+      cause: "uninitializedUse",
+    },
+    {
+      code: "ERR_RESOURCE_EXHAUSTED",
+      cause: "resourceExhausted",
+      dynamicState: "dmaChannelUnavailable",
+    },
   ]);
   const [, bufferHandle, byteLength] = dmaSignature.arguments;
   assert.equal(bufferHandle.invalidResourceError, "RangeError");
@@ -1192,32 +1409,31 @@ test("live nonportable compatibility extensions have explicit capability gates",
   );
 });
 
-test("pre-1.0 versioning and compatibility aliases have explicit removal policy", () => {
+test("pre-1.0 compatibility aliases match the live public surface and have typed gates", () => {
   const contract = loadSchema()["x-mcujs-contract"];
   const aliases = Object.fromEntries(
     contract.compatibility.aliases.map((alias) => [alias.name, alias]),
+  );
+  assert.equal(
+    Object.keys(aliases).length,
+    contract.compatibility.aliases.length,
+    "compatibility alias names must be unique",
   );
 
   assert.equal(contract.versioning.apiVersion, "0.2");
   assert.equal(contract.versioning.pre1BreakingChanges, "minorOnly");
   assert.equal(contract.versioning.patchChanges, "nonBreakingOnly");
   assert.equal(contract.compatibility.removalNotBefore, "1.0");
-  assert.deepEqual(sorted(Object.keys(aliases)), sorted([
-    "global.board",
-    "global.GPIO",
-    "global.PWM",
-    "global.adc",
-    "global.I2C",
-    "global.SPI",
-    "global.neopixel",
-    "i2c.init(positional)",
-    "spi.init(positional)",
-    "board.ledPin",
-    "board.neopixelPin",
-    "board.neopixelLength",
-    "adc.TEMP",
-    "adc.VSYS",
-  ]));
+  assert.deepEqual(contract.compatibility.removalPolicy, {
+    availableThrough: "0.x",
+    removalNotBefore: "1.0",
+    requiresMigrationNotes: true,
+  });
+  assert.deepEqual(
+    sorted(Object.keys(aliases)),
+    sorted(collectLiveCompatibilityAliasNames(contract)),
+    "the schema alias inventory drifted from native public bindings",
+  );
   assert.equal(aliases["global.board"].target, "require('board')");
   assert.equal(aliases["global.GPIO"].target, "require('gpio')");
   assert.equal(aliases["global.PWM"].target, "require('pwm')");
@@ -1227,10 +1443,96 @@ test("pre-1.0 versioning and compatibility aliases have explicit removal policy"
   assert.equal(aliases["global.neopixel"].target, "require('neopixel')");
   assert.equal(aliases["i2c.init(positional)"].target, "i2c.init(options)");
   assert.equal(aliases["spi.init(positional)"].target, "spi.init(options)");
-  assert.equal(aliases["adc.TEMP"].portable, false);
-  assert.equal(aliases["adc.VSYS"].portable, false);
+  assert.deepEqual(aliases["require('node:module')"], {
+    name: "require('node:module')",
+    target: "require('mcujs:module')",
+    kind: "moduleSpecifier",
+    javascriptType: "object",
+    availability: "required",
+    portable: false,
+    removalNotBefore: "1.0",
+    removalRequiresMigrationNotes: true,
+  });
+  assert.deepEqual(
+    {
+      target: aliases["board.ledPin"].target,
+      kind: aliases["board.ledPin"].kind,
+      javascriptType: aliases["board.ledPin"].javascriptType,
+      availability: aliases["board.ledPin"].availability,
+      onboardDevice: aliases["board.ledPin"].onboardDevice,
+      onboardDeviceField: aliases["board.ledPin"].onboardDeviceField,
+      onboardDeviceType: aliases["board.ledPin"].onboardDeviceType,
+    },
+    {
+      target: "board.devices.led.pin",
+      kind: "property",
+      javascriptType: "number",
+      availability: "onboardDeviceField",
+      onboardDevice: "led",
+      onboardDeviceField: "pin",
+      onboardDeviceType: "gpio",
+    },
+  );
+  assert.equal(aliases["board.neopixelPin"].availability, "onboardDeviceField");
+  assert.equal(aliases["board.neopixelPin"].onboardDevice, "neopixel");
+  assert.equal(aliases["board.neopixelPin"].onboardDeviceField, "pin");
+  assert.equal(aliases["board.neopixelLength"].availability, "onboardDeviceField");
+  assert.equal(aliases["board.neopixelLength"].onboardDeviceField, "length");
+  assert.equal(aliases["adc.TEMP"].availability, "capabilityFieldEquals");
+  assert.equal(aliases["adc.TEMP"].capabilityField, "adc.temperature.rawChannel");
+  assert.equal(aliases["adc.TEMP"].capabilityValue, true);
+  assert.equal(aliases["adc.VSYS"].availability, "capabilityFieldEquals");
+  assert.equal(aliases["adc.VSYS"].capabilityField, "adc.vsys");
+  assert.equal(aliases["adc.VSYS"].capabilityValue, true);
+
+  const globalCapabilityAliases = {
+    "global.GPIO": "gpio",
+    "global.PWM": "pwm",
+    "global.adc": "adc",
+    "global.I2C": "i2c",
+    "global.SPI": "spi",
+    "global.neopixel": "neopixel",
+  };
+  for (const [name, capability] of Object.entries(globalCapabilityAliases)) {
+    assert.equal(aliases[name].kind, "globalBinding");
+    assert.equal(aliases[name].javascriptType, "object");
+    assert.equal(aliases[name].availability, "capability");
+    assert.equal(aliases[name].capability, capability);
+  }
+  const availabilityGateKeys = [
+    "capability",
+    "capabilityField",
+    "capabilityValue",
+    "onboardDevice",
+    "onboardDeviceField",
+    "onboardDeviceType",
+  ];
   for (const alias of Object.values(aliases)) {
+    assert.ok(["globalBinding", "moduleSpecifier", "overload", "property"].includes(alias.kind));
+    assert.ok(["function", "number", "object"].includes(alias.javascriptType));
+    assert.ok(
+      ["required", "capability", "capabilityFieldEquals", "onboardDeviceField"].includes(
+        alias.availability,
+      ),
+    );
+    const expectedGateKeys = {
+      required: [],
+      capability: ["capability"],
+      capabilityFieldEquals: ["capabilityField", "capabilityValue"],
+      onboardDeviceField: [
+        "onboardDevice",
+        "onboardDeviceField",
+        ...(alias.onboardDeviceType === undefined ? [] : ["onboardDeviceType"]),
+      ],
+    }[alias.availability];
+    assert.deepEqual(
+      sorted(availabilityGateKeys.filter((key) => key in alias)),
+      sorted(expectedGateKeys),
+      `${alias.name} has an incomplete or irrelevant availability gate`,
+    );
+    assert.equal(alias.portable, false);
     assert.equal(alias.removalNotBefore, "1.0");
+    assert.equal(alias.removalRequiresMigrationNotes, true);
   }
 });
 
@@ -1270,6 +1572,7 @@ test("onboard shortcut overloads preserve existing calls but reject oversized co
 test("Docusaurus documents the frozen contract and 0.1 migration", () => {
   const apiDesign = readFileSync(apiDesignUrl, "utf8");
   const migration = readFileSync(migrationUrl, "utf8");
+  const portableApiDesign = readFileSync(portableApiDesignUrl, "utf8");
 
   for (const phrase of [
     "/schemas/mcujs-portable-api-0.2.schema.json",
@@ -1322,4 +1625,22 @@ test("Docusaurus documents the frozen contract and 0.1 migration", () => {
   ]) {
     assert.ok(migration.includes(phrase), `migration docs are missing ${phrase}`);
   }
+
+  const spiExports = loadSchema()["x-mcujs-contract"].modules.spi.exports;
+  assert.ok(spiExports.init);
+  assert.equal(spiExports.open, undefined);
+  assert.match(
+    portableApiDesign,
+    /SPI exists but requested mode is absent from advertised `spi\.modes` \| `spi\.init` throws `RangeError`/,
+  );
+  assert.match(
+    portableApiDesign,
+    /SPI exists and frequency is in range but not exactly representable \| `spi\.init` throws `NotSupportedError` \/ `ERR_NOT_SUPPORTED`/,
+  );
+  assert.doesNotMatch(portableApiDesign, /requested mode[^\n]*`ERR_NOT_SUPPORTED`/);
+  assert.match(
+    apiDesign,
+    /SPI mode absent from advertised `spi\.modes` therefore throws `RangeError`/,
+  );
+  assert.doesNotMatch(portableApiDesign, /spi\.open/);
 });

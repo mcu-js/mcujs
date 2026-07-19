@@ -421,7 +421,198 @@ function validateSemanticManifest(manifest) {
   return errors;
 }
 
+function contractError(errors, location, constraint, message) {
+  errors.push({ location, constraint, message });
+}
+
+function validatePortableApiContract(candidate) {
+  const errors = [];
+  const errorContract = candidate.errors ?? {};
+  const operational = errorContract.operational ?? {};
+  const conditionKinds = errorContract.operationalConditionKinds ?? {};
+  const argumentConstraintErrors = errorContract.argumentConstraintErrors ?? {};
+  const requiredModules = errorContract.operationalMappingsRequiredForModules ?? [];
+  const requiredModuleNames = new Set(requiredModules);
+
+  for (const constraint of [
+    "allowedFromCapability",
+    "minimumFromCapability",
+    "maximumFromCapability",
+    "exclusiveMaximumFromConfiguration",
+    "minimumLength",
+    "maximumFromArgumentResource",
+    "routeFromCapability",
+  ]) {
+    if (argumentConstraintErrors[constraint] !== "RangeError") {
+      contractError(
+        errors,
+        `errors.argumentConstraintErrors.${constraint}`,
+        "argumentBoundary.constraintMapping",
+        "capability-derived and explicit argument constraints must map to RangeError",
+      );
+    }
+  }
+
+  for (const moduleName of requiredModules) {
+    if (!candidate.modules?.[moduleName]) {
+      contractError(
+        errors,
+        `modules.${moduleName}`,
+        "operationalErrors.requiredModule",
+        "operational-error completeness names an unknown module",
+      );
+    }
+  }
+
+  for (const [moduleName, moduleContract] of Object.entries(candidate.modules ?? {})) {
+    for (const [exportName, exported] of Object.entries(moduleContract.exports)) {
+      if (exported.kind !== "method") {
+        continue;
+      }
+      for (const [signatureIndex, signature] of exported.signatures.entries()) {
+        const mappingRequired =
+          (requiredModuleNames.has(moduleName) && !exported.compatibilityOnly) ||
+          signature.operationalErrorMappingRequired === true;
+        if (!mappingRequired) {
+          continue;
+        }
+        const location = `modules.${moduleName}.exports.${exportName}.signatures.${signatureIndex}`;
+        if (!Array.isArray(signature.operationalErrors) || signature.operationalErrors.length === 0) {
+          contractError(
+            errors,
+            location,
+            "operationalErrors.required",
+            "must declare at least one operational error",
+          );
+          continue;
+        }
+        if (
+          !Array.isArray(signature.operationalErrorConditions) ||
+          signature.operationalErrorConditions.length === 0
+        ) {
+          contractError(
+            errors,
+            location,
+            "operationalErrors.conditionsRequired",
+            "must map every operational error to a machine-readable condition",
+          );
+          continue;
+        }
+
+        const conditionedCodes = new Set();
+        for (const condition of signature.operationalErrorConditions) {
+          conditionedCodes.add(condition.code);
+          if (!signature.operationalErrors.includes(condition.code)) {
+            contractError(
+              errors,
+              location,
+              "operationalErrors.conditionDeclared",
+              `${condition.code} is conditioned but not declared`,
+            );
+          }
+          if (!operational[condition.code]) {
+            contractError(
+              errors,
+              location,
+              "operationalErrors.knownCode",
+              `${condition.code} is not a stable operational code`,
+            );
+          }
+          if (conditionKinds[condition.cause]?.code !== condition.code) {
+            contractError(
+              errors,
+              location,
+              "operationalErrors.causeCode",
+              `${condition.cause} does not map to ${condition.code}`,
+            );
+          }
+          if (
+            condition.cause === "unsupportedConfiguration" &&
+            condition.afterArgumentValidation !== true
+          ) {
+            contractError(
+              errors,
+              location,
+              "operationalErrors.afterArgumentValidation",
+              "unsupported configuration begins only after all argument constraints pass",
+            );
+          }
+          if (condition.argumentConstraint) {
+            const { path, kind } = condition.argumentConstraint;
+            const constrainedArgument = path
+              ?.split(".")
+              .reduce((value, segment) => value?.[segment], candidate);
+            if (!constrainedArgument || !(kind in constrainedArgument)) {
+              contractError(
+                errors,
+                location,
+                "operationalErrors.argumentConstraintReference",
+                `${path}.${kind} is not a contract argument constraint`,
+              );
+            } else if (argumentConstraintErrors[kind] !== condition.code) {
+              contractError(
+                errors,
+                location,
+                "operationalErrors.argumentConstraintCode",
+                `${path}.${kind} maps to ${argumentConstraintErrors[kind] ?? "no programming error"}, not ${condition.code}`,
+              );
+            }
+          }
+          if (
+            condition.argument &&
+            !signature.arguments.some((argument) => argument.name === condition.argument.name)
+          ) {
+            contractError(
+              errors,
+              location,
+              "operationalErrors.argument",
+              `${condition.argument.name} is not an argument of this signature`,
+            );
+          }
+        }
+
+        for (const code of signature.operationalErrors) {
+          if (!operational[code]) {
+            contractError(
+              errors,
+              location,
+              "operationalErrors.knownCode",
+              `${code} is not a stable operational code`,
+            );
+          }
+          if (!conditionedCodes.has(code)) {
+            contractError(
+              errors,
+              location,
+              "operationalErrors.conditionMissing",
+              `${code} has no machine-readable condition`,
+            );
+          }
+        }
+
+        if (
+          exported.requiresInitialization &&
+          !signature.operationalErrorConditions.some(({ cause }) => cause === "uninitializedUse")
+        ) {
+          contractError(
+            errors,
+            location,
+            "operationalErrors.uninitializedUse",
+            "an initialization-dependent operation must map uninitialized use",
+          );
+        }
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 function validatePortableApiManifest(manifest) {
+  const contractValidation = validatePortableApiContract(contract);
+  if (!contractValidation.valid) {
+    return contractValidation;
+  }
   if (!validateSchema(manifest)) {
     return {
       valid: false,
@@ -466,5 +657,6 @@ if (require.main === module) {
 }
 
 module.exports = {
+  validatePortableApiContract,
   validatePortableApiManifest,
 };

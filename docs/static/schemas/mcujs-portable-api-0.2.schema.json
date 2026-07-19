@@ -1171,6 +1171,47 @@
           "code": null
         }
       },
+      "argumentBoundary": {
+        "RangeError": "The supplied value violates an explicit type, range, length, route, enum, or capability-derived argument constraint.",
+        "ERR_NOT_SUPPORTED": "Every supplied value passes its explicit argument constraints, but the advertised operation cannot implement the requested valid combination or exact hardware representation."
+      },
+      "argumentConstraintErrors": {
+        "allowedFromCapability": "RangeError",
+        "minimumFromCapability": "RangeError",
+        "maximumFromCapability": "RangeError",
+        "exclusiveMaximumFromConfiguration": "RangeError",
+        "minimumLength": "RangeError",
+        "maximumFromArgumentResource": "RangeError",
+        "routeFromCapability": "RangeError"
+      },
+      "operationalMappingsRequiredForModules": [
+        "gpio",
+        "pwm",
+        "adc",
+        "i2c",
+        "spi",
+        "neopixel"
+      ],
+      "operationalConditionKinds": {
+        "unsupportedConfiguration": {
+          "code": "ERR_NOT_SUPPORTED"
+        },
+        "resourceBusy": {
+          "code": "EBUSY"
+        },
+        "uninitializedUse": {
+          "code": "EBUSY"
+        },
+        "resourceExhausted": {
+          "code": "ERR_RESOURCE_EXHAUSTED"
+        },
+        "externalDeviceUnavailable": {
+          "code": "ENXIO"
+        },
+        "nativeIoFailure": {
+          "code": "EIO"
+        }
+      },
       "operational": {
         "ERR_NOT_SUPPORTED": {
           "class": "Error",
@@ -1483,6 +1524,7 @@
                 }
               },
               {
+                "operationalErrorMappingRequired": true,
                 "arguments": [
                   {
                     "name": "enabled",
@@ -1502,6 +1544,7 @@
                 "operationalErrorConditions": [
                   {
                     "code": "EBUSY",
+                    "cause": "resourceBusy",
                     "argument": {
                       "name": "enabled",
                       "equals": false
@@ -1510,6 +1553,7 @@
                   },
                   {
                     "code": "EIO",
+                    "cause": "nativeIoFailure",
                     "nativeFailure": "persistentBootStateWrite"
                   }
                 ]
@@ -1716,7 +1760,30 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "advertisedPinModeCombination"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "pin"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "gpioConfigure"
+                  }
+                ]
               }
             ]
           },
@@ -1743,7 +1810,27 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "pin"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "gpioWrite"
+                  }
+                ]
               }
             ]
           },
@@ -1765,7 +1852,27 @@
                   "types": [
                     "boolean"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "pin"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "gpioRead"
+                  }
+                ]
               }
             ]
           },
@@ -1787,7 +1894,27 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "pin"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "gpioToggle"
+                  }
+                ]
               }
             ]
           }
@@ -1823,7 +1950,36 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "exactFrequencyOrPinTimerCombination"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "pinOrTimer"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "pwmOutputOrTimer"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "pwmConfigure"
+                  }
+                ]
               }
             ]
           },
@@ -1857,7 +2013,34 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "exactDutyRepresentation"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "pwmOutput"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "pwmDutyWrite"
+                  }
+                ]
               }
             ]
           },
@@ -1879,7 +2062,22 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "pwmStop"
+                  }
+                ]
               }
             ]
           }
@@ -1909,7 +2107,23 @@
                   ],
                   "minimum": 0,
                   "maximumFromCapabilityBitWidth": "adc.resolutionBits"
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "adcController"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "adcReadPin"
+                  }
+                ]
               }
             ]
           },
@@ -1932,7 +2146,23 @@
                   ],
                   "minimum": 0,
                   "maximumFromCapabilityBitWidth": "adc.resolutionBits"
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "adcController"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "adcReadChannel"
+                  }
+                ]
               }
             ]
           },
@@ -1957,7 +2187,23 @@
                   "unit": "voltage",
                   "minimumFromCapability": "adc.voltage.minVolts",
                   "maximumFromCapability": "adc.voltage.maxVolts"
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "adcController"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "adcVoltageReadPin"
+                  }
+                ]
               }
             ]
           },
@@ -1982,7 +2228,23 @@
                   "unit": "voltage",
                   "minimumFromCapability": "adc.voltage.minVolts",
                   "maximumFromCapability": "adc.voltage.maxVolts"
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "adcController"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "adcVoltageReadChannel"
+                  }
+                ]
               }
             ]
           },
@@ -1998,7 +2260,23 @@
                     "number"
                   ],
                   "unit": "temperature"
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "temperatureSensor"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "temperatureRead"
+                  }
+                ]
               }
             ]
           }
@@ -2026,7 +2304,36 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "exactFrequencyOrRouteCombination"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "i2cBusOrRoute"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "i2cDriverSlot"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "i2cConfigure"
+                  }
+                ]
               },
               {
                 "compatibility": "i2c.init(positional)",
@@ -2076,7 +2383,36 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "exactFrequencyOrRouteCombination"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "i2cBusOrRoute"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "i2cDriverSlot"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "i2cConfigure"
+                  }
+                ]
               }
             ]
           },
@@ -2115,7 +2451,39 @@
                     "integer"
                   ],
                   "unit": "transferSize"
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "ENXIO",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "i2cBus"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "i2cTransactionBuffer"
+                  },
+                  {
+                    "code": "ENXIO",
+                    "cause": "externalDeviceUnavailable",
+                    "externalFailure": "addressNackOrDeviceAbsent"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "i2cWriteOrIndistinguishableNack"
+                  }
+                ]
               }
             ]
           },
@@ -2154,7 +2522,39 @@
                   "types": [
                     "byteArray"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "ENXIO",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "i2cBus"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "i2cTransactionBuffer"
+                  },
+                  {
+                    "code": "ENXIO",
+                    "cause": "externalDeviceUnavailable",
+                    "externalFailure": "addressNackOrDeviceAbsent"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "i2cReadOrIndistinguishableNack"
+                  }
+                ]
               }
             ]
           }
@@ -2194,7 +2594,36 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "inRangeFrequencyNotExactlyRepresentable"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "spiBusOrRoute"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "spiDriverSlot"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "spiConfigure"
+                  }
+                ]
               },
               {
                 "compatibility": "spi.init(positional)",
@@ -2260,7 +2689,36 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "inRangeFrequencyNotExactlyRepresentable"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "spiBusOrRoute"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "spiDriverSlot"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "spiConfigure"
+                  }
+                ]
               }
             ]
           },
@@ -2291,7 +2749,33 @@
                     "byteArray"
                   ],
                   "correlatesWithArgument": "data"
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "spiBus"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "spiTransactionBuffer"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "spiTransfer"
+                  }
+                ]
               }
             ]
           },
@@ -2305,6 +2789,7 @@
             "compatibilityOnly": true,
             "signatures": [
               {
+                "operationalErrorMappingRequired": true,
                 "arguments": [
                   {
                     "name": "bus",
@@ -2338,11 +2823,17 @@
                   ]
                 },
                 "operationalErrors": [
+                  "EBUSY",
                   "ERR_RESOURCE_EXHAUSTED"
                 ],
                 "operationalErrorConditions": [
                   {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
                     "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
                     "dynamicState": "dmaChannelUnavailable"
                   }
                 ]
@@ -2372,7 +2863,36 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "ERR_NOT_SUPPORTED",
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "ERR_NOT_SUPPORTED",
+                    "cause": "unsupportedConfiguration",
+                    "afterArgumentValidation": true,
+                    "configuration": "timingOrderOrStripConfiguration"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "pinOrWaveformPeripheral"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "waveformChannelOrPixelBuffer"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "neopixelConfigure"
+                  }
+                ]
               }
             ]
           },
@@ -2410,7 +2930,22 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "pixelBufferWrite"
+                  }
+                ]
               }
             ]
           },
@@ -2425,7 +2960,33 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "ERR_RESOURCE_EXHAUSTED",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EBUSY",
+                    "cause": "resourceBusy",
+                    "resource": "waveformPeripheral"
+                  },
+                  {
+                    "code": "ERR_RESOURCE_EXHAUSTED",
+                    "cause": "resourceExhausted",
+                    "resource": "waveformTransaction"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "neopixelTransmit"
+                  }
+                ]
               }
             ]
           },
@@ -2440,7 +3001,22 @@
                   "types": [
                     "undefined"
                   ]
-                }
+                },
+                "operationalErrors": [
+                  "EBUSY",
+                  "EIO"
+                ],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EBUSY",
+                    "cause": "uninitializedUse"
+                  },
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "pixelBufferClear"
+                  }
+                ]
               }
             ]
           }
@@ -2450,91 +3026,182 @@
     "compatibility": {
       "policy": "Aliases listed here remain available through the 0.x series when their target capability exists. They are not portable names and may be removed in 1.0 with migration notes.",
       "removalNotBefore": "1.0",
+      "removalPolicy": {
+        "availableThrough": "0.x",
+        "removalNotBefore": "1.0",
+        "requiresMigrationNotes": true
+      },
       "aliases": [
         {
           "name": "global.board",
           "target": "require('board')",
+          "kind": "globalBinding",
+          "javascriptType": "object",
+          "availability": "required",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "global.GPIO",
           "target": "require('gpio')",
+          "kind": "globalBinding",
+          "javascriptType": "object",
+          "availability": "capability",
+          "capability": "gpio",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "global.PWM",
           "target": "require('pwm')",
+          "kind": "globalBinding",
+          "javascriptType": "object",
+          "availability": "capability",
+          "capability": "pwm",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "global.adc",
           "target": "require('adc')",
+          "kind": "globalBinding",
+          "javascriptType": "object",
+          "availability": "capability",
+          "capability": "adc",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "global.I2C",
           "target": "require('i2c')",
+          "kind": "globalBinding",
+          "javascriptType": "object",
+          "availability": "capability",
+          "capability": "i2c",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "global.SPI",
           "target": "require('spi')",
+          "kind": "globalBinding",
+          "javascriptType": "object",
+          "availability": "capability",
+          "capability": "spi",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "global.neopixel",
           "target": "require('neopixel')",
+          "kind": "globalBinding",
+          "javascriptType": "object",
+          "availability": "capability",
+          "capability": "neopixel",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
+        },
+        {
+          "name": "require('node:module')",
+          "target": "require('mcujs:module')",
+          "kind": "moduleSpecifier",
+          "javascriptType": "object",
+          "availability": "required",
+          "portable": false,
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "i2c.init(positional)",
           "target": "i2c.init(options)",
+          "kind": "overload",
+          "javascriptType": "function",
+          "availability": "capability",
+          "capability": "i2c",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "spi.init(positional)",
           "target": "spi.init(options)",
+          "kind": "overload",
+          "javascriptType": "function",
+          "availability": "capability",
+          "capability": "spi",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "board.ledPin",
-          "target": "board.led()",
+          "target": "board.devices.led.pin",
+          "kind": "property",
+          "javascriptType": "number",
+          "availability": "onboardDeviceField",
+          "onboardDevice": "led",
+          "onboardDeviceField": "pin",
+          "onboardDeviceType": "gpio",
           "portable": false,
-          "meaning": "Legacy onboard LED identifier; it is not necessarily an MCU GPIO pin.",
-          "removalNotBefore": "1.0"
+          "meaning": "Legacy GPIO-backed onboard LED pin; this property is absent for managed LEDs that have no MCU GPIO pin.",
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "board.neopixelPin",
           "target": "board.devices.neopixel.pin",
+          "kind": "property",
+          "javascriptType": "number",
+          "availability": "onboardDeviceField",
+          "onboardDevice": "neopixel",
+          "onboardDeviceField": "pin",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "board.neopixelLength",
           "target": "board.devices.neopixel.length",
+          "kind": "property",
+          "javascriptType": "number",
+          "availability": "onboardDeviceField",
+          "onboardDevice": "neopixel",
+          "onboardDeviceField": "length",
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "adc.TEMP",
-          "target": "board.capability('adc').temperature",
+          "target": "adc.readTempC()",
+          "kind": "property",
+          "javascriptType": "number",
+          "availability": "capabilityFieldEquals",
+          "capabilityField": "adc.temperature.rawChannel",
+          "capabilityValue": true,
           "portable": false,
-          "removalNotBefore": "1.0"
+          "meaning": "RP compatibility raw-temperature channel identifier; readTempC() is the portable converted-temperature replacement, not a raw-channel equivalent.",
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         },
         {
           "name": "adc.VSYS",
-          "target": "board.capability('adc').vsys",
+          "target": "board.capability('adc').channels[aliases includes 'VSYS'].channel",
+          "kind": "property",
+          "javascriptType": "number",
+          "availability": "capabilityFieldEquals",
+          "capabilityField": "adc.vsys",
+          "capabilityValue": true,
           "portable": false,
-          "removalNotBefore": "1.0"
+          "removalNotBefore": "1.0",
+          "removalRequiresMigrationNotes": true
         }
       ]
     }

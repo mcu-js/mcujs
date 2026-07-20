@@ -105,6 +105,8 @@ static int s_gpio_pulls[NUM_BANK0_GPIOS];
 unsigned mcujs_test_gpio_init_calls;
 int mcujs_test_i2c_init_result;
 unsigned mcujs_test_i2c_init_calls;
+unsigned mcujs_test_i2c_deinit_calls;
+int mcujs_test_i2c_last_init_bus;
 unsigned mcujs_test_pwm_config_calls;
 unsigned mcujs_test_pwm_divider_scaled;
 unsigned mcujs_test_pwm_wrap;
@@ -149,6 +151,8 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_gpio_init_calls = 0;
     mcujs_test_i2c_init_result = -1;
     mcujs_test_i2c_init_calls = 0;
+    mcujs_test_i2c_deinit_calls = 0;
+    mcujs_test_i2c_last_init_bus = -1;
     mcujs_test_pwm_config_calls = 0;
     mcujs_test_pwm_divider_scaled = 0;
     mcujs_test_pwm_wrap = 0;
@@ -217,11 +221,16 @@ bool gpio_get(uint pin) { return pin < NUM_BANK0_GPIOS && s_gpio_levels[pin]; }
 void gpio_set_function(uint pin, uint function) { (void)pin; (void)function; }
 
 uint i2c_init(i2c_inst_t *instance, uint baudrate) {
-    (void)instance;
     mcujs_test_i2c_init_calls++;
+    mcujs_test_i2c_last_init_bus = instance->index;
     return mcujs_test_i2c_init_result >= 0
         ? (uint)mcujs_test_i2c_init_result
         : baudrate;
+}
+
+void i2c_deinit(i2c_inst_t *instance) {
+    (void)instance;
+    mcujs_test_i2c_deinit_calls++;
 }
 
 int i2c_write_blocking(i2c_inst_t *instance, uint8_t address,
@@ -438,6 +447,9 @@ int mcujs_test_gpio_result;
 unsigned mcujs_test_i2c_param_config_calls;
 unsigned mcujs_test_i2c_driver_install_calls;
 unsigned mcujs_test_i2c_driver_delete_calls;
+int mcujs_test_i2c_param_config_result;
+int mcujs_test_i2c_driver_install_result;
+int mcujs_test_i2c_driver_delete_result;
 int mcujs_test_ledc_result;
 unsigned mcujs_test_ledc_resolution;
 unsigned mcujs_test_ledc_configured_resolution;
@@ -483,6 +495,9 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_param_config_calls = 0;
     mcujs_test_i2c_driver_install_calls = 0;
     mcujs_test_i2c_driver_delete_calls = 0;
+    mcujs_test_i2c_param_config_result = ESP_OK;
+    mcujs_test_i2c_driver_install_result = ESP_OK;
+    mcujs_test_i2c_driver_delete_result = ESP_OK;
     mcujs_test_ledc_result = ESP_OK;
     mcujs_test_ledc_resolution = UINT32_MAX;
     mcujs_test_ledc_configured_resolution = 0;
@@ -572,7 +587,7 @@ esp_err_t i2c_param_config(i2c_port_t port, const i2c_config_t *config) {
     (void)port;
     (void)config;
     mcujs_test_i2c_param_config_calls++;
-    return ESP_OK;
+    return mcujs_test_i2c_param_config_result;
 }
 esp_err_t i2c_driver_install(i2c_port_t port, int mode, size_t rx_buffer_length,
                              size_t tx_buffer_length, int interrupt_flags) {
@@ -582,12 +597,12 @@ esp_err_t i2c_driver_install(i2c_port_t port, int mode, size_t rx_buffer_length,
     (void)tx_buffer_length;
     (void)interrupt_flags;
     mcujs_test_i2c_driver_install_calls++;
-    return ESP_OK;
+    return mcujs_test_i2c_driver_install_result;
 }
 esp_err_t i2c_driver_delete(i2c_port_t port) {
     (void)port;
     mcujs_test_i2c_driver_delete_calls++;
-    return ESP_OK;
+    return mcujs_test_i2c_driver_delete_result;
 }
 esp_err_t i2c_master_write_to_device(i2c_port_t port, uint8_t address,
                                      const uint8_t *data, size_t length,

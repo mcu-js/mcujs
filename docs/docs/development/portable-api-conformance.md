@@ -176,3 +176,9 @@ PWM electrical acceptance uses the separate
 [non-destructive PWM waveform protocol](./pwm-waveform-protocol.md). Host/native
 tests prove validation, scaling, allocation, and lifecycle state; they do not
 claim measured waveform frequency, duty, edge quality, or rail levels.
+
+I2C electrical acceptance uses the separate
+[non-destructive I2C peripheral protocol](./i2c-peripheral-protocol.md).
+Host/native tests prove strict arguments, transfer limits, lifecycle state, and
+SDK error mappings; only target-emulator and logic-analyzer evidence proves
+ACK/NACK behavior, measured SCL timing, and byte-level interoperability.

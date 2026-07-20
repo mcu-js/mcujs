@@ -6,7 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 node --test \
     "${ROOT}/tests/runtime-registry.test.js" \
     "${ROOT}/tests/portable-api-conformance.test.js" \
-    "${ROOT}/tests/examples-gpio-contract.test.js"
+    "${ROOT}/tests/examples-gpio-contract.test.js" \
+    "${ROOT}/tests/examples-i2c-contract.test.js"
 "${ROOT}/scripts/test-runtime-registry.sh"
 "${ROOT}/scripts/test-runtime-bindings.sh"
 "${ROOT}/scripts/test-runtime-validation.sh"

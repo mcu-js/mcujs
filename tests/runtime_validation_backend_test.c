@@ -10,6 +10,9 @@
 #if defined(MCUJS_PLATFORM_RP2)
 #include "hardware/pwm.h"
 #include "onboard_led.h"
+#include "pico/error.h"
+#elif defined(MCUJS_PLATFORM_ESP32)
+#include "esp_err.h"
 #endif
 
 static bool eval_source(const char *source) {
@@ -71,7 +74,11 @@ static const char s_strict_source[] =
     "  assert(gpioBusy.pin === 3, 'GPIO busy pin missing');\n"
     "  assert(!('code' in capture(function () { GPIO.set(3, 1); })), 'TypeError gained operational code');\n"
     "  assertType(function () { I2C.write(0, 0x50, ['1']); }, TypeError, 'I2C state masked invalid byte');\n"
-    "  assertType(function () { I2C.read(0, 0x50, 257); }, RangeError, 'I2C state masked invalid length');\n"
+    "  assertType(function () { I2C.write(0, -1, [1]); }, RangeError, 'I2C state masked negative address');\n"
+    "  assertType(function () { I2C.write(0, 128, [1]); }, RangeError, 'I2C state masked 8-bit address');\n"
+    "  assertType(function () { I2C.read(0, 0x50, __i2cMax + 1); }, RangeError, 'I2C state masked invalid length');\n"
+    "  assertType(function () { I2C.read(0, 0x50, NaN); }, TypeError, 'I2C NaN read length accepted');\n"
+    "  assertType(function () { I2C.read(0, 0x50, Infinity); }, TypeError, 'I2C infinite read length accepted');\n"
     "  var sentinel = new URIError('I2C accessor sentinel');\n"
     "  var throwing = [0]; Object.defineProperty(throwing, '0', {get: function () { throw sentinel; }});\n"
     "  assert(capture(function () { I2C.write(0, 0x50, throwing); }) === sentinel, 'I2C accessor exception replaced');\n"
@@ -99,10 +106,16 @@ static const char s_strict_source[] =
     "  assertType(function () { I2C.write(0, 0x50, ['1']); }, TypeError, 'I2C numeric string byte accepted');\n"
     "  assertType(function () { I2C.write(0, 0x50, [1.5]); }, RangeError, 'I2C fractional byte accepted');\n"
     "  assertType(function () { I2C.write(0, 0x50, [256]); }, RangeError, 'I2C wrapped byte accepted');\n"
-    "  var oversized = []; for (var i = 0; i < 257; i++) oversized.push(0);\n"
+    "  assertType(function () { I2C.write(0, 0x50, []); }, RangeError, 'I2C empty transfer accepted');\n"
+    "  assertType(function () { I2C.read(0, 0x50, 0); }, RangeError, 'I2C empty read accepted');\n"
+    "  var oversized = []; for (var i = 0; i < __i2cMax + 1; i++) oversized.push(0);\n"
     "  assertType(function () { I2C.write(0, 0x50, oversized); }, RangeError, 'I2C oversized transfer accepted');\n"
-    "  var maximum = []; for (var j = 0; j < 256; j++) maximum.push(j & 255);\n"
-    "  assert(I2C.write(0, 0x50, maximum) === 256, 'I2C exact maximum rejected');\n"
+    "  assert(I2C.write(0, 0x50, 0) === 1, 'I2C zero byte rejected');\n"
+    "  assert(I2C.write(0, 0x50, 255) === 1, 'I2C 255 byte rejected');\n"
+    "  var maximum = []; for (var j = 0; j < __i2cMax; j++) maximum.push(j & 255);\n"
+    "  assert(I2C.write(0, 0x50, maximum) === __i2cMax, 'I2C exact maximum rejected');\n"
+    "  var received = I2C.read(0, 0x50, __i2cMax);\n"
+    "  assert(received.length === __i2cMax && received[0] === 0 && received[__i2cMax - 1] === ((__i2cMax - 1) & 255), 'I2C exact maximum read changed');\n"
     "  assertType(function () { PWM.init('9', 1000); }, TypeError, 'PWM numeric string pin accepted');\n"
     "  assertType(function () { PWM.init(9, 1000.5); }, RangeError, 'PWM fractional frequency accepted');\n"
     "  PWM.init(9, 1000);\n"
@@ -156,6 +169,7 @@ int main(void) {
 #endif
     install_number("__pwmMin", MCUJS_RUNTIME_PWM_MIN_HZ);
     install_number("__pwmMax", MCUJS_RUNTIME_PWM_MAX_HZ);
+    install_number("__i2cMax", MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES);
 #if defined(MCUJS_PLATFORM_ESP32)
     install_number("__i2cSda", 5);
     install_number("__i2cScl", 6);
@@ -167,10 +181,53 @@ int main(void) {
 #endif
 
     assert(eval_source(s_strict_source));
-    assert(mcujs_test_i2c_write_calls == 1);
+    assert(mcujs_test_i2c_write_calls == 3);
+    assert(mcujs_test_i2c_read_calls == 1);
+    assert(mcujs_test_i2c_last_length == MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES);
+    assert(eval_source(
+        "(function () { function capture(call) { try { call(); } catch (error) { return error; } throw new Error('expected exception'); } "
+        "function expect(call, constructor, message) { var error = capture(call); if (!(error instanceof constructor) || ('code' in error)) throw new Error(message + ': ' + error); } "
+        "expect(function () { I2C.init(null); }, TypeError, 'null options accepted'); "
+        "expect(function () { I2C.init([]); }, TypeError, 'array options accepted'); "
+        "expect(function () { I2C.init({}); }, TypeError, 'missing frequency accepted'); "
+        "expect(function () { I2C.init({frequency: '100000'}); }, TypeError, 'string frequency accepted'); "
+        "expect(function () { I2C.init({frequency: 100000.5}); }, RangeError, 'fractional frequency accepted'); "
+        "expect(function () { I2C.init({frequency: 0}); }, RangeError, 'zero frequency accepted'); "
+        "expect(function () { I2C.init({frequency: 1000001}); }, RangeError, 'frequency above capability accepted'); "
+        "expect(function () { I2C.init({frequency: 100000, extra: true}); }, RangeError, 'unknown option accepted'); "
+        "expect(function () { I2C.init({bus: 1, frequency: 100000}); }, RangeError, 'non-default bus selected default pins'); "
+        "expect(function () { I2C.init({frequency: 100000, sda: __i2cSda}); }, RangeError, 'partial route accepted'); "
+        "expect(function () { I2C.init({bus: 0, sda: __i2cScl, scl: __i2cSda, frequency: 100000}); }, RangeError, 'unlisted route accepted'); "
+        "var sentinel = new URIError('I2C options getter sentinel'); var later = 0; var options = {}; "
+        "Object.defineProperty(options, 'bus', {enumerable: true, get: function () { throw sentinel; }}); "
+        "Object.defineProperty(options, 'frequency', {enumerable: true, get: function () { later++; return 100000; }}); "
+        "if (capture(function () { I2C.init(options); }) !== sentinel || later !== 0) throw new Error('options getter exception was replaced or did not short-circuit'); "
+        "I2C.init({frequency: 100000}); I2C.write(0, 0x50, [1]); "
+        "I2C.init({bus: 0, sda: __i2cSda, scl: __i2cScl, frequency: 100000}); I2C.write(0, 0x50, [2]); "
+        "I2C.init(0, __i2cSda, __i2cScl, 100000); "
+        "expect(function () { I2C.write(0, -1, [1]); }, RangeError, 'negative address accepted'); "
+        "expect(function () { I2C.write(0, 128, [1]); }, RangeError, '8-bit address accepted'); "
+        "expect(function () { I2C.write(0, 0x50, []); }, RangeError, 'empty write accepted'); "
+        "expect(function () { I2C.read(0, 0x50, 0); }, RangeError, 'zero read accepted'); "
+        "expect(function () { I2C.read(0, 0x50, 257); }, RangeError, 'oversize read accepted'); "
+        "var bytes = I2C.read(0, 0x50, 256); if (bytes.length !== 256 || bytes[0] !== 0 || bytes[255] !== 255) throw new Error('maximum read was truncated or corrupted');"
+        "}());"));
     assert(mcujs_test_i2c_last_length == 256);
 
 #if defined(MCUJS_PLATFORM_RP2)
+    unsigned i2c_deinit_calls = mcujs_test_i2c_deinit_calls;
+    assert(eval_source("I2C.init({frequency: 100000});"));
+    assert(mcujs_test_i2c_deinit_calls == i2c_deinit_calls + 1u);
+    mcujs_test_i2c_init_result = 0;
+    assert(assert_operational_error("I2C.init({frequency: 100000})",
+                                    "Error", "EIO"));
+    mcujs_test_i2c_init_result = -1;
+    assert(assert_operational_error("I2C.write(0, 0x50, [1])",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(eval_source("GPIO.init(__i2cSda, GPIO.OUTPUT); "
+                       "GPIO.init(__i2cScl, GPIO.OUTPUT); "
+                       "I2C.init({frequency: 100000});"));
+
     assert(mcujs_test_pwm_level == (mcujs_test_pwm_wrap + 1u) / 2u);
     assert(eval_source("PWM.setDuty(9, 0);"));
     assert(mcujs_test_pwm_level == 0u);
@@ -308,6 +365,44 @@ int main(void) {
         "throw new Error('I2C maximum-plus-one was not uncoded RangeError'); "
         "I2C.write(0, 0x50, [1]); }());"));
 
+    unsigned preserved_i2c_delete_calls = mcujs_test_i2c_driver_delete_calls;
+    mcujs_test_i2c_driver_delete_result = ESP_ERR_TIMEOUT;
+    assert(assert_operational_error("I2C.init({frequency: 100000})",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(mcujs_test_i2c_driver_delete_calls ==
+           preserved_i2c_delete_calls + 1u);
+    mcujs_test_i2c_driver_delete_result = ESP_OK;
+    assert(eval_source("I2C.write(0, 0x50, [1]);"));
+
+    mcujs_test_i2c_driver_install_result = ESP_ERR_NO_MEM;
+    assert(assert_operational_error("I2C.init({frequency: 100000})",
+                                    "ResourceExhaustedError",
+                                    "ERR_RESOURCE_EXHAUSTED"));
+    mcujs_test_i2c_driver_install_result = ESP_OK;
+    assert(assert_operational_error("I2C.write(0, 0x50, [1])",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(eval_source("GPIO.init(5, GPIO.OUTPUT); GPIO.init(6, GPIO.OUTPUT); "
+                       "I2C.init({frequency: 100000});"));
+
+    mcujs_test_gpio_reset_result = ESP_ERR_INVALID_STATE;
+    assert(assert_operational_error("I2C.init({frequency: 100000})",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(assert_operational_error("I2C.write(0, 0x50, [1])",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(assert_operational_error("GPIO.init(5, GPIO.OUTPUT)",
+                                    "ResourceBusyError", "EBUSY"));
+    mcujs_test_gpio_reset_result = ESP_OK;
+    assert(eval_source("I2C.init({frequency: 100000});"));
+
+    mcujs_test_i2c_param_config_result = ESP_FAIL;
+    assert(assert_operational_error("I2C.init({frequency: 100000})",
+                                    "Error", "EIO"));
+    mcujs_test_i2c_param_config_result = ESP_OK;
+    assert(assert_operational_error("I2C.write(0, 0x50, [1])",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(eval_source("GPIO.init(5, GPIO.OUTPUT); GPIO.init(6, GPIO.OUTPUT); "
+                       "I2C.init({frequency: 100000});"));
+
     mcujs_test_ledc_actual_frequency = 1099;
     assert(assert_operational_error("PWM.init(4, 1100)",
                                     "NotSupportedError", "ERR_NOT_SUPPORTED"));
@@ -401,6 +496,8 @@ int main(void) {
     assert(assert_uncoded_range_error("I2C.init(0, 10, 11, 100000)"));
     assert(assert_operational_error("I2C.init(0, 4, 5, 1)",
                                     "NotSupportedError", "ERR_NOT_SUPPORTED"));
+    assert(assert_operational_error("I2C.init(0, 4, 5, 1374)",
+                                    "NotSupportedError", "ERR_NOT_SUPPORTED"));
     assert(assert_operational_error("I2C.init(0, 4, 5, 110000)",
                                     "NotSupportedError", "ERR_NOT_SUPPORTED"));
     assert(mcujs_test_i2c_init_calls == i2c_init_calls);
@@ -474,6 +571,31 @@ int main(void) {
                        "GPIO.init(4, GPIO.OUTPUT);"));
     assert(assert_operational_error("GPIO.init(8, GPIO.OUTPUT)",
                                     "ResourceBusyError", "EBUSY"));
+
+    /* A route-changing native init failure tears down the old controller and
+     * releases both its old route and the newly claimed route. Stale GPIO state
+     * remains inaccessible until each pin is explicitly reinitialized. */
+    mcujs_test_i2c_init_result = 0;
+    assert(assert_operational_error("I2C.init(0, 4, 5, 100000)",
+                                    "Error", "EIO"));
+    mcujs_test_i2c_init_result = -1;
+    assert(assert_operational_error("I2C.write(0, 0x50, [1])",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(assert_operational_error("GPIO.set(4, true)",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(assert_operational_error("GPIO.set(8, true)",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(eval_source(
+        "GPIO.init(4, GPIO.OUTPUT); GPIO.init(5, GPIO.OUTPUT); "
+        "GPIO.init(8, GPIO.OUTPUT); GPIO.init(9, GPIO.OUTPUT); "
+        "GPIO.set(4, true); GPIO.set(5, true); "
+        "GPIO.set(8, true); GPIO.set(9, true); "
+        "I2C.init(0, 8, 9, 100000);"));
+    assert(assert_operational_error("GPIO.init(8, GPIO.OUTPUT)",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(assert_operational_error("GPIO.init(9, GPIO.OUTPUT)",
+                                    "ResourceBusyError", "EBUSY"));
+
     mcujs_test_i2c_result = 1;
     assert(assert_operational_error("I2C.write(0, 0x50, [1, 2])",
                                     "Error", "EIO"));
@@ -595,9 +717,15 @@ int main(void) {
     mcujs_test_i2c_result = 0x103;
     assert(assert_operational_error("I2C.read(0, 0x50, 1)",
                                     "ResourceBusyError", "EBUSY"));
+    mcujs_test_i2c_result = ESP_ERR_TIMEOUT;
+    assert(assert_operational_error("I2C.read(0, 0x50, 1)",
+                                    "Error", "EIO"));
     mcujs_test_i2c_result = 0x555;
 #else
-    mcujs_test_i2c_result = -2;
+    mcujs_test_i2c_result = PICO_ERROR_TIMEOUT;
+    assert(assert_operational_error("I2C.read(0, 0x50, 1)",
+                                    "ResourceBusyError", "EBUSY"));
+    mcujs_test_i2c_result = -6;
 #endif
     assert(assert_operational_error("I2C.read(0, 0x50, 1)", "Error", "EIO"));
 

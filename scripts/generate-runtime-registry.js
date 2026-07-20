@@ -81,6 +81,13 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK ${pinMask(descriptor.capabilities.neopixel?.pins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MIN_HZ ${descriptor.capabilities.pwm?.frequency.minHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MAX_HZ ${descriptor.capabilities.pwm?.frequency.maxHz ?? 0}`);
+  const i2c = descriptor.capabilities.i2c;
+  lines.push(`#define MCUJS_RUNTIME_I2C_DEFAULT_BUS ${i2c?.defaultBus ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_I2C_DEFAULT_SDA ${i2c?.defaultRoute.sda ?? -1}`);
+  lines.push(`#define MCUJS_RUNTIME_I2C_DEFAULT_SCL ${i2c?.defaultRoute.scl ?? -1}`);
+  lines.push(`#define MCUJS_RUNTIME_I2C_MIN_HZ ${i2c?.frequency.minHz ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_I2C_MAX_HZ ${i2c?.frequency.maxHz ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES ${i2c?.maxTransferBytes ?? 0}`);
   const i2cRoutes = descriptor.capabilities.i2c?.routes ?? [];
   if (i2cRoutes.length === 0) {
     lines.push("#define MCUJS_RUNTIME_I2C_ROUTES(X)");

@@ -77,6 +77,7 @@ compile_binding_test() {
         "${ROOT}/host/runtime_registry.c" \
         "${ROOT}/host/bindings/bindings.c" \
         "${ROOT}/host/bindings/validation.c" \
+        "${ROOT}/host/bindings/i2c_options.c" \
         "${ROOT}/host/bindings/pwm_policy.c" \
         "${ROOT}/host/bindings/board_registry.c" \
         "${ROOT}/host/bindings/require.c" \

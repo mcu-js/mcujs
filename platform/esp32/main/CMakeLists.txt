@@ -33,6 +33,7 @@ set(MCUJS_SOURCES
     ${MCUJS_ROOT}/host/runtime_registry.c
     ${MCUJS_ROOT}/host/bindings/bindings.c
     ${MCUJS_ROOT}/host/bindings/validation.c
+    ${MCUJS_ROOT}/host/bindings/i2c_options.c
     ${MCUJS_ROOT}/host/bindings/pwm_policy.c
     ${MCUJS_ROOT}/host/bindings/board_registry.c
     ${MCUJS_ROOT}/host/bindings/console.c

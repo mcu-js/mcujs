@@ -168,12 +168,18 @@ PWM.stop(pin);
 
 ### I2C
 ```javascript
+const board = require('board');
 const I2C = require('i2c');
+const limits = board.capability('i2c');
 
-I2C.init(bus, sda, scl, baudrate);
-I2C.write(bus, address, data);    // data: array of bytes
-I2C.read(bus, address, length);   // returns array of bytes
+I2C.init({ frequency: 100000 });         // defaultBus + defaultRoute
+I2C.write(limits.defaultBus, address, data);
+I2C.read(limits.defaultBus, address, length);
 ```
+
+Use only listed routes and keep transfers at or below `maxTransferBytes`.
+The positional `I2C.init(bus, sda, scl, frequency)` form remains available
+through 0.x for migration.
 
 ### SPI
 ```javascript

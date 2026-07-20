@@ -143,6 +143,55 @@ and returns a typed operational error so `stop()` can be retried. As with every
 peripheral release, GPIO does not regain its previous configuration: call
 `gpio.init()` explicitly before reusing the pin.
 
+### I2C contract
+
+The canonical I2C module is `require('i2c')`. Its portable surface is exactly
+`i2c.init(options)`, `i2c.write(bus, address, data)`, and
+`i2c.read(bus, address, length)`. The positional
+`i2c.init(bus, sda, scl, frequency)` form remains as a 0.x migration alias.
+
+Read `board.capability('i2c')` before configuration. It exposes `buses`, every
+complete listed route, `defaultBus`, `defaultRoute`, inclusive frequency bounds,
+and `maxTransferBytes`. Portable code normally selects the board default without
+copying pin numbers:
+
+```javascript
+(function () {
+  var boardApi = require('board');
+  var i2c = require('i2c');
+  var limits = boardApi.capability('i2c');
+
+  i2c.init({frequency: 100000});
+  i2c.write(limits.defaultBus, 0x42, [0x00, 0xff]);
+  console.log(i2c.read(limits.defaultBus, 0x42, 2));
+}());
+```
+
+`frequency` is a required finite integer in the advertised range. Omitting
+`bus`, `sda`, and `scl` selects `defaultRoute`; selecting a non-default bus
+requires both pins from one listed route. Unknown options, partial routes,
+unlisted route combinations, and out-of-range values throw uncoded
+`TypeError`/`RangeError`. An in-range frequency that cannot be represented
+exactly throws `ERR_NOT_SUPPORTED` before replacing a working configuration.
+
+Addresses are strict 7-bit integers `0..127`. Payload bytes are strict integers
+`0..255`, and write/read lengths are `1..maxTransferBytes`; oversized requests
+throw rather than being truncated. Use before initialization throws `EBUSY`.
+A distinguishable address NACK/no-target result throws `ENXIO`; generic native
+transfer failure throws `EIO`, while a distinguishable controller/state-busy
+condition throws `EBUSY`. Timeout codes are backend-specific but stable: the RP
+timeout result is `EBUSY`, while an ESP transfer timeout is `EIO`; ESP teardown
+or configuration timeout remains `EBUSY`. Operational errors include the I2C
+resource, bus, and applicable native diagnostics.
+
+Successful reinitialization tears down the old controller and releases its old
+route. A teardown failure retains any still-live controller state and every
+unreleased pin claim so the call can be retried; another binding cannot silently
+remux a possibly live bus. See
+the non-destructive
+[I2C peripheral acceptance protocol](./development/i2c-peripheral-protocol.md)
+for target-emulator, NACK, transfer-boundary, and logic-analyzer evidence.
+
 ### ADC contract
 
 The canonical ADC module is `require('adc')`. Its portable surface is exactly

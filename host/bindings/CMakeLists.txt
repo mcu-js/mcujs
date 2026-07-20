@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.13)
 set(BINDINGS_SOURCES
     bindings.c
     validation.c
+    i2c_options.c
     pwm_policy.c
     board_registry.c
     console.c

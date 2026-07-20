@@ -5,6 +5,7 @@
  */
 
 #include "bindings.h"
+#include "i2c_options.h"
 #include "jerryscript.h"
 #include "pin_policy.h"
 #include "validation.h"
@@ -22,9 +23,6 @@ extern void js_set_function(jerry_value_t object, const char *name,
 extern void js_register_global(const char *name, jerry_value_t object);
 
 
-/* Maximum I2C transfer size */
-#define MAX_I2C_TRANSFER 256
-
 static bool s_i2c_initialized[2];
 static int s_i2c_sda[2] = {-1, -1};
 static int s_i2c_scl[2] = {-1, -1};
@@ -33,13 +31,6 @@ static mcujs_rp2_pin_owner_t i2c_pin_owner(int bus) {
     return bus == 0 ? MCUJS_RP2_PIN_OWNER_I2C0 : MCUJS_RP2_PIN_OWNER_I2C1;
 }
 
-static bool i2c_route_supported(int bus, int sda, int scl) {
-#define MCUJS_MATCH_I2C_ROUTE(route_bus, route_sda, route_scl) \
-    if (bus == (route_bus) && sda == (route_sda) && scl == (route_scl)) return true;
-    MCUJS_RUNTIME_I2C_ROUTES(MCUJS_MATCH_I2C_ROUTE)
-#undef MCUJS_MATCH_I2C_ROUTE
-    return false;
-}
 
 /* I2C instances */
 static i2c_inst_t *get_i2c_instance(int bus) {
@@ -52,6 +43,12 @@ static i2c_inst_t *get_i2c_instance(int bus) {
 
 static jerry_value_t throw_i2c_failure(int result, int bus,
                                        const char *message) {
+    mcujs_operational_error_t error = MCUJS_ERROR_IO;
+    if (result == PICO_ERROR_GENERIC) {
+        error = MCUJS_ERROR_NO_DEVICE;
+    } else if (result == PICO_ERROR_TIMEOUT) {
+        error = MCUJS_ERROR_BUSY;
+    }
     const mcujs_error_details_t details = {
         .resource = "i2c",
         .has_bus = true,
@@ -59,9 +56,7 @@ static jerry_value_t throw_i2c_failure(int result, int bus,
         .has_native_code = true,
         .native_code = result,
     };
-    return mcujs_throw_operational_error(
-        result == PICO_ERROR_GENERIC ? MCUJS_ERROR_NO_DEVICE : MCUJS_ERROR_IO,
-        message, &details);
+    return mcujs_throw_operational_error(error, message, &details);
 }
 
 static jerry_value_t throw_i2c_busy(int bus, const char *message) {
@@ -93,6 +88,24 @@ static void release_i2c_route(int pin, mcujs_rp2_pin_owner_t owner,
     mcujs_rp2_pin_release(pin, owner);
 }
 
+static void release_i2c_pin(int pin, mcujs_rp2_pin_owner_t owner) {
+    if (pin < 0 || mcujs_rp2_pin_owner(pin) != owner) return;
+    gpio_set_function((uint)pin, GPIO_FUNC_SIO);
+    gpio_init((uint)pin);
+    mcujs_rp2_pin_release(pin, owner);
+}
+
+static void rollback_i2c_init(int bus, int sda_pin, int scl_pin,
+                              mcujs_rp2_pin_owner_t owner) {
+    release_i2c_pin(s_i2c_sda[bus], owner);
+    release_i2c_pin(s_i2c_scl[bus], owner);
+    release_i2c_pin(sda_pin, owner);
+    release_i2c_pin(scl_pin, owner);
+    s_i2c_sda[bus] = -1;
+    s_i2c_scl[bus] = -1;
+    s_i2c_initialized[bus] = false;
+}
+
 static jerry_value_t throw_i2c_short(int result, int bus,
                                      const char *message) {
     const mcujs_error_details_t details = {
@@ -106,38 +119,23 @@ static jerry_value_t throw_i2c_short(int result, int bus,
 }
 
 /*
- * I2C.init(bus, sda, scl, baudrate)
- * Initialize I2C bus
+ * I2C.init(options) or I2C.init(bus, sda, scl, frequency)
+ * Initialize an I2C bus using the preferred portable options form or the 0.x
+ * positional compatibility form.
  */
 static jerry_value_t i2c_init_handler(const jerry_call_info_t *call_info_p,
                                        const jerry_value_t args[],
                                        const jerry_length_t argc) {
     (void)call_info_p;
 
-    int bus;
-    int sda_pin;
-    int scl_pin;
-    int baudrate;
-    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &bus);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C bus must be a finite number",
-                              "I2C bus must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 1, &sda_pin);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C SDA pin must be a finite number",
-                              "I2C SDA pin must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 2, &scl_pin);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C SCL pin must be a finite number",
-                              "I2C SCL pin must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 3, &baudrate);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C baudrate must be a finite number",
-                              "I2C baudrate must be an integer");
-    }
+    mcujs_i2c_init_options_t options;
+    jerry_value_t parsed = mcujs_parse_i2c_init_args(args, argc, &options);
+    if (jerry_value_is_exception(parsed)) return parsed;
+    jerry_value_free(parsed);
+    int bus = options.bus;
+    int sda_pin = options.sda;
+    int scl_pin = options.scl;
+    int baudrate = options.frequency;
 
     i2c_inst_t *i2c = get_i2c_instance(bus);
     if (i2c == NULL) {
@@ -148,14 +146,6 @@ static jerry_value_t i2c_init_handler(const jerry_call_info_t *call_info_p,
         return jerry_throw_sz(JERRY_ERROR_RANGE,
                               "Invalid I2C SDA/SCL pin route");
     }
-    if (baudrate < 1 || baudrate > 1000000) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE,
-                              "I2C baudrate must be 1..1000000");
-    }
-    if (!i2c_route_supported(bus, sda_pin, scl_pin)) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE,
-                              "I2C route is not supported by this board");
-    }
 
     uint32_t clock_frequency = clock_get_hz(clk_sys);
     uint32_t period =
@@ -164,7 +154,7 @@ static jerry_value_t i2c_init_handler(const jerry_call_info_t *call_info_p,
     uint32_t hcnt = period - lcnt;
     uint32_t represented_baudrate = clock_frequency / period;
     if (hcnt > UINT16_MAX || lcnt > UINT16_MAX || hcnt < 8u || lcnt < 8u ||
-        represented_baudrate != (uint32_t)baudrate) {
+        (uint64_t)(uint32_t)baudrate * period != clock_frequency) {
         const mcujs_error_details_t details = {
             .resource = "i2c",
             .has_bus = true,
@@ -187,7 +177,6 @@ static jerry_value_t i2c_init_handler(const jerry_call_info_t *call_info_p,
                                   "I2C SCL pin is owned by another peripheral");
     }
     bool sda_owned = mcujs_rp2_pin_owner(sda_pin) == owner;
-    bool scl_owned = mcujs_rp2_pin_owner(scl_pin) == owner;
     if (!mcujs_rp2_pin_claim(sda_pin, owner)) {
         return throw_i2c_pin_busy(bus, sda_pin, "I2C SDA pin claim failed");
     }
@@ -196,15 +185,19 @@ static jerry_value_t i2c_init_handler(const jerry_call_info_t *call_info_p,
         return throw_i2c_pin_busy(bus, scl_pin, "I2C SCL pin claim failed");
     }
 
+    if (s_i2c_initialized[bus]) {
+        i2c_deinit(i2c);
+        s_i2c_initialized[bus] = false;
+    }
+
     uint actual_baudrate = i2c_init(i2c, (uint)baudrate);
     if (actual_baudrate == 0) {
-        if (!sda_owned) mcujs_rp2_pin_release(sda_pin, owner);
-        if (!scl_owned) mcujs_rp2_pin_release(scl_pin, owner);
+        rollback_i2c_init(bus, sda_pin, scl_pin, owner);
         return throw_i2c_short(0, bus, "I2C initialization failed");
     }
     if (actual_baudrate != (uint)baudrate) {
-        if (!sda_owned) mcujs_rp2_pin_release(sda_pin, owner);
-        if (!scl_owned) mcujs_rp2_pin_release(scl_pin, owner);
+        i2c_deinit(i2c);
+        rollback_i2c_init(bus, sda_pin, scl_pin, owner);
         const mcujs_error_details_t details = {
             .resource = "i2c",
             .has_bus = true,
@@ -260,18 +253,18 @@ static jerry_value_t i2c_write_handler(const jerry_call_info_t *call_info_p,
         return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid 7-bit I2C address");
     }
 
-    uint8_t buffer[MAX_I2C_TRANSFER];
+    uint8_t buffer[MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES];
     size_t len = 0;
     if (argc > 2 && jerry_value_is_array(args[2])) {
         jerry_value_t exception;
         status = mcujs_get_byte_array(
-            args, argc, 2, buffer, sizeof(buffer), 1, MAX_I2C_TRANSFER,
-            &len, &exception);
+            args, argc, 2, buffer, sizeof(buffer), 1,
+            MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES, &len, &exception);
         if (status == MCUJS_ARG_EXCEPTION) return exception;
         if (status != MCUJS_ARG_OK) {
             return mcujs_throw_arg(status,
                                   "I2C data must be an array of numbers",
-                                  "I2C data must contain 1..256 integer bytes");
+                                  "I2C data exceeds maxTransferBytes");
         }
     } else {
         if (argc < 3) {
@@ -335,16 +328,17 @@ static jerry_value_t i2c_read_handler(const jerry_call_info_t *call_info_p,
     if (address < 0 || address > 0x7f) {
         return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid 7-bit I2C address");
     }
-    if (requested < 1 || requested > MAX_I2C_TRANSFER) {
+    if (requested < 1 ||
+        requested > MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES) {
         return jerry_throw_sz(JERRY_ERROR_RANGE,
-                              "I2C read length must be 1..256");
+                              "I2C read length exceeds maxTransferBytes");
     }
 
     if (!s_i2c_initialized[bus]) {
         return throw_i2c_busy(bus, "I2C bus is not initialized");
     }
 
-    uint8_t buffer[MAX_I2C_TRANSFER];
+    uint8_t buffer[MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES];
     int result = i2c_read_blocking(i2c, (uint8_t)address, buffer,
                                    (size_t)requested, false);
     if (result < 0) {

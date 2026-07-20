@@ -2,6 +2,7 @@
 
 #include "binding_utils.h"
 #include "bindings.h"
+#include "i2c_options.h"
 #include "jerryscript.h"
 #include "pin_policy.h"
 #include "runtime_features.h"
@@ -14,7 +15,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MCUJS_I2C_MAX_TRANSFER 256
 #define MCUJS_I2C_TIMEOUT_MS 1000
 #define MCUJS_I2C_SOURCE_HZ 40000000u
 
@@ -34,13 +34,6 @@ static i2c_bus_state_t *get_bus(int index) {
     return index >= 0 && index < 2 ? &s_buses[index] : NULL;
 }
 
-static bool i2c_route_supported(int bus, int sda, int scl) {
-#define MCUJS_MATCH_I2C_ROUTE(route_bus, route_sda, route_scl) \
-    if (bus == (route_bus) && sda == (route_sda) && scl == (route_scl)) return true;
-    MCUJS_RUNTIME_I2C_ROUTES(MCUJS_MATCH_I2C_ROUTE)
-#undef MCUJS_MATCH_I2C_ROUTE
-    return false;
-}
 
 /* ESP-IDF 5.3.2 selects the 40 MHz XTAL first for clk_flags=0 on ESP32-S3,
  * then programs an integer source divider and integer SCL half-cycle. */
@@ -67,7 +60,7 @@ static jerry_value_t throw_i2c_error(mcujs_operational_error_t error,
         .has_bus = true,
         .bus = index,
         .has_limit = error == MCUJS_ERROR_RESOURCE_EXHAUSTED,
-        .limit = MCUJS_I2C_MAX_TRANSFER,
+        .limit = MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES,
         .has_native_code = native_error != ESP_OK,
         .native_code = native_error,
     };
@@ -77,7 +70,8 @@ static jerry_value_t throw_i2c_error(mcujs_operational_error_t error,
 static mcujs_operational_error_t map_i2c_error(esp_err_t error,
                                                bool transfer) {
     if (transfer && error == ESP_FAIL) return MCUJS_ERROR_NO_DEVICE;
-    if (error == ESP_ERR_TIMEOUT || error == ESP_ERR_INVALID_STATE) {
+    if (error == ESP_ERR_INVALID_STATE ||
+        (!transfer && error == ESP_ERR_TIMEOUT)) {
         return MCUJS_ERROR_BUSY;
     }
     if (error == ESP_ERR_NO_MEM) return MCUJS_ERROR_RESOURCE_EXHAUSTED;
@@ -127,27 +121,14 @@ static esp_err_t release_bus(i2c_bus_state_t *bus, int index) {
 static jerry_value_t i2c_init_handler(const jerry_call_info_t *info,
                                       const jerry_value_t args[], jerry_length_t argc) {
     (void)info;
-    int index, sda, scl, baudrate;
-    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &index);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C bus must be a finite number",
-                              "I2C bus must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 1, &sda);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C SDA pin must be a finite number",
-                              "I2C SDA pin must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 2, &scl);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C SCL pin must be a finite number",
-                              "I2C SCL pin must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 3, &baudrate);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "I2C baudrate must be a finite number",
-                              "I2C baudrate must be an integer");
-    }
+    mcujs_i2c_init_options_t options;
+    jerry_value_t parsed = mcujs_parse_i2c_init_args(args, argc, &options);
+    if (jerry_value_is_exception(parsed)) return parsed;
+    jerry_value_free(parsed);
+    int index = options.bus;
+    int sda = options.sda;
+    int scl = options.scl;
+    int baudrate = options.frequency;
 
     i2c_bus_state_t *bus = get_bus(index);
     if (bus == NULL) {
@@ -158,13 +139,7 @@ static jerry_value_t i2c_init_handler(const jerry_call_info_t *info,
         return jerry_throw_sz(JERRY_ERROR_RANGE,
                               "Invalid I2C SDA/SCL pins (use distinct GPIO1..GPIO9)");
     }
-    if (baudrate < 1 || baudrate > 1000000) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "I2C baudrate must be 1..1000000");
-    }
-    if (!i2c_route_supported(index, sda, scl)) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE,
-                              "I2C route is not supported by this board");
-    }
+
     if (!frequency_is_exact((uint32_t)baudrate)) {
         return throw_i2c_error(
             MCUJS_ERROR_NOT_SUPPORTED, ESP_OK, index, -1,
@@ -257,18 +232,18 @@ static jerry_value_t i2c_write_handler(const jerry_call_info_t *info,
         return jerry_throw_sz(JERRY_ERROR_TYPE, "I2C.write requires data");
     }
 
-    uint8_t buffer[MCUJS_I2C_MAX_TRANSFER];
+    uint8_t buffer[MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES];
     size_t length = 0;
     if (jerry_value_is_array(args[2])) {
         jerry_value_t exception;
         mcujs_arg_status_t status = mcujs_get_byte_array(
-            args, argc, 2, buffer, sizeof(buffer), 1, MCUJS_I2C_MAX_TRANSFER,
-            &length, &exception);
+            args, argc, 2, buffer, sizeof(buffer), 1,
+            MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES, &length, &exception);
         if (status == MCUJS_ARG_EXCEPTION) return exception;
         if (status != MCUJS_ARG_OK) {
             return mcujs_throw_arg(status,
                                   "I2C data must be an array of numbers",
-                                  "I2C data must contain 1..256 integer bytes");
+                                  "I2C data exceeds maxTransferBytes");
         }
     } else {
         mcujs_arg_status_t status = mcujs_value_to_byte(args[2], &buffer[0]);
@@ -308,15 +283,17 @@ static jerry_value_t i2c_read_handler(const jerry_call_info_t *info,
         return mcujs_throw_arg(status, "I2C read length must be a finite number",
                               "I2C read length must be an integer");
     }
-    if (requested < 1 || requested > MCUJS_I2C_MAX_TRANSFER) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "I2C read length must be 1..256");
+    if (requested < 1 ||
+        requested > MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "I2C read length exceeds maxTransferBytes");
     }
     if (!bus->initialized) {
         return throw_i2c_error(MCUJS_ERROR_BUSY, ESP_OK, (int)bus->port, -1,
                                "I2C bus is not initialized");
     }
 
-    uint8_t buffer[MCUJS_I2C_MAX_TRANSFER];
+    uint8_t buffer[MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES];
     esp_err_t err = i2c_master_read_from_device(
         bus->port, (uint8_t)address, buffer, (size_t)requested,
         pdMS_TO_TICKS(MCUJS_I2C_TIMEOUT_MS));

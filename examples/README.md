@@ -39,11 +39,14 @@ Portable LED breathing effect using PWM - smoothly fades an advertised PWM-capab
 **Hardware:** A PWM-capable onboard GPIO LED, or set `globalThis.pwmFadePin` to an advertised PWM pin connected to an LED and resistor. Set `globalThis.pwmFadeActiveLow = true` for active-low wiring.
 
 ### i2c-scan/
-Scans the I2C bus for connected devices and identifies common chips.
+Scans readable standard addresses on the board-declared default I2C route.
 
-**Concepts:** `I2C.init`, `I2C.read`, bus scanning, error handling
+**Concepts:** `board.capability('i2c')`, options-object `i2c.init`,
+`defaultRoute`, strict `ENXIO` handling, safe persistent-realm reruns
 
-**Hardware:** I2C devices connected to GPIO 4 (SDA) and GPIO 5 (SCL)
+**Hardware:** A 3.3 V I2C target connected to the printed `defaultRoute`, with
+appropriate SDA/SCL pull-ups and a common ground. Read-incompatible targets may
+not appear; unexpected bus and native I/O errors stop the scan.
 
 ### modules/
 Demonstrates the CommonJS `require()` system with custom modules.

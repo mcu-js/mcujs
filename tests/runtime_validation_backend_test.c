@@ -184,6 +184,10 @@ int main(void) {
     assert(mcujs_test_i2c_write_calls == 3);
     assert(mcujs_test_i2c_read_calls == 1);
     assert(mcujs_test_i2c_last_length == MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES);
+#if defined(MCUJS_PLATFORM_RP2)
+    assert(mcujs_test_i2c_last_write_timeout_us == 5000000u);
+    assert(mcujs_test_i2c_last_read_timeout_us == 5000000u);
+#endif
     assert(eval_source(
         "(function () { function capture(call) { try { call(); } catch (error) { return error; } throw new Error('expected exception'); } "
         "function expect(call, constructor, message) { var error = capture(call); if (!(error instanceof constructor) || ('code' in error)) throw new Error(message + ': ' + error); } "

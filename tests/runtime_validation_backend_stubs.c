@@ -107,6 +107,8 @@ int mcujs_test_i2c_init_result;
 unsigned mcujs_test_i2c_init_calls;
 unsigned mcujs_test_i2c_deinit_calls;
 int mcujs_test_i2c_last_init_bus;
+unsigned mcujs_test_i2c_last_write_timeout_us;
+unsigned mcujs_test_i2c_last_read_timeout_us;
 unsigned mcujs_test_pwm_config_calls;
 unsigned mcujs_test_pwm_divider_scaled;
 unsigned mcujs_test_pwm_wrap;
@@ -153,6 +155,8 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_init_calls = 0;
     mcujs_test_i2c_deinit_calls = 0;
     mcujs_test_i2c_last_init_bus = -1;
+    mcujs_test_i2c_last_write_timeout_us = 0;
+    mcujs_test_i2c_last_read_timeout_us = 0;
     mcujs_test_pwm_config_calls = 0;
     mcujs_test_pwm_divider_scaled = 0;
     mcujs_test_pwm_wrap = 0;
@@ -233,24 +237,28 @@ void i2c_deinit(i2c_inst_t *instance) {
     mcujs_test_i2c_deinit_calls++;
 }
 
-int i2c_write_blocking(i2c_inst_t *instance, uint8_t address,
-                       const uint8_t *data, size_t length, bool nostop) {
+int i2c_write_timeout_us(i2c_inst_t *instance, uint8_t address,
+                         const uint8_t *data, size_t length, bool nostop,
+                         uint timeout_us) {
     (void)instance;
     (void)address;
     (void)data;
     (void)nostop;
     mcujs_test_i2c_write_calls++;
     mcujs_test_i2c_last_length = length;
+    mcujs_test_i2c_last_write_timeout_us = timeout_us;
     return mcujs_test_i2c_result != 0 ? mcujs_test_i2c_result : (int)length;
 }
 
-int i2c_read_blocking(i2c_inst_t *instance, uint8_t address,
-                      uint8_t *data, size_t length, bool nostop) {
+int i2c_read_timeout_us(i2c_inst_t *instance, uint8_t address,
+                        uint8_t *data, size_t length, bool nostop,
+                        uint timeout_us) {
     (void)instance;
     (void)address;
     (void)nostop;
     mcujs_test_i2c_read_calls++;
     mcujs_test_i2c_last_length = length;
+    mcujs_test_i2c_last_read_timeout_us = timeout_us;
     if (mcujs_test_i2c_result != 0) return mcujs_test_i2c_result;
     for (size_t i = 0; i < length; i++) data[i] = (uint8_t)i;
     return (int)length;

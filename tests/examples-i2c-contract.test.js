@@ -122,6 +122,14 @@ test("I2C docs cover options migration, limits, errors, and physical acceptance"
 
   assert.match(migration, /i2c\.init\(bus, sda, scl, frequency\).*i2c\.init\(options\)/);
   assert.match(migration, /oversized transfers throw instead of being truncated/);
+  assert.match(
+    migration,
+    /I2C options-object form and descriptor-driven route enforcement are implemented in the production RP and ESP bindings/,
+  );
+  assert.doesNotMatch(
+    migration,
+    /I2C options-object form[\s\S]{0,120}(?:remain|separate) implementation work/,
+  );
   assert.ok(existsSync(protocolPath), "I2C peripheral protocol is missing");
   assert.match(conformance, /i2c-peripheral-protocol\.md/);
 

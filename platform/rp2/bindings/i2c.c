@@ -17,6 +17,10 @@
 
 #include <stdint.h>
 
+/* Bound synchronous user transfers without rejecting the current descriptors'
+ * slowest exactly representable maximum-size transfer. */
+#define MCUJS_RP2_I2C_TRANSFER_TIMEOUT_US 5000000u
+
 /* External helpers from bindings.c */
 extern void js_set_function(jerry_value_t object, const char *name, 
                             jerry_external_handler_t handler);
@@ -283,7 +287,9 @@ static jerry_value_t i2c_write_handler(const jerry_call_info_t *call_info_p,
         return throw_i2c_busy(bus, "I2C bus is not initialized");
     }
 
-    int result = i2c_write_blocking(i2c, (uint8_t)address, buffer, len, false);
+    int result = i2c_write_timeout_us(
+        i2c, (uint8_t)address, buffer, len, false,
+        MCUJS_RP2_I2C_TRANSFER_TIMEOUT_US);
     if (result < 0) {
         return throw_i2c_failure(result, bus, "I2C write failed");
     }
@@ -339,8 +345,9 @@ static jerry_value_t i2c_read_handler(const jerry_call_info_t *call_info_p,
     }
 
     uint8_t buffer[MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES];
-    int result = i2c_read_blocking(i2c, (uint8_t)address, buffer,
-                                   (size_t)requested, false);
+    int result = i2c_read_timeout_us(
+        i2c, (uint8_t)address, buffer, (size_t)requested, false,
+        MCUJS_RP2_I2C_TRANSFER_TIMEOUT_US);
     if (result < 0) {
         return throw_i2c_failure(result, bus, "I2C read failed");
     }

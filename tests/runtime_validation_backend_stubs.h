@@ -20,6 +20,8 @@ extern int mcujs_test_i2c_init_result;
 extern unsigned mcujs_test_i2c_init_calls;
 extern unsigned mcujs_test_i2c_deinit_calls;
 extern int mcujs_test_i2c_last_init_bus;
+extern unsigned mcujs_test_i2c_last_write_timeout_us;
+extern unsigned mcujs_test_i2c_last_read_timeout_us;
 extern unsigned mcujs_test_pwm_config_calls;
 extern unsigned mcujs_test_pwm_divider_scaled;
 extern unsigned mcujs_test_pwm_wrap;

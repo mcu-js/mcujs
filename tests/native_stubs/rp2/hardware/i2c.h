@@ -15,9 +15,11 @@ extern i2c_inst_t *i2c1;
 
 uint i2c_init(i2c_inst_t *instance, uint baudrate);
 void i2c_deinit(i2c_inst_t *instance);
-int i2c_write_blocking(i2c_inst_t *instance, uint8_t address,
-                       const uint8_t *data, size_t length, bool nostop);
-int i2c_read_blocking(i2c_inst_t *instance, uint8_t address,
-                      uint8_t *data, size_t length, bool nostop);
+int i2c_write_timeout_us(i2c_inst_t *instance, uint8_t address,
+                         const uint8_t *data, size_t length, bool nostop,
+                         uint timeout_us);
+int i2c_read_timeout_us(i2c_inst_t *instance, uint8_t address,
+                        uint8_t *data, size_t length, bool nostop,
+                        uint timeout_us);
 
 #endif

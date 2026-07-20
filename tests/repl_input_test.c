@@ -224,31 +224,28 @@ static void test_help_matches_build_features(void) {
     feed_bytes(".help\r");
     assert(strstr(s_output, "uniqueId()") != NULL);
     assert(strstr(s_output, " led, ids") == NULL);
-    assert(strstr(s_output, "require('board')") != NULL);
-    assert(strstr(s_output, "require('fs')") != NULL);
-    assert(strstr(s_output, "require('gpio')") != NULL);
-    assert(strstr(s_output, "require('mcujs:module')") != NULL);
-    assert(strstr(s_output, "require('node:module')") != NULL);
-#if MCUJS_FEATURE_PWM
-    assert(strstr(s_output, "require('pwm')") != NULL);
-#else
-    assert(strstr(s_output, "require('pwm')") == NULL);
-#endif
-#if MCUJS_FEATURE_I2C
-    assert(strstr(s_output, "require('i2c')") != NULL);
-#else
-    assert(strstr(s_output, "require('i2c')") == NULL);
-#endif
-#if MCUJS_FEATURE_SPI
-    assert(strstr(s_output, "require('spi')") != NULL);
-#else
-    assert(strstr(s_output, "require('spi')") == NULL);
-#endif
-#if MCUJS_FEATURE_ADC
-    assert(strstr(s_output, "require('adc')") != NULL);
-#else
-    assert(strstr(s_output, "require('adc')") == NULL);
-#endif
+    const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
+    for (size_t i = 0; i < registry->builtin_module_count; i++) {
+        char expected[192];
+        int written = snprintf(expected, sizeof(expected),
+                               "  require('%s')\r\n",
+                               registry->builtin_modules[i]);
+        assert(written > 0 && (size_t)written < sizeof(expected));
+        assert(strstr(s_output, expected) != NULL);
+    }
+    static const char *const known_modules[] = {
+        "board", "fs", "process", "gpio", "pwm", "i2c", "spi", "adc",
+        "neopixel", "image", "keyboard", "mouse", "mcujs:module",
+        "node:module",
+    };
+    for (size_t i = 0; i < sizeof(known_modules) / sizeof(known_modules[0]); i++) {
+        char marker[192];
+        int written = snprintf(marker, sizeof(marker), "  require('%s')\r\n",
+                               known_modules[i]);
+        assert(written > 0 && (size_t)written < sizeof(marker));
+        assert((strstr(s_output, marker) != NULL) ==
+               mcujs_runtime_has_module(known_modules[i]));
+    }
 #if MCUJS_REGISTRY_SAFE_MODE && MCUJS_REGISTRY_STORAGE_READY
     assert(strstr(s_output, "safeMode(), storageReady()") != NULL);
 #elif MCUJS_REGISTRY_SAFE_MODE
@@ -267,15 +264,30 @@ static void test_capability_discovery_uses_registry(void) {
     repl_init();
     feed_bytes(".capabilities\r");
     assert(strstr(s_output, "Board: ") != NULL);
-    assert(strstr(s_output, "Modules: board fs process gpio") != NULL);
+    const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
+    char expected_modules[1024] = "Modules:";
+    size_t expected_length = strlen(expected_modules);
+    for (size_t i = 0; i < registry->builtin_module_count; i++) {
+        int written = snprintf(expected_modules + expected_length,
+                               sizeof(expected_modules) - expected_length,
+                               " %s", registry->builtin_modules[i]);
+        assert(written > 0 && (size_t)written <
+               sizeof(expected_modules) - expected_length);
+        expected_length += (size_t)written;
+    }
+    assert(strstr(s_output, expected_modules) != NULL);
 
     reset_io();
     repl_init();
-    feed_bytes(".capabilities spi\r");
-    const mcujs_runtime_capability_t *spi = mcujs_runtime_find_capability("spi");
-    assert(spi != NULL);
+    assert(registry->capability_count > 0);
+    const mcujs_runtime_capability_t *capability = &registry->capabilities[0];
+    char command[96];
+    int command_length = snprintf(command, sizeof(command),
+                                  ".capabilities %s\r", capability->name);
+    assert(command_length > 0 && (size_t)command_length < sizeof(command));
+    feed_bytes(command);
     assert(s_exec_count == 0);
-    assert(strstr(s_output, spi->json) != NULL);
+    assert(strstr(s_output, capability->json) != NULL);
 
     reset_io();
     repl_init();

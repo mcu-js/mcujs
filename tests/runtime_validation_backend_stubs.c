@@ -11,6 +11,7 @@ unsigned mcujs_test_i2c_write_calls;
 unsigned mcujs_test_i2c_read_calls;
 size_t mcujs_test_i2c_last_length;
 
+#if !defined(MCUJS_USE_PRODUCTION_BINDING_HELPERS)
 void js_set_property(jerry_value_t object, const char *name, jerry_value_t value) {
     jerry_value_t result = jerry_object_set_sz(object, name, value);
     assert(!jerry_value_is_exception(result) && jerry_value_is_true(result));
@@ -47,6 +48,7 @@ bool js_get_boolean_arg(const jerry_value_t args[], jerry_length_t argc,
     if (index >= argc || !jerry_value_is_boolean(args[index])) return default_value;
     return jerry_value_is_true(args[index]);
 }
+#endif
 
 #if defined(MCUJS_PLATFORM_RP2)
 

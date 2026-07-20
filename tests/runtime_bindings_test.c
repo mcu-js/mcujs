@@ -13,9 +13,6 @@ static jerry_value_t stub_module(void) {
 }
 
 jerry_value_t js_create_fs_module(void) { return stub_module(); }
-jerry_value_t js_create_gpio_module(void) { return stub_module(); }
-jerry_value_t js_create_pwm_module(void) { return stub_module(); }
-jerry_value_t js_create_i2c_module(void) { return stub_module(); }
 jerry_value_t js_create_spi_module(void) { return stub_module(); }
 jerry_value_t js_create_adc_module(void) { return stub_module(); }
 jerry_value_t js_create_neopixel_module(void) { return stub_module(); }
@@ -168,6 +165,23 @@ static const char s_test_source[] =
     "    assert(modules.has(name) === true, name + ' missing from has()');\n"
     "    assert(require(name) !== undefined, name + ' cannot be required');\n"
     "  });\n"
+    "  var knownModules = ['board', 'fs', 'process', 'gpio', 'pwm', 'i2c', 'spi', 'adc', 'neopixel', 'image', 'keyboard', 'mouse', 'mcujs:module', 'node:module'];\n"
+    "  knownModules.forEach(function (name) {\n"
+    "    var listed = modules.builtinModules.indexOf(name) !== -1;\n"
+    "    assert(modules.has(name) === listed, name + ' has()/list mismatch');\n"
+    "    if (!listed) assertThrowsType(function () { require(name); }, Error, name + ' absent module was require-able');\n"
+    "  });\n"
+    "  var productionExports = {\n"
+    "    gpio: ['OUTPUT', 'INPUT', 'INPUT_PULLUP', 'INPUT_PULLDOWN', 'init', 'set', 'get', 'toggle'],\n"
+    "    pwm: ['init', 'setDuty', 'stop'],\n"
+    "    i2c: ['init', 'write', 'read']\n"
+    "  };\n"
+    "  Object.keys(productionExports).forEach(function (name) {\n"
+    "    if (!modules.has(name)) return;\n"
+    "    var actual = Object.keys(require(name)).sort();\n"
+    "    var expected = productionExports[name].slice().sort();\n"
+    "    assert(JSON.stringify(actual) === JSON.stringify(expected), name + ' production factory exports mismatch');\n"
+    "  });\n"
     "  assert(modules.builtinModules.indexOf('image') !== -1 === (__mcujsHasImage === true), 'image list mismatch');\n"
     "  if (!__mcujsHasImage) {\n"
     "    assertThrowsType(function () { require('image'); }, Error, 'absent image module was require-able');\n"
@@ -197,6 +211,12 @@ static const char s_test_source[] =
     "  assertFrozenTree(capabilities, 'board.capabilities()');\n"
     "  attackFrozenTree(capabilities, 'board.capabilities()');\n"
     "  assert(JSON.stringify(capabilities.gpio) === JSON.stringify(gpioCapability), 'singular and snapshot capabilities diverged');\n"
+    "  var moduleCapabilities = {fs: 'fs', gpio: 'gpio', pwm: 'pwm', i2c: 'i2c', spi: 'spi', adc: 'adc', neopixel: 'neopixel'};\n"
+    "  Object.keys(moduleCapabilities).forEach(function (name) {\n"
+    "    var capabilityName = moduleCapabilities[name];\n"
+    "    assert(modules.has(name) === (board.capability(capabilityName) !== undefined), name + ' module/capability mismatch');\n"
+    "    assert((capabilityName in capabilities) === modules.has(name), name + ' snapshot capability mismatch');\n"
+    "  });\n"
     "  assert(board.capability('__missing_capability__') === undefined, 'unknown capability is present');\n"
     "  assertThrowsType(function () { board.capability(); }, TypeError, 'missing capability argument did not throw TypeError');\n"
     "  assertThrowsType(function () { board.capability(1); }, TypeError, 'numeric capability argument did not throw TypeError');\n"

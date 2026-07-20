@@ -3,8 +3,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BINARY_RP="$(mktemp "${TMPDIR:-/tmp}/mcujs-repl-rp-test.XXXXXX")"
+BINARY_CONSTRAINED_RP="$(mktemp "${TMPDIR:-/tmp}/mcujs-repl-constrained-rp-test.XXXXXX")"
 BINARY_ESP="$(mktemp "${TMPDIR:-/tmp}/mcujs-repl-esp-test.XXXXXX")"
-trap 'rm -f "${BINARY_RP}" "${BINARY_ESP}"' EXIT
+trap 'rm -f "${BINARY_RP}" "${BINARY_CONSTRAINED_RP}" "${BINARY_ESP}"' EXIT
 
 compile_repl_test() {
     local output="$1"
@@ -26,6 +27,10 @@ compile_repl_test() {
 
 compile_repl_test "${BINARY_RP}" -DMCUJS_BOARD_PICO=1
 "${BINARY_RP}"
+
+compile_repl_test "${BINARY_CONSTRAINED_RP}" \
+    -DMCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A=1
+"${BINARY_CONSTRAINED_RP}"
 
 compile_repl_test "${BINARY_ESP}" \
     -DMCUJS_PLATFORM_ESP32=1 \

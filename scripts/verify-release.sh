@@ -181,6 +181,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/package-release.sh"
         "${ROOT_DIR}/scripts/release.sh"
         "${ROOT_DIR}/scripts/test-repl.sh"
+        "${ROOT_DIR}/scripts/test-portable-conformance.sh"
         "${ROOT_DIR}/scripts/test-rp-build-identity.sh"
         "${ROOT_DIR}/scripts/test-runtime-bindings.sh"
         "${ROOT_DIR}/scripts/test-runtime-registry.sh"
@@ -234,11 +235,8 @@ check_api_schema() {
 
 check_runtime_registry() {
     node "${ROOT_DIR}/scripts/generate-runtime-registry.js" --check
-    node --test "${ROOT_DIR}/tests/runtime-registry.test.js"
-    "${ROOT_DIR}/scripts/test-runtime-registry.sh"
-    "${ROOT_DIR}/scripts/test-runtime-bindings.sh"
-    "${ROOT_DIR}/scripts/test-runtime-validation.sh"
-    pass 'runtime registry, native maps, Jerry bindings, validation, and errors are consistent'
+    "${ROOT_DIR}/scripts/test-portable-conformance.sh"
+    pass 'runtime registry, discovery, native maps, boundaries, validation, and errors are consistent'
 }
 
 check_release_artifacts() {

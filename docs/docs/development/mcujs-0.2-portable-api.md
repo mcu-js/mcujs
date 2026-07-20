@@ -357,6 +357,11 @@ Do not maintain a C feature macro, help list, JavaScript capability object, and 
 
 Build-time feature switches describe the current firmware image, not everything the silicon could theoretically do.
 
+The executable workflow, full/constrained native lanes, schema-derived boundary
+case IDs, and `MCUJS_CONFORMANCE_V1` serial evidence envelope are documented in
+[Portable API conformance](./portable-api-conformance.md). Later module work
+extends that suite instead of creating board-specific contract tests.
+
 ## Portable examples
 
 ### Optional module

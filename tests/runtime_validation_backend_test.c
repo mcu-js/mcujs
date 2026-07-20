@@ -609,21 +609,21 @@ int main(void) {
      * GPIO is a soft owner, but stale GPIO state loses access after takeover. */
     assert(eval_source(
         "GPIO.init(16, GPIO.OUTPUT); GPIO.init(18, GPIO.OUTPUT); "
-        "GPIO.init(19, GPIO.OUTPUT); SPI.init(0, 18, 19, 16, 1000000);"));
+        "GPIO.init(19, GPIO.OUTPUT); SPI.init(0, 18, 19, 16, 1250000);"));
     assert(assert_operational_error("GPIO.set(16, true)",
                                     "ResourceBusyError", "EBUSY"));
     assert(assert_operational_error("GPIO.get(18)",
                                     "ResourceBusyError", "EBUSY"));
     assert(assert_operational_error("GPIO.init(19, GPIO.OUTPUT)",
                                     "ResourceBusyError", "EBUSY"));
-    mcujs_test_spi_init_result = 999999;
+    mcujs_test_spi_init_result = 1249999;
     unsigned strict_rate_deinit_calls = mcujs_test_spi_deinit_calls;
-    assert(assert_operational_error("SPI.init(0, 18, 19, 16, 1000000)",
+    assert(assert_operational_error("SPI.init(0, 18, 19, 16, 1250000)",
                                     "NotSupportedError",
                                     "ERR_NOT_SUPPORTED"));
     assert(mcujs_test_spi_deinit_calls == strict_rate_deinit_calls + 2u);
     mcujs_test_spi_init_result = -1;
-    assert(eval_source("SPI.init(0, 18, 19, 16, 1000000);"));
+    assert(eval_source("SPI.init(0, 18, 19, 16, 1250000);"));
     mcujs_test_dma_claim_result = -1;
     assert(assert_operational_error("SPI.writeBufferDMA(0, 1, 2)",
                                     "ResourceExhaustedError",
@@ -639,7 +639,7 @@ int main(void) {
      * back every claim without reviving stale GPIO state. */
     mcujs_test_spi_init_result = 0;
     unsigned spi_deinit_calls = mcujs_test_spi_deinit_calls;
-    assert(assert_operational_error("SPI.init(0, 18, 19, 16, 1000000)",
+    assert(assert_operational_error("SPI.init(0, 18, 19, 16, 1250000)",
                                     "Error", "EIO"));
     assert(mcujs_test_spi_deinit_calls == spi_deinit_calls + 2u);
     mcujs_test_spi_init_result = -1;
@@ -651,7 +651,7 @@ int main(void) {
         "GPIO.init(16, GPIO.OUTPUT); GPIO.init(18, GPIO.OUTPUT); "
         "GPIO.init(19, GPIO.OUTPUT); GPIO.set(18, true);"));
 
-    assert(eval_source("SPI.init(1, 10, 11, 12, 1000000);"));
+    assert(eval_source("SPI.init(1, 10, 11, 12, 1250000);"));
     assert(assert_operational_error("GPIO.init(10, GPIO.OUTPUT)",
                                     "ResourceBusyError", "EBUSY"));
     assert(assert_operational_error(

@@ -307,7 +307,7 @@ The boundary is deliberate: a frequency below `minHz` or above `maxHz` is a `Ran
 ### SPI
 
 - Keep `init` and `transfer` as the portable core.
-- Add a preferred options form with board defaults: `spi.init({ bus: 0, frequency: 1000000, mode: 0 })`; explicit route pins remain available for advanced wiring.
+- Add a preferred options form with board defaults: `spi.init({ bus: 0, frequency: 1250000, mode: 0 })`; explicit route pins remain available for advanced wiring. The 1.25 MHz example is exactly representable on current RP and ESP targets; an in-range frequency that is not exact throws `ERR_NOT_SUPPORTED`.
 - Retain the positional form through 0.x for migration.
 - Reject oversize transfers on every backend.
 - Expose modes, duplex, routes, one complete listed `defaultRoute`, transfer maximum, DMA availability, and any explicitly capability-gated compatibility extensions. The byte-oriented 0.2 contract implicitly uses exactly 8-bit words and MSB-first order; manifests must advertise only those executable formats until initialization makes format selectable.

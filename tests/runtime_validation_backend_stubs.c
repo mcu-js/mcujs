@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined(MCUJS_PLATFORM_RP2)
 #include "pico/unique_id.h"
@@ -119,6 +120,13 @@ unsigned mcujs_test_pwm_disable_calls;
 int mcujs_test_spi_init_result;
 unsigned mcujs_test_spi_init_calls;
 unsigned mcujs_test_spi_deinit_calls;
+int mcujs_test_spi_last_init_bus;
+unsigned mcujs_test_spi_last_format_bits;
+int mcujs_test_spi_last_format_cpol;
+int mcujs_test_spi_last_format_cpha;
+int mcujs_test_spi_last_format_order;
+int mcujs_test_spi_transfer_result;
+size_t mcujs_test_spi_last_transfer_length;
 unsigned mcujs_test_adc_gpio_init_calls;
 unsigned mcujs_test_adc_last_pin;
 unsigned mcujs_test_adc_init_calls;
@@ -167,6 +175,13 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_spi_init_result = -1;
     mcujs_test_spi_init_calls = 0;
     mcujs_test_spi_deinit_calls = 0;
+    mcujs_test_spi_last_init_bus = -1;
+    mcujs_test_spi_last_format_bits = 0;
+    mcujs_test_spi_last_format_cpol = -1;
+    mcujs_test_spi_last_format_cpha = -1;
+    mcujs_test_spi_last_format_order = -1;
+    mcujs_test_spi_transfer_result = 0;
+    mcujs_test_spi_last_transfer_length = 0;
     mcujs_test_adc_gpio_init_calls = 0;
     mcujs_test_adc_last_pin = UINT32_MAX;
     mcujs_test_adc_init_calls = 0;
@@ -302,8 +317,8 @@ uint32_t clock_get_hz(int clock) {
 }
 
 uint spi_init(spi_inst_t *instance, uint baudrate) {
-    (void)instance;
     mcujs_test_spi_init_calls++;
+    mcujs_test_spi_last_init_bus = instance->index;
     return mcujs_test_spi_init_result >= 0
         ? (uint)mcujs_test_spi_init_result
         : baudrate;
@@ -315,14 +330,18 @@ void spi_deinit(spi_inst_t *instance) {
 void spi_set_format(spi_inst_t *instance, uint data_bits, int cpol, int cpha,
                     int order) {
     (void)instance;
-    (void)data_bits;
-    (void)cpol;
-    (void)cpha;
-    (void)order;
+    mcujs_test_spi_last_format_bits = data_bits;
+    mcujs_test_spi_last_format_cpol = cpol;
+    mcujs_test_spi_last_format_cpha = cpha;
+    mcujs_test_spi_last_format_order = order;
 }
 int spi_write_read_blocking(spi_inst_t *instance, const uint8_t *tx,
                             uint8_t *rx, size_t length) {
     (void)instance;
+    mcujs_test_spi_last_transfer_length = length;
+    if (mcujs_test_spi_transfer_result != 0) {
+        return mcujs_test_spi_transfer_result;
+    }
     for (size_t i = 0; i < length; i++) rx[i] = tx[i];
     return (int)length;
 }
@@ -445,6 +464,7 @@ void cyw43_arch_gpio_put(int pin, int value) { (void)pin; (void)value; }
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "driver/ledc.h"
+#include "driver/spi_master.h"
 #include "driver/temperature_sensor.h"
 #include "esp_adc/adc_cali_scheme.h"
 
@@ -489,6 +509,18 @@ int mcujs_test_temperature_enable_result;
 int mcujs_test_temperature_read_result;
 int mcujs_test_temperature_disable_result;
 float mcujs_test_temperature_celsius;
+int mcujs_test_spi_bus_init_result;
+int mcujs_test_spi_bus_free_result;
+int mcujs_test_spi_add_result;
+int mcujs_test_spi_remove_result;
+int mcujs_test_spi_transmit_result;
+int mcujs_test_spi_last_host;
+int mcujs_test_spi_last_frequency;
+int mcujs_test_spi_last_mode;
+int mcujs_test_spi_actual_frequency;
+unsigned mcujs_test_spi_remove_calls;
+size_t mcujs_test_spi_last_transfer_length;
+static int s_spi_devices[2];
 static uint32_t s_ledc_timer_frequency[4];
 static int s_adc_unit_storage;
 static int s_adc_cali_storage;
@@ -540,6 +572,17 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_temperature_read_result = ESP_OK;
     mcujs_test_temperature_disable_result = ESP_OK;
     mcujs_test_temperature_celsius = 31.25f;
+    mcujs_test_spi_bus_init_result = ESP_OK;
+    mcujs_test_spi_bus_free_result = ESP_OK;
+    mcujs_test_spi_add_result = ESP_OK;
+    mcujs_test_spi_remove_result = ESP_OK;
+    mcujs_test_spi_transmit_result = ESP_OK;
+    mcujs_test_spi_last_host = -1;
+    mcujs_test_spi_last_frequency = 0;
+    mcujs_test_spi_last_mode = -1;
+    mcujs_test_spi_actual_frequency = 0;
+    mcujs_test_spi_remove_calls = 0;
+    mcujs_test_spi_last_transfer_length = 0;
     for (size_t i = 0; i < 4; i++) s_ledc_timer_frequency[i] = 0;
     for (size_t i = 0; i < GPIO_NUM_MAX; i++) {
         s_gpio_levels[i] = 0;
@@ -633,6 +676,58 @@ esp_err_t i2c_master_read_from_device(i2c_port_t port, uint8_t address,
     mcujs_test_i2c_last_length = length;
     if (mcujs_test_i2c_result != ESP_OK) return mcujs_test_i2c_result;
     for (size_t i = 0; i < length; i++) data[i] = (uint8_t)i;
+    return ESP_OK;
+}
+
+esp_err_t spi_bus_initialize(spi_host_device_t host,
+                             const spi_bus_config_t *config,
+                             int dma_channel) {
+    (void)config;
+    (void)dma_channel;
+    mcujs_test_spi_last_host = host;
+    return mcujs_test_spi_bus_init_result;
+}
+
+esp_err_t spi_bus_free(spi_host_device_t host) {
+    (void)host;
+    return mcujs_test_spi_bus_free_result;
+}
+
+esp_err_t spi_bus_add_device(spi_host_device_t host,
+                             const spi_device_interface_config_t *config,
+                             spi_device_handle_t *device) {
+    mcujs_test_spi_last_host = host;
+    mcujs_test_spi_last_frequency = config->clock_speed_hz;
+    mcujs_test_spi_last_mode = config->mode;
+    if (mcujs_test_spi_add_result == ESP_OK) {
+        *device = &s_spi_devices[host];
+    }
+    return mcujs_test_spi_add_result;
+}
+
+esp_err_t spi_bus_remove_device(spi_device_handle_t device) {
+    (void)device;
+    mcujs_test_spi_remove_calls++;
+    return mcujs_test_spi_remove_result;
+}
+
+int spi_get_actual_clock(int source_hz, int requested_hz, int duty_cycle) {
+    (void)source_hz;
+    (void)duty_cycle;
+    return mcujs_test_spi_actual_frequency != 0
+               ? mcujs_test_spi_actual_frequency
+               : requested_hz;
+}
+
+esp_err_t spi_device_transmit(spi_device_handle_t device,
+                              spi_transaction_t *transaction) {
+    (void)device;
+    mcujs_test_spi_last_transfer_length = transaction->length / 8u;
+    if (mcujs_test_spi_transmit_result != ESP_OK) {
+        return mcujs_test_spi_transmit_result;
+    }
+    memcpy(transaction->rx_buffer, transaction->tx_buffer,
+           mcujs_test_spi_last_transfer_length);
     return ESP_OK;
 }
 

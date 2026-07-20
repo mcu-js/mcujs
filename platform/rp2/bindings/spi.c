@@ -8,13 +8,16 @@
 #include "graphics.h"
 #include "jerryscript.h"
 #include "pin_policy.h"
+#include "spi_options.h"
 #include "validation.h"
 
 #include "hardware/dma.h"
+#include "hardware/clocks.h"
 #include "hardware/spi.h"
 #include "pico/stdlib.h"
 
 #include <stdbool.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -23,7 +26,7 @@ extern void js_set_function(jerry_value_t object, const char *name,
                             jerry_external_handler_t handler);
 extern void js_register_global(const char *name, jerry_value_t object);
 
-#define MAX_SPI_TRANSFER 256
+#define MCUJS_SPI_NO_NATIVE_CODE INT_MIN
 
 static int s_dma_tx_channel = -1;
 
@@ -51,13 +54,22 @@ static mcujs_rp2_pin_owner_t spi_pin_owner(int bus) {
     return bus == 0 ? MCUJS_RP2_PIN_OWNER_SPI0 : MCUJS_RP2_PIN_OWNER_SPI1;
 }
 
-static bool spi_route_supported(int bus, int sck, int mosi, int miso) {
-#define MCUJS_MATCH_SPI_ROUTE(route_bus, route_sck, route_mosi, route_miso) \
-    if (bus == (route_bus) && sck == (route_sck) &&                 \
-        mosi == (route_mosi) && miso == (route_miso)) return true;
-    MCUJS_RUNTIME_SPI_ROUTES(MCUJS_MATCH_SPI_ROUTE)
-#undef MCUJS_MATCH_SPI_ROUTE
-    return false;
+static uint32_t represented_spi_frequency(uint32_t frequency) {
+    uint32_t source = clock_get_hz(clk_peri);
+    uint32_t prescale;
+    for (prescale = 2; prescale <= 254; prescale += 2) {
+        if ((uint64_t)source <
+            (uint64_t)prescale * 256u * frequency) {
+            break;
+        }
+    }
+    if (prescale > 254) return 0;
+
+    uint32_t postdiv;
+    for (postdiv = 256; postdiv > 1; postdiv--) {
+        if (source / (prescale * (postdiv - 1u)) > frequency) break;
+    }
+    return source / (prescale * postdiv);
 }
 
 static jerry_value_t throw_spi_error(mcujs_operational_error_t error, int bus,
@@ -69,7 +81,7 @@ static jerry_value_t throw_spi_error(mcujs_operational_error_t error, int bus,
         .pin = pin,
         .has_bus = true,
         .bus = bus,
-        .has_native_code = native_code >= 0,
+        .has_native_code = native_code != MCUJS_SPI_NO_NATIVE_CODE,
         .native_code = native_code,
     };
     return mcujs_throw_operational_error(error, message, &details);
@@ -119,49 +131,26 @@ static jerry_value_t spi_init_handler(const jerry_call_info_t *call_info_p,
                                       const jerry_length_t argc) {
     (void)call_info_p;
 
-    int bus;
-    int sck_pin;
-    int mosi_pin;
-    int miso_pin;
-    int baudrate;
-    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &bus);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "SPI bus must be a finite number",
-                              "SPI bus must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 1, &sck_pin);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "SPI SCK pin must be a finite number",
-                              "SPI SCK pin must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 2, &mosi_pin);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "SPI MOSI pin must be a finite number",
-                              "SPI MOSI pin must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 3, &miso_pin);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "SPI MISO pin must be a finite number",
-                              "SPI MISO pin must be an integer");
-    }
-    status = mcujs_get_integer(args, argc, 4, &baudrate);
-    if (status != MCUJS_ARG_OK) {
-        return mcujs_throw_arg(status, "SPI baudrate must be a finite number",
-                              "SPI baudrate must be an integer");
-    }
+    mcujs_spi_init_options_t options;
+    jerry_value_t parsed = mcujs_parse_spi_init_args(args, argc, &options);
+    if (jerry_value_is_exception(parsed)) return parsed;
+    jerry_value_free(parsed);
+    int bus = options.bus;
+    int sck_pin = options.sck;
+    int mosi_pin = options.mosi;
+    int miso_pin = options.miso;
+    int baudrate = options.frequency;
 
     spi_inst_t *spi = get_spi_instance(bus);
     if (spi == NULL) {
         return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid SPI bus (0 or 1)");
     }
-    if (!spi_route_supported(bus, sck_pin, mosi_pin, miso_pin)) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE,
-                              "SPI route is not supported by this board");
-    }
-    if (baudrate < MCUJS_RUNTIME_SPI_MIN_HZ ||
-        baudrate > MCUJS_RUNTIME_SPI_MAX_HZ) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE,
-                              "SPI baudrate is outside the board capability");
+
+    uint32_t represented = represented_spi_frequency((uint32_t)baudrate);
+    if (represented != (uint32_t)baudrate) {
+        return throw_spi_error(
+            MCUJS_ERROR_NOT_SUPPORTED, bus, -1, (int)represented,
+            "SPI frequency cannot be represented exactly");
     }
 
     spi_bus_state_t candidate = {
@@ -177,7 +166,8 @@ static jerry_value_t spi_init_handler(const jerry_call_info_t *call_info_p,
 
     for (size_t i = 0; i < 3; i++) {
         if (!mcujs_rp2_pin_can_claim(pins[i], owner)) {
-            return throw_spi_error(MCUJS_ERROR_BUSY, bus, pins[i], -1,
+            return throw_spi_error(MCUJS_ERROR_BUSY, bus, pins[i],
+                                   MCUJS_SPI_NO_NATIVE_CODE,
                                    "SPI pin is owned by another peripheral");
         }
         already_owned[i] = mcujs_rp2_pin_owner(pins[i]) == owner;
@@ -189,7 +179,8 @@ static jerry_value_t spi_init_handler(const jerry_call_info_t *call_info_p,
                     mcujs_rp2_pin_release(pins[rollback], owner);
                 }
             }
-            return throw_spi_error(MCUJS_ERROR_BUSY, bus, pins[i], -1,
+            return throw_spi_error(MCUJS_ERROR_BUSY, bus, pins[i],
+                                   MCUJS_SPI_NO_NATIVE_CODE,
                                    "SPI pin claim failed");
         }
     }
@@ -216,7 +207,10 @@ static jerry_value_t spi_init_handler(const jerry_call_info_t *call_info_p,
     gpio_set_function((uint)sck_pin, GPIO_FUNC_SPI);
     gpio_set_function((uint)mosi_pin, GPIO_FUNC_SPI);
     gpio_set_function((uint)miso_pin, GPIO_FUNC_SPI);
-    spi_set_format(spi, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_format(spi, 8,
+                   (options.mode & 2) != 0 ? SPI_CPOL_1 : SPI_CPOL_0,
+                   (options.mode & 1) != 0 ? SPI_CPHA_1 : SPI_CPHA_0,
+                   SPI_MSB_FIRST);
 
     *active = candidate;
     active->initialized = true;
@@ -243,20 +237,21 @@ static jerry_value_t spi_transfer_handler(const jerry_call_info_t *call_info_p,
                               "SPI.transfer requires bus and data");
     }
 
-    uint8_t tx_buffer[MAX_SPI_TRANSFER];
-    uint8_t rx_buffer[MAX_SPI_TRANSFER];
+    uint8_t tx_buffer[MCUJS_RUNTIME_SPI_MAX_TRANSFER_BYTES];
+    uint8_t rx_buffer[MCUJS_RUNTIME_SPI_MAX_TRANSFER_BYTES];
     size_t len = 0;
     bool array_input = jerry_value_is_array(args[1]);
     if (array_input) {
         jerry_value_t exception;
         status = mcujs_get_byte_array(args, argc, 1, tx_buffer,
-                                      sizeof(tx_buffer), 1, MAX_SPI_TRANSFER,
+                                      sizeof(tx_buffer), 1,
+                                      MCUJS_RUNTIME_SPI_MAX_TRANSFER_BYTES,
                                       &len, &exception);
         if (status == MCUJS_ARG_EXCEPTION) return exception;
         if (status != MCUJS_ARG_OK) {
             return mcujs_throw_arg(status,
                                    "SPI data must be an array of numbers",
-                                   "SPI data must contain 1..256 integer bytes");
+                                   "SPI data exceeds maxTransferBytes");
         }
     } else {
         status = mcujs_value_to_byte(args[1], &tx_buffer[0]);
@@ -269,7 +264,8 @@ static jerry_value_t spi_transfer_handler(const jerry_call_info_t *call_info_p,
     }
 
     if (!s_spi_buses[bus].initialized) {
-        return throw_spi_error(MCUJS_ERROR_BUSY, bus, -1, -1,
+        return throw_spi_error(MCUJS_ERROR_BUSY, bus, -1,
+                               MCUJS_SPI_NO_NATIVE_CODE,
                                "SPI bus is not initialized");
     }
 
@@ -348,7 +344,8 @@ static jerry_value_t spi_write_buffer_dma_handler(
                               "SPI DMA byte length exceeds the graphics buffer");
     }
     if (!s_spi_buses[bus].initialized) {
-        return throw_spi_error(MCUJS_ERROR_BUSY, bus, -1, -1,
+        return throw_spi_error(MCUJS_ERROR_BUSY, bus, -1,
+                               MCUJS_SPI_NO_NATIVE_CODE,
                                "SPI bus is not initialized");
     }
     if (byte_length == 0) return jerry_undefined();

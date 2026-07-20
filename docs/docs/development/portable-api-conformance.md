@@ -12,7 +12,7 @@ npm run test:conformance
 ```
 
 The command runs descriptor checks, the schema-driven JavaScript cases, native
-registry/JerryScript tests, production GPIO/I2C/PWM bindings against SDK stubs,
+registry/JerryScript tests, production GPIO/I2C/SPI/PWM bindings against SDK stubs,
 and REPL help/capability tests. `scripts/verify-release.sh --allow-dirty --docs`
 runs the same gate before the docs typecheck and production build.
 
@@ -24,7 +24,7 @@ The gate deliberately includes three production board maps:
 |---|---|---|
 | Full RP | `pico` | The complete RP module surface remains require-able and discoverable. |
 | Constrained RP2350 | `waveshare_rp2350_lcd_1.47_a` | Missing SPI/ADC APIs stay absent while shared APIs remain discoverable. |
-| ESP32 | `seeed_xiao_esp32s3` | The constrained ESP surface and real ESP GPIO/I2C/PWM bindings obey the same contract. |
+| ESP32 | `seeed_xiao_esp32s3` | The constrained ESP surface and real ESP GPIO/I2C/SPI/PWM bindings obey the same contract. |
 
 `tests/portable-api-conformance.test.js` generates an execution plan for every
 shipping board. A board-map lane with no production observation reports every
@@ -44,7 +44,7 @@ The framework checks these discovery views independently:
 
 A change to only one view therefore fails instead of being hidden by another
 projection of the same list. Native registry lanes compile the production
-GPIO/I2C/PWM factories for full RP, constrained RP2350, and ESP32, verify their
+GPIO/I2C/SPI/PWM factories for full RP, constrained RP2350, and ESP32, verify their
 linked symbols and exact exports, and use the selected production registry for
 advertised and known-unavailable modules.
 
@@ -182,3 +182,10 @@ I2C electrical acceptance uses the separate
 Host/native tests prove strict arguments, transfer limits, lifecycle state, and
 SDK error mappings; only target-emulator and logic-analyzer evidence proves
 ACK/NACK behavior, measured SCL timing, and byte-level interoperability.
+
+SPI electrical acceptance uses the separate
+[non-destructive SPI loopback and logic-analyzer protocol](./spi-loopback-protocol.md).
+Host/native tests prove strict options, scalar/array returns, 256-byte RP and
+64-byte ESP boundaries, format selection, lifecycle state, and SDK error
+mappings; only loopback/peripheral and analyzer evidence proves waveform mode,
+measured clock timing, and physical full-duplex byte integrity.

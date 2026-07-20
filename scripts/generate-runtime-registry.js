@@ -99,6 +99,16 @@ function branchFor(boardId, first) {
     });
   }
   const spiRoutes = descriptor.capabilities.spi?.routes ?? [];
+  const spi = descriptor.capabilities.spi;
+  const spiModeMask = (spi?.modes ?? []).reduce(
+    (mask, mode) => mask | (1 << mode), 0,
+  );
+  lines.push(`#define MCUJS_RUNTIME_SPI_DEFAULT_BUS ${spi?.defaultBus ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_DEFAULT_SCK ${spi?.defaultRoute.sck ?? -1}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_DEFAULT_MOSI ${spi?.defaultRoute.mosi ?? -1}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_DEFAULT_MISO ${spi?.defaultRoute.miso ?? -1}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_MAX_TRANSFER_BYTES ${spi?.maxTransferBytes ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_MODE_MASK ${spiModeMask}u`);
   if (spiRoutes.length === 0) {
     lines.push("#define MCUJS_RUNTIME_SPI_ROUTES(X)");
   } else {
@@ -108,8 +118,8 @@ function branchFor(boardId, first) {
       lines.push(`    X(${bus}, ${sck}, ${mosi}, ${miso})${suffix}`);
     });
   }
-  lines.push(`#define MCUJS_RUNTIME_SPI_MIN_HZ ${descriptor.capabilities.spi?.frequency.minHz ?? 0}`);
-  lines.push(`#define MCUJS_RUNTIME_SPI_MAX_HZ ${descriptor.capabilities.spi?.frequency.maxHz ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_MIN_HZ ${spi?.frequency.minHz ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_MAX_HZ ${spi?.frequency.maxHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_API_VERSION ${cString(manifest.apiVersion)}`);
   lines.push(`#define MCUJS_RUNTIME_BOARD_JSON ${cString(JSON.stringify(manifest.board))}`);
   lines.push(`#define MCUJS_RUNTIME_MANIFEST_JSON ${cString(JSON.stringify(manifest))}`);

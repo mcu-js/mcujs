@@ -107,6 +107,7 @@ compile_backend_test() {
         "${ROOT}/tests/runtime_validation_backend_stubs.c" \
         "${ROOT}/host/bindings/validation.c" \
         "${ROOT}/host/bindings/i2c_options.c" \
+        "${ROOT}/host/bindings/spi_options.c" \
         "${ROOT}/host/bindings/pwm_policy.c" \
         "${ROOT}/${backend}/bindings/gpio.c" \
         "${ROOT}/${backend}/bindings/i2c.c" \
@@ -189,6 +190,30 @@ compile_adc_backend_test() {
         -o "${output}"
 }
 
+compile_spi_backend_test() {
+    local output="$1"
+    local backend="$2"
+    shift 2
+    cc -std=gnu17 -Wall -Wextra -Werror \
+        -ffunction-sections -fdata-sections \
+        "$@" \
+        -I"${ROOT}/host" \
+        -I"${ROOT}/host/bindings" \
+        -I"${ROOT}/tests" \
+        -I"${JERRY_ROOT}/jerry-core/include" \
+        "${ROOT}/tests/spi_backend_test.c" \
+        "${ROOT}/tests/runtime_validation_backend_stubs.c" \
+        "${ROOT}/host/bindings/validation.c" \
+        "${ROOT}/host/bindings/spi_options.c" \
+        "${ROOT}/${backend}/bindings/pin_policy.c" \
+        "${ROOT}/${backend}/bindings/spi.c" \
+        -Wl,--gc-sections \
+        "${JERRY_BUILD}/lib/libjerry-core.a" \
+        "${JERRY_BUILD}/lib/libjerry-port.a" \
+        -lm \
+        -o "${output}"
+}
+
 VALIDATION_TEST="${TMP_ROOT}/runtime-validation-shared"
 compile_validation_test "${VALIDATION_TEST}"
 "${VALIDATION_TEST}"
@@ -238,6 +263,26 @@ compile_adc_backend_test "${RP2_ADC_TEST}" platform/rp2 \
     -I"${ROOT}/tests/native_stubs/rp2"
 assert_global_text_symbol "${RP2_ADC_TEST}" "js_create_adc_module"
 "${RP2_ADC_TEST}"
+
+RP2_SPI_TEST="${TMP_ROOT}/spi-rp2"
+compile_spi_backend_test "${RP2_SPI_TEST}" platform/rp2 \
+    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
+    -I"${ROOT}/board/pico" \
+    -I"${ROOT}/platform/rp2/bindings" \
+    -I"${ROOT}/tests/native_stubs/rp2"
+assert_global_text_symbol "${RP2_SPI_TEST}" "js_create_spi_module"
+"${RP2_SPI_TEST}"
+
+RP2_SPI_DEFAULT_BUS_1_TEST="${TMP_ROOT}/spi-rp2-default-bus-1"
+compile_spi_backend_test "${RP2_SPI_DEFAULT_BUS_1_TEST}" platform/rp2 \
+    -DMCUJS_PLATFORM_RP2=1 \
+    -DMCUJS_BOARD_WAVESHARE_RP2040_TOUCH_LCD_1_28=1 \
+    -I"${ROOT}/board/waveshare_rp2040_touch_lcd_1.28" \
+    -I"${ROOT}/platform/rp2/bindings" \
+    -I"${ROOT}/tests/native_stubs/rp2"
+assert_global_text_symbol "${RP2_SPI_DEFAULT_BUS_1_TEST}" \
+    "js_create_spi_module"
+"${RP2_SPI_DEFAULT_BUS_1_TEST}"
 
 RP2350_BACKEND_TEST="${TMP_ROOT}/runtime-validation-rp2350-backend"
 compile_backend_test "${RP2350_BACKEND_TEST}" platform/rp2 \
@@ -363,6 +408,14 @@ for factory in gpio i2c pwm; do
     assert_global_text_symbol "${ESP32_BACKEND_TEST}" "js_create_${factory}_module"
 done
 "${ESP32_BACKEND_TEST}"
+
+ESP32_SPI_TEST="${TMP_ROOT}/spi-esp32"
+compile_spi_backend_test "${ESP32_SPI_TEST}" platform/esp32/main \
+    -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1 \
+    -I"${ROOT}/tests/native_stubs/esp32" \
+    -I"${ROOT}/platform/esp32/main/bindings"
+assert_global_text_symbol "${ESP32_SPI_TEST}" "js_create_spi_module"
+"${ESP32_SPI_TEST}"
 
 ESP32_PWM_RESOURCE_TEST="${TMP_ROOT}/pwm-resource-esp32"
 compile_pwm_resource_backend_test "${ESP32_PWM_RESOURCE_TEST}" platform/esp32/main \

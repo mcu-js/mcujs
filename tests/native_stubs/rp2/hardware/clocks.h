@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define clk_sys 0
+#define clk_peri 1
 
 uint32_t clock_get_hz(int clock);
 

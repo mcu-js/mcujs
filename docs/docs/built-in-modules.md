@@ -192,6 +192,57 @@ the non-destructive
 [I2C peripheral acceptance protocol](./development/i2c-peripheral-protocol.md)
 for target-emulator, NACK, transfer-boundary, and logic-analyzer evidence.
 
+### SPI contract
+
+The canonical SPI module is `require('spi')`. Its portable surface is exactly
+`spi.init(options)` and `spi.transfer(bus, data)`. The positional
+`spi.init(bus, sck, mosi, miso, frequency)` form remains as a 0.x migration
+alias. Initialization is master-mode, full-duplex, fixed at 8-bit words and
+MSB-first order; those formats are advertised by `bitsPerWord` and `bitOrders`
+but are not selectable in 0.2.
+
+Read `board.capability('spi')` before configuration. It exposes `buses`, complete
+routes, `defaultBus`, `defaultRoute`, inclusive frequency bounds,
+`maxTransferBytes`, and the implemented modes and format. Portable code can use
+the board default without copying pin numbers:
+
+```javascript
+(function () {
+  var boardApi = require('board');
+  var spi = require('spi');
+  var limits = boardApi.capability('spi');
+
+  spi.init({frequency: 1250000, mode: 0});
+  console.log(spi.transfer(limits.defaultBus, [0x9f, 0x00, 0x00, 0x00]));
+}());
+```
+
+`frequency` is a required finite integer in the advertised range. Omitting
+`bus`, `sck`, `mosi`, and `miso` selects `defaultRoute`; a non-default bus needs
+all three pins from one listed route. `mode` defaults to 0 and must be listed in
+`modes`. Unknown options, partial or unlisted routes, unadvertised modes, and
+out-of-range values throw uncoded `TypeError`/`RangeError`. An in-range frequency
+that the selected hardware cannot represent exactly throws `NotSupportedError`
+with `code === 'ERR_NOT_SUPPORTED'` rather than rounding it.
+
+`transfer()` accepts either one strict byte or an array of
+`1..maxTransferBytes` strict bytes. Scalar input returns one byte; array input
+returns an equally sized byte array. Empty or oversized arrays and bytes outside
+`0..255` throw before native I/O. The current RP capability advertises 256-byte
+transfers; the ESP32-S3 polling/no-DMA backend truthfully advertises its 64-byte
+native limit. Use before initialization and live route/bus contention throw
+`EBUSY`; driver allocation failure throws `ERR_RESOURCE_EXHAUSTED`; generic
+configuration or transfer failure throws `EIO` with native diagnostics.
+
+Successful reinitialization releases the previous route only after native
+ownership is stopped. ESP teardown or rollback failure retains every still-live
+device/bus handle and pin claim so a later `init()` can retry; other bindings
+cannot remux quarantined hardware. RP route changes likewise invalidate stale
+GPIO state, which must be explicitly reinitialized after release. See the
+non-destructive
+[SPI loopback and logic-analyzer protocol](./development/spi-loopback-protocol.md)
+for exact-byte, maximum-boundary, mode, timing, and lifecycle evidence.
+
 ### ADC contract
 
 The canonical ADC module is `require('adc')`. Its portable surface is exactly

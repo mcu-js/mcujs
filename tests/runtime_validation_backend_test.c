@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(MCUJS_PLATFORM_RP2)
+#include "hardware/pwm.h"
+#endif
+
 static bool eval_source(const char *source) {
     jerry_value_t result = jerry_eval((const jerry_char_t *)source,
                                       strlen(source), JERRY_PARSE_NO_OPTS);
@@ -148,6 +152,34 @@ int main(void) {
     assert(mcujs_test_i2c_write_calls == 1);
     assert(mcujs_test_i2c_last_length == 256);
 
+#if defined(MCUJS_PLATFORM_RP2)
+    assert(mcujs_test_pwm_level == 31250u);
+    assert(eval_source("PWM.setDuty(9, 0);"));
+    assert(mcujs_test_pwm_level == 0u);
+    assert(eval_source("PWM.setDuty(9, 0.5);"));
+    assert(mcujs_test_pwm_level == 31250u);
+    assert(eval_source("PWM.setDuty(9, 1);"));
+    assert(mcujs_test_pwm_level == 62500u);
+    unsigned pwm_duty_calls = mcujs_test_pwm_duty_calls;
+#else
+    assert(mcujs_test_ledc_duty == 512u);
+    assert(eval_source("PWM.setDuty(9, 0);"));
+    assert(mcujs_test_ledc_duty == 0u);
+    assert(eval_source("PWM.setDuty(9, 0.5);"));
+    assert(mcujs_test_ledc_duty == 512u);
+    assert(eval_source("PWM.setDuty(9, 1);"));
+    assert(mcujs_test_ledc_duty == 1024u);
+    unsigned pwm_duty_calls = mcujs_test_ledc_duty_calls;
+#endif
+    assert(assert_operational_error("PWM.setDuty(9, 1 / 3)",
+                                    "NotSupportedError",
+                                    "ERR_NOT_SUPPORTED"));
+#if defined(MCUJS_PLATFORM_RP2)
+    assert(mcujs_test_pwm_duty_calls == pwm_duty_calls);
+#else
+    assert(mcujs_test_ledc_duty_calls == pwm_duty_calls);
+#endif
+
     assert(eval_source("PWM.init(__pwmProbePin, __pwmMin);"));
 #if defined(MCUJS_PLATFORM_RP2)
     assert((uint64_t)125000000u * 16u ==
@@ -281,6 +313,32 @@ int main(void) {
                                     "ResourceBusyError", "EBUSY"));
     assert(eval_source("PWM.setDuty(12, 0.5); PWM.stop(12); "
                        "GPIO.init(12, GPIO.OUTPUT); GPIO.set(12, true);"));
+
+    assert(pwm_gpio_to_slice_num(0) == pwm_gpio_to_slice_num(16));
+    assert(pwm_gpio_to_channel(0) == pwm_gpio_to_channel(16));
+    assert(pwm_gpio_to_slice_num(1) == pwm_gpio_to_slice_num(17));
+    assert(pwm_gpio_to_channel(1) == pwm_gpio_to_channel(17));
+    assert(pwm_gpio_to_slice_num(32) == pwm_gpio_to_slice_num(40));
+    assert(pwm_gpio_to_channel(32) == pwm_gpio_to_channel(40));
+    assert(pwm_gpio_to_slice_num(33) == pwm_gpio_to_slice_num(41));
+    assert(pwm_gpio_to_channel(33) == pwm_gpio_to_channel(41));
+    pwm_config_calls = mcujs_test_pwm_config_calls;
+    assert(eval_source("PWM.init(0, 1000);"));
+    unsigned claimed_output_config_calls = mcujs_test_pwm_config_calls;
+    assert(claimed_output_config_calls > pwm_config_calls);
+    assert(assert_operational_error("PWM.init(16, 1000)",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(mcujs_test_pwm_config_calls == claimed_output_config_calls);
+    assert(eval_source("PWM.setDuty(0, 0.5); PWM.stop(0); "
+                       "PWM.init(16, 1000); PWM.setDuty(16, 0.5); "
+                       "PWM.stop(16);"));
+    assert(eval_source("PWM.init(1, 1000);"));
+    claimed_output_config_calls = mcujs_test_pwm_config_calls;
+    assert(assert_operational_error("PWM.init(17, 1000)",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(mcujs_test_pwm_config_calls == claimed_output_config_calls);
+    assert(eval_source("PWM.stop(1); PWM.init(17, 1000); PWM.stop(17);"));
+
     assert(assert_operational_error("PWM.init(3, 1000)",
                                     "ResourceBusyError", "EBUSY"));
     assert(eval_source("GPIO.set(3, true);"));

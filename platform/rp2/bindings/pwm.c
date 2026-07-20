@@ -21,13 +21,15 @@ extern void js_register_global(const char *name, jerry_value_t object);
 #define PWM_DIVIDER_SCALE 16u
 #define PWM_DIVIDER_SCALED_MIN 16u
 #define PWM_DIVIDER_SCALED_MAX 4095u
-#define PWM_PERIOD_MAX 65536u
+#define PWM_PERIOD_MAX UINT16_MAX
 #define PWM_SLICE_STORAGE ((NUM_BANK0_GPIOS + 1u) / 2u)
 
 static bool s_pwm_initialized[NUM_BANK0_GPIOS];
 static uint16_t s_pwm_slice_references[PWM_SLICE_STORAGE];
 static uint32_t s_pwm_slice_frequency[PWM_SLICE_STORAGE];
 static uint16_t s_pwm_slice_wrap[PWM_SLICE_STORAGE];
+/* Zero means unclaimed; otherwise the stored value is GPIO + 1. */
+static uint8_t s_pwm_output_owners[PWM_SLICE_STORAGE][2];
 
 typedef struct {
     uint16_t divider_scaled;
@@ -57,6 +59,17 @@ static bool find_exact_frequency(uint32_t clock_frequency, uint32_t frequency,
     return false;
 }
 
+static bool find_exact_duty_level(double duty, uint32_t period,
+                                  uint16_t *level) {
+    uint32_t candidate = (uint32_t)(duty * (double)period + 0.5);
+    if (candidate > period || candidate > UINT16_MAX ||
+        (double)candidate / (double)period != duty) {
+        return false;
+    }
+    *level = (uint16_t)candidate;
+    return true;
+}
+
 static jerry_value_t throw_pwm_error(mcujs_operational_error_t error, int pin,
                                      const char *message) {
     const mcujs_error_details_t details = {
@@ -70,6 +83,7 @@ static jerry_value_t throw_pwm_error(mcujs_operational_error_t error, int pin,
 static void release_pwm_pin(uint pin) {
     if (!s_pwm_initialized[pin]) return;
     uint slice = pwm_gpio_to_slice_num(pin);
+    uint channel = pwm_gpio_to_channel(pin);
     gpio_set_function(pin, GPIO_FUNC_SIO);
     gpio_init(pin);
     s_pwm_initialized[pin] = false;
@@ -80,6 +94,10 @@ static void release_pwm_pin(uint pin) {
             s_pwm_slice_frequency[slice] = 0;
             s_pwm_slice_wrap[slice] = 0;
         }
+    }
+    if (slice < PWM_SLICE_STORAGE && channel < 2u &&
+        s_pwm_output_owners[slice][channel] == (uint8_t)(pin + 1u)) {
+        s_pwm_output_owners[slice][channel] = 0;
     }
     mcujs_rp2_pin_release((int)pin, MCUJS_RP2_PIN_OWNER_PWM);
 }
@@ -125,9 +143,15 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *call_info_p,
     }
 
     uint slice = pwm_gpio_to_slice_num((uint)pin);
-    if (slice >= PWM_SLICE_STORAGE) {
+    uint channel = pwm_gpio_to_channel((uint)pin);
+    if (slice >= PWM_SLICE_STORAGE || channel >= 2u) {
         return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, pin,
                                "PWM pin cannot be mapped to a timer");
+    }
+    uint8_t output_owner = s_pwm_output_owners[slice][channel];
+    if (output_owner != 0 && output_owner != (uint8_t)(pin + 1)) {
+        return throw_pwm_error(MCUJS_ERROR_BUSY, pin,
+                               "PWM output is owned by an aliased pin");
     }
     uint16_t own_reference = s_pwm_initialized[pin] ? 1u : 0u;
     if (s_pwm_slice_references[slice] > own_reference &&
@@ -157,6 +181,7 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *call_info_p,
     s_pwm_slice_references[slice]++;
     s_pwm_slice_frequency[slice] = (uint32_t)frequency;
     s_pwm_slice_wrap[slice] = frequency_config.wrap;
+    s_pwm_output_owners[slice][channel] = (uint8_t)(pin + 1);
     return jerry_undefined();
 }
 
@@ -191,7 +216,12 @@ static jerry_value_t pwm_set_duty_handler(const jerry_call_info_t *call_info_p,
     }
 
     uint slice = pwm_gpio_to_slice_num((uint)pin);
-    uint16_t level = (uint16_t)(duty * s_pwm_slice_wrap[slice]);
+    uint32_t period = (uint32_t)s_pwm_slice_wrap[slice] + 1u;
+    uint16_t level;
+    if (!find_exact_duty_level(duty, period, &level)) {
+        return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, pin,
+                               "PWM duty cannot be represented exactly");
+    }
     pwm_set_gpio_level((uint)pin, level);
     return jerry_undefined();
 }

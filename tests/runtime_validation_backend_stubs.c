@@ -64,6 +64,8 @@ unsigned mcujs_test_i2c_init_calls;
 unsigned mcujs_test_pwm_config_calls;
 unsigned mcujs_test_pwm_divider_scaled;
 unsigned mcujs_test_pwm_wrap;
+unsigned mcujs_test_pwm_duty_calls;
+unsigned mcujs_test_pwm_level;
 
 void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_result = 0;
@@ -75,6 +77,8 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_pwm_config_calls = 0;
     mcujs_test_pwm_divider_scaled = 0;
     mcujs_test_pwm_wrap = 0;
+    mcujs_test_pwm_duty_calls = 0;
+    mcujs_test_pwm_level = 0;
     for (size_t i = 0; i < NUM_BANK0_GPIOS; i++) s_gpio_levels[i] = false;
 }
 
@@ -116,7 +120,12 @@ int i2c_read_blocking(i2c_inst_t *instance, uint8_t address,
     return (int)length;
 }
 
-uint pwm_gpio_to_slice_num(uint pin) { return pin / 2u; }
+uint pwm_gpio_to_slice_num(uint pin) {
+    /* Pico SDK 2.2.0 PWM_GPIO_SLICE_NUM mapping for RP2040 and RP2350. */
+    return pin < 32u ? ((pin >> 1u) & 7u)
+                     : 8u + ((pin >> 1u) & 3u);
+}
+uint pwm_gpio_to_channel(uint pin) { return pin & 1u; }
 void pwm_set_clkdiv_int_frac(uint slice, uint8_t div_int, uint8_t div_frac4) {
     (void)slice;
     mcujs_test_pwm_divider_scaled = (unsigned)div_int * 16u + div_frac4;
@@ -126,7 +135,11 @@ void pwm_set_wrap(uint slice, uint16_t wrap) {
     (void)slice;
     mcujs_test_pwm_wrap = wrap;
 }
-void pwm_set_gpio_level(uint pin, uint16_t level) { (void)pin; (void)level; }
+void pwm_set_gpio_level(uint pin, uint16_t level) {
+    (void)pin;
+    mcujs_test_pwm_duty_calls++;
+    mcujs_test_pwm_level = level;
+}
 void pwm_set_enabled(uint slice, bool enabled) { (void)slice; (void)enabled; }
 uint32_t clock_get_hz(int clock) { (void)clock; return 125000000u; }
 
@@ -143,6 +156,8 @@ unsigned mcujs_test_i2c_driver_delete_calls;
 int mcujs_test_ledc_result;
 unsigned mcujs_test_ledc_resolution;
 unsigned mcujs_test_ledc_actual_frequency;
+unsigned mcujs_test_ledc_duty_calls;
+unsigned mcujs_test_ledc_duty;
 static uint32_t s_ledc_timer_frequency[4];
 
 void mcujs_test_reset_backend(void) {
@@ -156,6 +171,8 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_ledc_result = ESP_OK;
     mcujs_test_ledc_resolution = 10;
     mcujs_test_ledc_actual_frequency = 0;
+    mcujs_test_ledc_duty_calls = 0;
+    mcujs_test_ledc_duty = 0;
     for (size_t i = 0; i < 4; i++) s_ledc_timer_frequency[i] = 0;
     for (size_t i = 0; i < GPIO_NUM_MAX; i++) s_gpio_levels[i] = 0;
 }
@@ -262,7 +279,8 @@ esp_err_t ledc_set_duty(int speed_mode, ledc_channel_t channel,
                         uint32_t duty) {
     (void)speed_mode;
     (void)channel;
-    (void)duty;
+    mcujs_test_ledc_duty_calls++;
+    mcujs_test_ledc_duty = duty;
     return mcujs_test_ledc_result;
 }
 

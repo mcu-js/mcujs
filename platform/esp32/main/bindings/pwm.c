@@ -16,7 +16,6 @@
 
 #define MCUJS_PWM_CHANNEL_COUNT 8
 #define MCUJS_PWM_TIMER_COUNT 4
-#define MCUJS_PWM_MAX_INPUT 65535.0
 #define MCUJS_PWM_SOURCE_HZ 80000000u
 #define MCUJS_PWM_MAX_RESOLUTION 14u
 
@@ -59,6 +58,17 @@ static mcujs_operational_error_t map_pwm_native_error(esp_err_t error) {
     if (error == ESP_ERR_NO_MEM) return MCUJS_ERROR_RESOURCE_EXHAUSTED;
     if (error == ESP_ERR_NOT_SUPPORTED) return MCUJS_ERROR_NOT_SUPPORTED;
     return MCUJS_ERROR_IO;
+}
+
+static bool find_exact_duty_value(double duty, uint32_t period,
+                                  uint32_t *value) {
+    uint32_t candidate = (uint32_t)(duty * (double)period + 0.5);
+    if (candidate > period ||
+        (double)candidate / (double)period != duty) {
+        return false;
+    }
+    *value = candidate;
+    return true;
 }
 
 static pwm_channel_state_t *find_channel(int pin) {
@@ -314,10 +324,13 @@ static jerry_value_t pwm_set_duty_handler(const jerry_call_info_t *info,
         return throw_pwm_error(MCUJS_ERROR_BUSY, ESP_OK, pin, 0,
                                "PWM pin is not initialized");
     }
-    double public_duty = input * MCUJS_PWM_MAX_INPUT;
     uint32_t resolution = (uint32_t)s_timers[channel->timer].resolution;
-    uint32_t maximum = (1u << resolution) - 1u;
-    uint32_t duty = (uint32_t)((public_duty * maximum) / MCUJS_PWM_MAX_INPUT);
+    uint32_t period = 1u << resolution;
+    uint32_t duty;
+    if (!find_exact_duty_value(input, period, &duty)) {
+        return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, ESP_OK, pin, 0,
+                               "PWM duty cannot be represented exactly");
+    }
     esp_err_t duty_error =
         ledc_set_duty(LEDC_LOW_SPEED_MODE, channel->channel, duty);
     if (duty_error == ESP_OK) {

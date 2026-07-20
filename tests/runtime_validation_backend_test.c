@@ -548,11 +548,13 @@ int main(void) {
     assert(eval_source("GPIO.init(26, GPIO.OUTPUT); adc.readPin(26);"));
     assert(assert_operational_error("GPIO.set(26, true)",
                                     "ResourceBusyError", "EBUSY"));
-    assert(assert_operational_error("PWM.init(26, 1000)",
+    assert(eval_source("PWM.init(26, 1000);"));
+    assert(assert_operational_error("adc.readPin(26)",
                                     "ResourceBusyError", "EBUSY"));
     assert(assert_operational_error(
         "neopixel.init({pin: 26, length: 1, order: 'RGB'})",
         "ResourceBusyError", "EBUSY"));
+    assert(eval_source("PWM.stop(26); adc.readPin(26);"));
 
     /* A failed NeoPixel creation releases its claim, and a later init can
      * recover only after GPIO explicitly reclaims the stale soft state. */

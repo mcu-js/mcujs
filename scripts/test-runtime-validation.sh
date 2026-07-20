@@ -131,6 +131,29 @@ compile_pwm_resource_backend_test() {
         -o "${output}"
 }
 
+compile_adc_backend_test() {
+    local output="$1"
+    local backend="$2"
+    shift 2
+    cc -std=gnu17 -Wall -Wextra -Werror \
+        -ffunction-sections -fdata-sections \
+        "$@" \
+        -I"${ROOT}/host" \
+        -I"${ROOT}/host/bindings" \
+        -I"${ROOT}/tests" \
+        -I"${JERRY_ROOT}/jerry-core/include" \
+        "${ROOT}/tests/adc_backend_test.c" \
+        "${ROOT}/tests/runtime_validation_backend_stubs.c" \
+        "${ROOT}/host/bindings/validation.c" \
+        "${ROOT}/${backend}/bindings/pin_policy.c" \
+        "${ROOT}/${backend}/bindings/adc.c" \
+        -Wl,--gc-sections \
+        "${JERRY_BUILD}/lib/libjerry-core.a" \
+        "${JERRY_BUILD}/lib/libjerry-port.a" \
+        -lm \
+        -o "${output}"
+}
+
 VALIDATION_TEST="${TMP_ROOT}/runtime-validation-shared"
 compile_validation_test "${VALIDATION_TEST}"
 "${VALIDATION_TEST}"
@@ -166,6 +189,15 @@ compile_pwm_resource_backend_test "${RP2_PWM_RESOURCE_TEST}" platform/rp2 \
     "${ROOT}/platform/rp2/bindings/pwm.c"
 "${RP2_PWM_RESOURCE_TEST}"
 
+RP2_ADC_TEST="${TMP_ROOT}/adc-rp2"
+compile_adc_backend_test "${RP2_ADC_TEST}" platform/rp2 \
+    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
+    -I"${ROOT}/board/pico" \
+    -I"${ROOT}/platform/rp2/bindings" \
+    -I"${ROOT}/tests/native_stubs/rp2"
+nm -g "${RP2_ADC_TEST}" | grep -Eq " T js_create_adc_module$"
+"${RP2_ADC_TEST}"
+
 RP2350_BACKEND_TEST="${TMP_ROOT}/runtime-validation-rp2350-backend"
 compile_backend_test "${RP2350_BACKEND_TEST}" platform/rp2 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO2=1 \
@@ -192,6 +224,15 @@ compile_pwm_resource_backend_test "${RP2350_PWM_RESOURCE_TEST}" platform/rp2 \
     "${ROOT}/platform/rp2/bindings/pin_policy.c" \
     "${ROOT}/platform/rp2/bindings/pwm.c"
 "${RP2350_PWM_RESOURCE_TEST}"
+
+RP2350_ADC_TEST="${TMP_ROOT}/adc-rp2350"
+compile_adc_backend_test "${RP2350_ADC_TEST}" platform/rp2 \
+    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO2=1 \
+    -I"${ROOT}/board/pico2" \
+    -I"${ROOT}/platform/rp2/bindings" \
+    -I"${ROOT}/tests/native_stubs/rp2"
+nm -g "${RP2350_ADC_TEST}" | grep -Eq " T js_create_adc_module$"
+"${RP2350_ADC_TEST}"
 
 compile_rp_board_surface_test() {
     local output="$1"
@@ -290,3 +331,11 @@ compile_pwm_resource_backend_test "${ESP32_PWM_RESOURCE_TEST}" platform/esp32/ma
     "${ROOT}/platform/esp32/main/bindings/pin_policy.c" \
     "${ROOT}/platform/esp32/main/bindings/pwm.c"
 "${ESP32_PWM_RESOURCE_TEST}"
+
+ESP32_ADC_TEST="${TMP_ROOT}/adc-esp32"
+compile_adc_backend_test "${ESP32_ADC_TEST}" platform/esp32/main \
+    -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1 \
+    -I"${ROOT}/tests/native_stubs/esp32" \
+    -I"${ROOT}/platform/esp32/main/bindings"
+nm -g "${ESP32_ADC_TEST}" | grep -Eq " T js_create_adc_module$"
+"${ESP32_ADC_TEST}"

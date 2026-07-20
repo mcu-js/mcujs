@@ -14,6 +14,9 @@ int mcujs_test_i2c_result;
 unsigned mcujs_test_i2c_write_calls;
 unsigned mcujs_test_i2c_read_calls;
 size_t mcujs_test_i2c_last_length;
+unsigned mcujs_test_adc_read_calls;
+unsigned mcujs_test_adc_calibrated_calls;
+int mcujs_test_adc_raw_value;
 
 #if !defined(MCUJS_USE_PRODUCTION_BINDING_HELPERS)
 void js_set_property(jerry_value_t object, const char *name, jerry_value_t value) {
@@ -116,7 +119,6 @@ unsigned mcujs_test_adc_gpio_init_calls;
 unsigned mcujs_test_adc_last_pin;
 unsigned mcujs_test_adc_init_calls;
 unsigned mcujs_test_adc_select_calls;
-unsigned mcujs_test_adc_read_calls;
 bool mcujs_test_pio_can_add_program;
 unsigned mcujs_test_neopixel_init_calls;
 unsigned mcujs_test_neopixel_last_pin;
@@ -162,6 +164,8 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_adc_init_calls = 0;
     mcujs_test_adc_select_calls = 0;
     mcujs_test_adc_read_calls = 0;
+    mcujs_test_adc_calibrated_calls = 0;
+    mcujs_test_adc_raw_value = 2048;
     mcujs_test_pio_can_add_program = true;
     mcujs_test_neopixel_init_calls = 0;
     mcujs_test_neopixel_last_pin = UINT32_MAX;
@@ -367,7 +371,10 @@ void adc_gpio_init(uint pin) {
     mcujs_test_adc_last_pin = pin;
 }
 void adc_select_input(uint channel) { (void)channel; mcujs_test_adc_select_calls++; }
-uint16_t adc_read(void) { mcujs_test_adc_read_calls++; return 2048; }
+uint16_t adc_read(void) {
+    mcujs_test_adc_read_calls++;
+    return (uint16_t)mcujs_test_adc_raw_value;
+}
 void adc_set_temp_sensor_enabled(bool enabled) { (void)enabled; }
 
 bool pio_can_add_program(PIO pio, const pio_program_t *program) {
@@ -421,6 +428,8 @@ void cyw43_arch_gpio_put(int pin, int value) { (void)pin; (void)value; }
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "driver/ledc.h"
+#include "driver/temperature_sensor.h"
+#include "esp_adc/adc_cali_scheme.h"
 
 static int s_gpio_levels[GPIO_NUM_MAX];
 static int s_gpio_directions[GPIO_NUM_MAX];
@@ -450,7 +459,20 @@ unsigned mcujs_test_ledc_timer_config_calls;
 unsigned mcujs_test_ledc_timer_deconfigure_calls;
 unsigned mcujs_test_ledc_timer_pause_calls;
 unsigned mcujs_test_ledc_channel_config_calls;
+int mcujs_test_adc_unit_result;
+int mcujs_test_adc_config_result;
+int mcujs_test_adc_read_result;
+int mcujs_test_adc_calibration_result;
+int mcujs_test_adc_millivolts;
+int mcujs_test_temperature_install_result;
+int mcujs_test_temperature_enable_result;
+int mcujs_test_temperature_read_result;
+int mcujs_test_temperature_disable_result;
+float mcujs_test_temperature_celsius;
 static uint32_t s_ledc_timer_frequency[4];
+static int s_adc_unit_storage;
+static int s_adc_cali_storage;
+static int s_temperature_sensor_storage;
 
 void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_result = ESP_OK;
@@ -482,6 +504,19 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_ledc_timer_deconfigure_calls = 0;
     mcujs_test_ledc_timer_pause_calls = 0;
     mcujs_test_ledc_channel_config_calls = 0;
+    mcujs_test_adc_read_calls = 0;
+    mcujs_test_adc_calibrated_calls = 0;
+    mcujs_test_adc_raw_value = 2048;
+    mcujs_test_adc_unit_result = ESP_OK;
+    mcujs_test_adc_config_result = ESP_OK;
+    mcujs_test_adc_read_result = ESP_OK;
+    mcujs_test_adc_calibration_result = ESP_OK;
+    mcujs_test_adc_millivolts = 1234;
+    mcujs_test_temperature_install_result = ESP_OK;
+    mcujs_test_temperature_enable_result = ESP_OK;
+    mcujs_test_temperature_read_result = ESP_OK;
+    mcujs_test_temperature_disable_result = ESP_OK;
+    mcujs_test_temperature_celsius = 31.25f;
     for (size_t i = 0; i < 4; i++) s_ledc_timer_frequency[i] = 0;
     for (size_t i = 0; i < GPIO_NUM_MAX; i++) {
         s_gpio_levels[i] = 0;
@@ -660,6 +695,85 @@ esp_err_t ledc_update_duty(int speed_mode, ledc_channel_t channel) {
     (void)speed_mode;
     (void)channel;
     return mcujs_test_ledc_result;
+}
+
+esp_err_t adc_oneshot_new_unit(const adc_oneshot_unit_init_cfg_t *config,
+                               adc_oneshot_unit_handle_t *handle) {
+    (void)config;
+    if (mcujs_test_adc_unit_result == ESP_OK) {
+        *handle = (adc_oneshot_unit_handle_t)&s_adc_unit_storage;
+    }
+    return mcujs_test_adc_unit_result;
+}
+
+esp_err_t adc_oneshot_config_channel(adc_oneshot_unit_handle_t handle,
+                                     adc_channel_t channel,
+                                     const adc_oneshot_chan_cfg_t *config) {
+    (void)handle;
+    (void)channel;
+    (void)config;
+    return mcujs_test_adc_config_result;
+}
+
+esp_err_t adc_oneshot_read(adc_oneshot_unit_handle_t handle,
+                           adc_channel_t channel, int *raw) {
+    (void)handle;
+    (void)channel;
+    mcujs_test_adc_read_calls++;
+    if (mcujs_test_adc_read_result == ESP_OK) *raw = mcujs_test_adc_raw_value;
+    return mcujs_test_adc_read_result;
+}
+
+esp_err_t adc_cali_create_scheme_curve_fitting(
+    const adc_cali_curve_fitting_config_t *config,
+    adc_cali_handle_t *handle) {
+    (void)config;
+    if (mcujs_test_adc_calibration_result == ESP_OK) {
+        *handle = (adc_cali_handle_t)&s_adc_cali_storage;
+    }
+    return mcujs_test_adc_calibration_result;
+}
+
+esp_err_t adc_oneshot_get_calibrated_result(adc_oneshot_unit_handle_t unit,
+                                             adc_cali_handle_t calibration,
+                                             adc_channel_t channel,
+                                             int *millivolts) {
+    (void)unit;
+    (void)calibration;
+    (void)channel;
+    mcujs_test_adc_calibrated_calls++;
+    if (mcujs_test_adc_calibration_result == ESP_OK) {
+        *millivolts = mcujs_test_adc_millivolts;
+    }
+    return mcujs_test_adc_calibration_result;
+}
+
+esp_err_t temperature_sensor_install(const temperature_sensor_config_t *config,
+                                     temperature_sensor_handle_t *handle) {
+    (void)config;
+    if (mcujs_test_temperature_install_result == ESP_OK) {
+        *handle = (temperature_sensor_handle_t)&s_temperature_sensor_storage;
+    }
+    return mcujs_test_temperature_install_result;
+}
+
+esp_err_t temperature_sensor_enable(temperature_sensor_handle_t handle) {
+    (void)handle;
+    return mcujs_test_temperature_enable_result;
+}
+
+esp_err_t temperature_sensor_get_celsius(temperature_sensor_handle_t handle,
+                                         float *celsius) {
+    (void)handle;
+    if (mcujs_test_temperature_read_result == ESP_OK) {
+        *celsius = mcujs_test_temperature_celsius;
+    }
+    return mcujs_test_temperature_read_result;
+}
+
+esp_err_t temperature_sensor_disable(temperature_sensor_handle_t handle) {
+    (void)handle;
+    return mcujs_test_temperature_disable_result;
 }
 
 #else

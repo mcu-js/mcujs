@@ -74,7 +74,8 @@ jerry_value_t js_create_spi_module(void);
 
 /*
  * Register ADC bindings
- * adc.readPin(), adc.readChannel(), adc.readTempC(), adc.TEMP
+ * adc.readPin(), adc.readChannel(), adc.readVoltagePin(),
+ * adc.readVoltageChannel(), adc.readTempC()
  */
 void js_bind_adc(void);
 

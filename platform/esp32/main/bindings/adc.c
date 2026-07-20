@@ -4,6 +4,7 @@
 #include "bindings.h"
 #include "jerryscript.h"
 #include "pin_policy.h"
+#include "runtime_features.h"
 
 #include "driver/temperature_sensor.h"
 #include "esp_adc/adc_cali.h"
@@ -14,6 +15,29 @@
 static adc_oneshot_unit_handle_t s_adc_unit;
 static adc_cali_handle_t s_adc_cali;
 static temperature_sensor_handle_t s_temp_sensor;
+static bool s_temp_enabled;
+
+static mcujs_operational_error_t map_adc_error(esp_err_t error) {
+    if (error == ESP_ERR_TIMEOUT || error == ESP_ERR_INVALID_STATE) {
+        return MCUJS_ERROR_BUSY;
+    }
+    return MCUJS_ERROR_IO;
+}
+
+static jerry_value_t throw_adc_error(esp_err_t error, int pin,
+                                     const char *resource,
+                                     const char *message) {
+    const mcujs_error_details_t details = {
+        .resource = resource,
+        .has_pin = pin >= 0,
+        .pin = pin,
+        .has_native_code = error != ESP_OK,
+        .native_code = error,
+    };
+    return mcujs_throw_operational_error(
+        error == ESP_OK ? MCUJS_ERROR_BUSY : map_adc_error(error),
+        message, &details);
+}
 
 static bool adc_pin_to_channel(int pin, adc_channel_t *channel) {
     if (pin < 1 || pin > 9) {
@@ -70,10 +94,11 @@ static esp_err_t configure_channel(adc_channel_t channel) {
 
 static jerry_value_t read_adc(int pin, adc_channel_t channel, bool calibrated) {
     if (!mcujs_pin_can_claim(pin, MCUJS_PIN_OWNER_ADC)) {
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "ADC pin is owned by another peripheral");
+        return throw_adc_error(ESP_OK, pin, "adc",
+                               "ADC pin is owned by another peripheral");
     }
     if (!mcujs_pin_claim(pin, MCUJS_PIN_OWNER_ADC)) {
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "ADC pin claim failed");
+        return throw_adc_error(ESP_OK, pin, "adc", "ADC pin claim failed");
     }
     esp_err_t err = configure_channel(channel);
     int result = 0;
@@ -86,11 +111,22 @@ static jerry_value_t read_adc(int pin, adc_channel_t channel, bool calibrated) {
                   : adc_oneshot_read(s_adc_unit, channel, &result);
     }
     if (err != ESP_OK) {
-        (void)gpio_reset_pin((gpio_num_t)pin);
+        esp_err_t cleanup_err = gpio_reset_pin((gpio_num_t)pin);
+        if (cleanup_err != ESP_OK) {
+            return throw_adc_error(cleanup_err, pin, "adc",
+                                   "ADC rollback failed");
+        }
         mcujs_pin_release(pin, MCUJS_PIN_OWNER_ADC);
-        return jerry_throw_sz(JERRY_ERROR_COMMON,
-                              calibrated ? "ADC calibration/read failed" : "ADC read failed");
+        return throw_adc_error(
+            err, pin, "adc",
+            calibrated ? "ADC calibration/read failed" : "ADC read failed");
     }
+    esp_err_t cleanup_err = gpio_reset_pin((gpio_num_t)pin);
+    if (cleanup_err != ESP_OK) {
+        return throw_adc_error(cleanup_err, pin, "adc",
+                               "ADC cleanup failed");
+    }
+    mcujs_pin_release(pin, MCUJS_PIN_OWNER_ADC);
     return jerry_number(calibrated ? (double)result / 1000.0 : (double)result);
 }
 
@@ -164,16 +200,30 @@ static jerry_value_t adc_read_temp_handler(const jerry_call_info_t *info,
     (void)argc;
     esp_err_t err = ensure_temperature_sensor();
     if (err != ESP_OK) {
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "Temperature sensor initialization failed");
+        return throw_adc_error(err, -1, "temperatureSensor",
+                               "Temperature sensor initialization failed");
     }
-    err = temperature_sensor_enable(s_temp_sensor);
+    if (!s_temp_enabled) {
+        err = temperature_sensor_enable(s_temp_sensor);
+        if (err != ESP_OK) {
+            return throw_adc_error(err, -1, "temperatureSensor",
+                                   "Temperature sensor enable failed");
+        }
+        s_temp_enabled = true;
+    }
     float celsius = 0;
-    if (err == ESP_OK) {
-        err = temperature_sensor_get_celsius(s_temp_sensor, &celsius);
-    }
+    err = temperature_sensor_get_celsius(s_temp_sensor, &celsius);
     esp_err_t disable_err = temperature_sensor_disable(s_temp_sensor);
-    if (err != ESP_OK || disable_err != ESP_OK) {
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "Temperature sensor read failed");
+    if (disable_err == ESP_OK) {
+        s_temp_enabled = false;
+    }
+    if (disable_err != ESP_OK) {
+        return throw_adc_error(disable_err, -1, "temperatureSensor",
+                               "Temperature sensor disable failed");
+    }
+    if (err != ESP_OK) {
+        return throw_adc_error(err, -1, "temperatureSensor",
+                               "Temperature sensor read failed");
     }
     return jerry_number((double)celsius);
 }
@@ -182,9 +232,13 @@ jerry_value_t js_create_adc_module(void) {
     jerry_value_t adc = jerry_object();
     js_set_function(adc, "readPin", adc_read_pin_handler);
     js_set_function(adc, "readChannel", adc_read_channel_handler);
+#if MCUJS_REGISTRY_ADC_VOLTAGE
     js_set_function(adc, "readVoltagePin", adc_read_voltage_pin_handler);
     js_set_function(adc, "readVoltageChannel", adc_read_voltage_channel_handler);
+#endif
+#if MCUJS_REGISTRY_ADC_TEMPERATURE
     js_set_function(adc, "readTempC", adc_read_temp_handler);
+#endif
     return adc;
 }
 

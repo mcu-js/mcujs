@@ -168,6 +168,50 @@ test("XIAO ESP32-S3 pin aliases exactly match the exposed header", () => {
   assert.equal(Object.hasOwn(xiao.board.pins, "D21"), false);
 });
 
+test("ADC channels, aliases, calibration, and temperature metadata are truthful for every board", () => {
+  const vsysBoards = new Set(["pico", "pico2"]);
+
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    const adc = descriptor.capabilities.adc;
+    assert.equal(Boolean(adc), descriptor.features.adc, `${boardId}.adc availability`);
+    if (!adc) continue;
+
+    assert.equal(adc.resolutionBits, 12, `${boardId}.adc.resolutionBits`);
+    assert.equal(adc.voltage.supported, true, `${boardId}.adc.voltage.supported`);
+    assert.equal(
+      adc.voltage.calibrated,
+      boardId === "seeed_xiao_esp32s3",
+      `${boardId}.adc.voltage.calibrated`,
+    );
+    assert.deepEqual(
+      adc.temperature,
+      { supported: true, rawChannel: boardId !== "seeed_xiao_esp32s3" },
+      `${boardId}.adc.temperature`,
+    );
+    assert.equal(adc.vsys, vsysBoards.has(boardId), `${boardId}.adc.vsys`);
+
+    assert.deepEqual(
+      adc.channels.map(({ pin }) => pin),
+      adc.pins,
+      `${boardId}.adc channel/pin order`,
+    );
+    for (const channel of adc.channels) {
+      const expectedChannel = boardId === "seeed_xiao_esp32s3"
+        ? channel.pin - 1
+        : channel.pin - 26;
+      assert.equal(channel.channel, expectedChannel, `${boardId}.adc GPIO/channel mapping`);
+      for (const alias of channel.aliases) {
+        assert.equal(
+          descriptor.board.pins[alias],
+          channel.pin,
+          `${boardId}.adc alias ${alias}`,
+        );
+      }
+    }
+  }
+});
+
 test("reserved implementation pins are absent from public RP maps", () => {
   for (const boardId of ["pico", "pico2", "pico2_w"]) {
     const pins = boardDescriptors[boardId].board.exposedPins;

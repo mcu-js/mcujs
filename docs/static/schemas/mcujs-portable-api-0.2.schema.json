@@ -3182,7 +3182,7 @@
         },
         {
           "name": "adc.TEMP",
-          "target": "adc.readTempC()",
+          "target": "adc.readChannel(4) (RP compatibility raw-temperature channel)",
           "kind": "property",
           "javascriptType": "number",
           "availability": "capabilityFieldEquals",
@@ -3195,7 +3195,7 @@
         },
         {
           "name": "adc.VSYS",
-          "target": "board.capability('adc').channels[aliases includes 'VSYS'].channel",
+          "target": "adc.readChannel(3) (RP compatibility VSYS/3 channel)",
           "kind": "property",
           "javascriptType": "number",
           "availability": "capabilityFieldEquals",

@@ -253,16 +253,23 @@ Missing color values default to 0. Color arrays longer than three bytes and pixe
 
 ### ADC
 ```javascript
-const adc = require('adc');
+(function () {
+  var boardApi = require('board');
+  var adc = require('adc');
+  var capability = boardApi.capability('adc');
+  var route = capability.channels[0];
 
-adc.readPin(26);                  // Raw ADC reading (0-4095)
-adc.readChannel(0);               // Raw ADC reading by channel
-adc.readVoltagePin(26);           // Voltage using 3.3V reference
-adc.readVoltageChannel(0);        // Voltage using 3.3V reference
-adc.readTempC();                  // Internal temperature sensor (°C)
+  adc.readPin(route.pin);                    // Raw count (0..2^resolutionBits - 1)
+  adc.readChannel(route.channel);            // Same route by advertised channel
+  adc.readVoltagePin(route.pin);             // Volts; see voltage.calibrated
+  adc.readVoltageChannel(route.channel);     // Volts by advertised channel
+  if (capability.temperature.supported) {
+    adc.readTempC();                         // Internal die temperature (°C)
+  }
 
-adc.TEMP;                         // Internal temperature channel when advertised
-adc.VSYS;                         // VSYS channel only when adc.vsys is true
+  if ('TEMP' in adc) adc.TEMP;               // Deprecated RP-only raw channel
+  if ('VSYS' in adc) adc.VSYS;               // Deprecated RP-only VSYS/3 channel
+}());
 ```
 
 ### Process

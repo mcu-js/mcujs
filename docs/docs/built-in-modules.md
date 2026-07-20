@@ -143,6 +143,58 @@ and returns a typed operational error so `stop()` can be retried. As with every
 peripheral release, GPIO does not regain its previous configuration: call
 `gpio.init()` explicitly before reusing the pin.
 
+### ADC contract
+
+The canonical ADC module is `require('adc')`. Its portable surface is exactly
+`readPin(pin)`, `readChannel(channel)`, `readVoltagePin(pin)`,
+`readVoltageChannel(channel)`, and `readTempC()`. Raw reads return integer ADC
+counts in `0..(2^resolutionBits - 1)`. Voltage reads always return volts, and
+`readTempC()` returns MCU die temperature in degrees Celsius.
+
+Select pins and channels from `board.capability('adc')`; do not infer routes from
+the board name. Each external channel entry contains its numeric channel, pin,
+and semantic aliases. Every alias resolves through `board.pins`:
+
+```javascript
+(function () {
+  var boardApi = require('board');
+  var adc = require('adc');
+  var capability = boardApi.capability('adc');
+  var route;
+
+  for (var i = 0; i < capability.channels.length; i++) {
+    if (capability.channels[i].aliases.indexOf('A0') !== -1) {
+      route = capability.channels[i];
+      break;
+    }
+  }
+  if (!route) throw new Error('This board has no A0 ADC route');
+  console.log(adc.readVoltageChannel(route.channel), 'V');
+}());
+```
+
+`voltage.calibrated` is calibration truth, not a unit switch. ESP32-S3 uses the
+native calibration driver and advertises `true`; RP2040/RP2350 use the runtime's
+nominal 3.3 V conversion and advertise `false`. Both return volts. The
+temperature sensor reports chip temperature, not ambient temperature.
+
+Missing values, strings, non-finite numbers, and fractional pin/channel values
+are rejected before hardware access. Unadvertised routes throw uncoded
+`RangeError`. Active peripheral ownership and busy native drivers throw `EBUSY`;
+native conversion failures throw `EIO` with diagnostics. A completed one-shot
+read releases its synchronous claim after restoring the pad, so a deliberately
+initialized routed peripheral can take over safely; stale GPIO state still
+requires an explicit `gpio.init()`.
+
+RP firmware may temporarily expose deprecated numeric `adc.TEMP` and `adc.VSYS`
+properties. They are nonportable 0.x compatibility aliases for raw internal
+channel 4 and a board-specific VSYS/3 channel 3 respectively. Feature-detect the
+property itself. These internal aliases are separate from `capability.channels`,
+which describes board-exposed pin/channel pairs. Portable code uses
+`readTempC()` and advertised routes. See the non-destructive
+[ADC voltage and temperature acceptance protocol](./development/adc-voltage-protocol.md)
+for known-voltage, temperature, and ownership hardware evidence.
+
 ## Example usage
 
 ```javascript

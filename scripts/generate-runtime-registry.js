@@ -66,6 +66,8 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_REGISTRY_ONBOARD_NEOPIXEL ${descriptor.features.onboardNeopixel ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_LED_PIN ${descriptor.board.devices.led?.type === "gpio" ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_ADC_VSYS ${descriptor.capabilities.adc?.vsys === true ? 1 : 0}`);
+  lines.push(`#define MCUJS_REGISTRY_ADC_VOLTAGE ${descriptor.capabilities.adc?.voltage?.supported === true ? 1 : 0}`);
+  lines.push(`#define MCUJS_REGISTRY_ADC_TEMPERATURE ${descriptor.capabilities.adc?.temperature?.supported === true ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_SAFE_MODE ${descriptor.features.safeMode ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_STORAGE_READY ${descriptor.features.storageReady ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_GPIO_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.pins ?? [])}`);

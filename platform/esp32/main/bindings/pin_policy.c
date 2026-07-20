@@ -31,7 +31,7 @@ bool mcujs_pin_can_claim(int pin, mcujs_pin_owner_t owner) {
     }
     mcujs_pin_owner_t current = s_pin_owners[pin];
     return current == MCUJS_PIN_OWNER_NONE || current == owner ||
-           current == MCUJS_PIN_OWNER_GPIO || current == MCUJS_PIN_OWNER_ADC;
+           current == MCUJS_PIN_OWNER_GPIO;
 }
 
 bool mcujs_pin_claim(int pin, mcujs_pin_owner_t owner) {
@@ -53,6 +53,5 @@ bool mcujs_pin_gpio_access_allowed(int pin) {
         return false;
     }
     mcujs_pin_owner_t owner = s_pin_owners[pin];
-    return owner == MCUJS_PIN_OWNER_NONE || owner == MCUJS_PIN_OWNER_GPIO ||
-           owner == MCUJS_PIN_OWNER_ADC;
+    return owner == MCUJS_PIN_OWNER_NONE || owner == MCUJS_PIN_OWNER_GPIO;
 }

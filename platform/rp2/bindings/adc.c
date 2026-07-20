@@ -3,7 +3,7 @@
  *
  * Implements: adc.readPin(), adc.readChannel(), adc.readVoltagePin(),
  *             adc.readVoltageChannel(), adc.readTempC()
- * Constants: adc.TEMP, adc.VSYS
+ * RP compatibility constants: adc.TEMP, adc.VSYS
  */
 
 #include "bindings.h"
@@ -120,7 +120,10 @@ static jerry_value_t adc_read_pin_handler(const jerry_call_info_t *call_info_p,
     jerry_value_t prepared = prepare_adc_pin(pin);
     if (jerry_value_is_exception(prepared)) return prepared;
     jerry_value_free(prepared);
-    return jerry_number((double)adc_read_channel(channel));
+    uint16_t raw = adc_read_channel(channel);
+    gpio_init((uint)pin);
+    mcujs_rp2_pin_release(pin, MCUJS_RP2_PIN_OWNER_ADC);
+    return jerry_number((double)raw);
 }
 
 static jerry_value_t adc_read_channel_handler(const jerry_call_info_t *call_info_p,
@@ -162,6 +165,10 @@ static jerry_value_t adc_read_channel_handler(const jerry_call_info_t *call_info
         jerry_value_t prepared = prepare_adc_pin(pin);
         if (jerry_value_is_exception(prepared)) return prepared;
         jerry_value_free(prepared);
+        uint16_t raw = adc_read_channel((uint)channel);
+        gpio_init((uint)pin);
+        mcujs_rp2_pin_release(pin, MCUJS_RP2_PIN_OWNER_ADC);
+        return jerry_number((double)raw);
     }
     return jerry_number((double)adc_read_channel((uint)channel));
 }
@@ -208,10 +215,18 @@ jerry_value_t js_create_adc_module(void) {
     jerry_value_t adc = jerry_object();
     js_set_function(adc, "readPin", adc_read_pin_handler);
     js_set_function(adc, "readChannel", adc_read_channel_handler);
+#if MCUJS_REGISTRY_ADC_VOLTAGE
     js_set_function(adc, "readVoltagePin", adc_read_voltage_pin_handler);
     js_set_function(adc, "readVoltageChannel", adc_read_voltage_channel_handler);
+#endif
+#if MCUJS_REGISTRY_ADC_TEMPERATURE
     js_set_function(adc, "readTempC", adc_read_temp_handler);
+#endif
+    /* These are explicitly nonportable 0.x compatibility aliases. Portable
+     * code uses readTempC() and board capability metadata. */
+#if MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL
     js_set_number(adc, "TEMP", ADC_TEMP_CHANNEL);
+#endif
 #if MCUJS_REGISTRY_ADC_VSYS
     js_set_number(adc, "VSYS", 3);
 #endif

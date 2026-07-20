@@ -467,6 +467,8 @@ void cyw43_arch_gpio_put(int pin, int value) { (void)pin; (void)value; }
 #include "driver/spi_master.h"
 #include "driver/temperature_sensor.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include "led_strip.h"
+#include "led_strip_rmt.h"
 
 static int s_gpio_levels[GPIO_NUM_MAX];
 static int s_gpio_directions[GPIO_NUM_MAX];
@@ -520,11 +522,32 @@ int mcujs_test_spi_last_mode;
 int mcujs_test_spi_actual_frequency;
 unsigned mcujs_test_spi_remove_calls;
 size_t mcujs_test_spi_last_transfer_length;
+int mcujs_test_led_strip_new_result;
+int mcujs_test_led_strip_set_result;
+int mcujs_test_led_strip_refresh_result;
+int mcujs_test_led_strip_clear_result;
+int mcujs_test_led_strip_del_result;
+unsigned mcujs_test_led_strip_new_calls;
+unsigned mcujs_test_led_strip_set_calls;
+unsigned mcujs_test_led_strip_refresh_calls;
+unsigned mcujs_test_led_strip_clear_calls;
+unsigned mcujs_test_led_strip_del_calls;
+int mcujs_test_led_strip_last_pin;
+unsigned mcujs_test_led_strip_last_length;
+int mcujs_test_led_strip_last_order;
+unsigned mcujs_test_led_strip_last_index;
+unsigned mcujs_test_led_strip_last_red;
+unsigned mcujs_test_led_strip_last_green;
+unsigned mcujs_test_led_strip_last_blue;
 static int s_spi_devices[2];
 static uint32_t s_ledc_timer_frequency[4];
 static int s_adc_unit_storage;
 static int s_adc_cali_storage;
 static int s_temperature_sensor_storage;
+struct mcujs_test_led_strip {
+    bool active;
+};
+static struct mcujs_test_led_strip s_led_strip_storage;
 
 void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_result = ESP_OK;
@@ -583,6 +606,24 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_spi_actual_frequency = 0;
     mcujs_test_spi_remove_calls = 0;
     mcujs_test_spi_last_transfer_length = 0;
+    mcujs_test_led_strip_new_result = ESP_OK;
+    mcujs_test_led_strip_set_result = ESP_OK;
+    mcujs_test_led_strip_refresh_result = ESP_OK;
+    mcujs_test_led_strip_clear_result = ESP_OK;
+    mcujs_test_led_strip_del_result = ESP_OK;
+    mcujs_test_led_strip_new_calls = 0;
+    mcujs_test_led_strip_set_calls = 0;
+    mcujs_test_led_strip_refresh_calls = 0;
+    mcujs_test_led_strip_clear_calls = 0;
+    mcujs_test_led_strip_del_calls = 0;
+    mcujs_test_led_strip_last_pin = -1;
+    mcujs_test_led_strip_last_length = 0;
+    mcujs_test_led_strip_last_order = -1;
+    mcujs_test_led_strip_last_index = 0;
+    mcujs_test_led_strip_last_red = 0;
+    mcujs_test_led_strip_last_green = 0;
+    mcujs_test_led_strip_last_blue = 0;
+    s_led_strip_storage.active = false;
     for (size_t i = 0; i < 4; i++) s_ledc_timer_frequency[i] = 0;
     for (size_t i = 0; i < GPIO_NUM_MAX; i++) {
         s_gpio_levels[i] = 0;
@@ -729,6 +770,51 @@ esp_err_t spi_device_transmit(spi_device_handle_t device,
     memcpy(transaction->rx_buffer, transaction->tx_buffer,
            mcujs_test_spi_last_transfer_length);
     return ESP_OK;
+}
+
+esp_err_t led_strip_new_rmt_device(const led_strip_config_t *strip_config,
+                                   const led_strip_rmt_config_t *rmt_config,
+                                   led_strip_handle_t *strip) {
+    (void)rmt_config;
+    mcujs_test_led_strip_new_calls++;
+    mcujs_test_led_strip_last_pin = strip_config->strip_gpio_num;
+    mcujs_test_led_strip_last_length = strip_config->max_leds;
+    mcujs_test_led_strip_last_order = strip_config->color_component_format;
+    if (mcujs_test_led_strip_new_result == ESP_OK) {
+        s_led_strip_storage.active = true;
+        *strip = &s_led_strip_storage;
+    }
+    return mcujs_test_led_strip_new_result;
+}
+
+esp_err_t led_strip_set_pixel(led_strip_handle_t strip, uint32_t index,
+                              uint32_t red, uint32_t green, uint32_t blue) {
+    assert(strip == &s_led_strip_storage && strip->active);
+    mcujs_test_led_strip_set_calls++;
+    mcujs_test_led_strip_last_index = index;
+    mcujs_test_led_strip_last_red = red;
+    mcujs_test_led_strip_last_green = green;
+    mcujs_test_led_strip_last_blue = blue;
+    return mcujs_test_led_strip_set_result;
+}
+
+esp_err_t led_strip_refresh(led_strip_handle_t strip) {
+    assert(strip == &s_led_strip_storage && strip->active);
+    mcujs_test_led_strip_refresh_calls++;
+    return mcujs_test_led_strip_refresh_result;
+}
+
+esp_err_t led_strip_clear(led_strip_handle_t strip) {
+    assert(strip == &s_led_strip_storage && strip->active);
+    mcujs_test_led_strip_clear_calls++;
+    return mcujs_test_led_strip_clear_result;
+}
+
+esp_err_t led_strip_del(led_strip_handle_t strip) {
+    assert(strip == &s_led_strip_storage && strip->active);
+    mcujs_test_led_strip_del_calls++;
+    if (mcujs_test_led_strip_del_result == ESP_OK) strip->active = false;
+    return mcujs_test_led_strip_del_result;
 }
 
 esp_err_t ledc_timer_pause(int speed_mode, ledc_timer_t timer) {

@@ -243,6 +243,60 @@ non-destructive
 [SPI loopback and logic-analyzer protocol](./development/spi-loopback-protocol.md)
 for exact-byte, maximum-boundary, mode, timing, and lifecycle evidence.
 
+### NeoPixel contract
+
+The canonical external addressable-LED module is `require('neopixel')`. Its
+portable surface is exactly `init(options)`, `setPixel(index, red, green, blue)`,
+`show()`, and `clear()`. External-driver availability is independent from
+onboard inventory: feature-detect the module and capability, while checking
+`board.devices.neopixel` separately before using an onboard shortcut.
+
+```javascript
+(function () {
+  var boardApi = require('board');
+  var modules = require('mcujs:module');
+  if (!modules.has('neopixel')) return;
+
+  var limits = boardApi.capability('neopixel');
+  var pixels = require('neopixel');
+  pixels.init({pin: limits.pins[0], length: 1, order: limits.orders[0]});
+  pixels.setPixel(0, 32, 0, 0);
+  pixels.show();
+}());
+```
+
+`options` is closed and requires a finite integral `pin` from `pins` and a
+finite integral `length` from `1..maxLength`. `order` defaults to `GRB` and, when
+provided, must be an exact string in `orders`; unknown keys, lowercase aliases,
+unlisted pins/orders, zero length, and `maxLength + 1` throw uncoded
+`TypeError`/`RangeError` before replacing a working configuration. Current
+shipping descriptors advertise both `RGB` and `GRB`, but portable code reads the
+running capability rather than assuming that set.
+
+`setPixel()` always accepts red, green, and blue as strict integer bytes
+`0..255`; wire order is selected only by `init()`. The index must be a finite
+integer in `0..(configured length - 1)`. Values are never coerced, clamped, or
+wrapped. `show()` transmits the current buffer. `clear()` drives the configured
+strip dark; call `show()` afterward when code needs an explicit portable frame
+boundary before setting the next colors.
+
+Calling `setPixel()`, `show()`, or `clear()` before successful initialization
+throws `ResourceBusyError` with `code === 'EBUSY'`. Live pin contention also
+throws `EBUSY`; finite waveform/buffer exhaustion throws
+`ERR_RESOURCE_EXHAUSTED`; unsupported native configuration throws
+`ERR_NOT_SUPPORTED`; native driver failure throws `EIO`. Successful
+reinitialization releases the old pin. Validation or contention failure leaves
+the existing strip usable, while creation failure leaves a safe uninitialized
+state. A teardown failure retains the still-live handle and claim so a later
+`init()` can retry cleanup rather than allowing another binding to remux active
+hardware.
+
+Use the non-destructive
+[NeoPixel electrical and runtime acceptance protocol](./development/neopixel-hardware-protocol.md)
+for maximum/max+1, RGB/GRB known-color photographs, waveform timing, electrical
+safety, pin lifecycle, watchdog, CDC, and MSC evidence. Native stubs do not prove
+physical color, wire order, voltage levels, or signal integrity.
+
 ### ADC contract
 
 The canonical ADC module is `require('adc')`. Its portable surface is exactly

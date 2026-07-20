@@ -682,12 +682,13 @@ int main(void) {
         "ResourceBusyError", "EBUSY"));
     assert(eval_source("PWM.stop(26); adc.readPin(26);"));
 
-    /* A failed NeoPixel creation releases its claim, and a later init can
-     * recover only after GPIO explicitly reclaims the stale soft state. */
+    /* A failed NeoPixel creation reports finite-resource exhaustion, releases
+     * its claim, and leaves stale GPIO state inaccessible until explicit
+     * GPIO reinitialization. */
     mcujs_test_pio_can_add_program = false;
     assert(assert_operational_error(
         "neopixel.init({pin: 3, length: 1, order: 'RGB'})",
-        "Error", "EIO"));
+        "ResourceExhaustedError", "ERR_RESOURCE_EXHAUSTED"));
     mcujs_test_pio_can_add_program = true;
     assert(assert_operational_error("GPIO.set(3, true)",
                                     "ResourceBusyError", "EBUSY"));

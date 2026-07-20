@@ -168,6 +168,45 @@ test("XIAO ESP32-S3 pin aliases exactly match the exposed header", () => {
   assert.equal(Object.hasOwn(xiao.board.pins, "D21"), false);
 });
 
+test("external NeoPixel capability is independent from onboard inventory", () => {
+  const onboardBoards = new Set([
+    "waveshare_rp2040_zero",
+    "waveshare_rp2350_lcd_1.47_a",
+    "adafruit_feather_rp2040",
+  ]);
+
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    const capability = descriptor.capabilities.neopixel;
+    assert.equal(descriptor.features.neopixel, true, `${boardId} external driver`);
+    assert.ok(descriptor.modules.includes("neopixel"), `${boardId} module`);
+    assert.deepEqual(capability.orders, ["RGB", "GRB"], `${boardId} orders`);
+    assert.equal(capability.maxLength, 256, `${boardId} maximum length`);
+    assert.ok(capability.pins.length > 0, `${boardId} driver pins`);
+    for (const pin of capability.pins) {
+      assert.ok(
+        descriptor.capabilities.gpio.outputPins.includes(pin),
+        `${boardId} NeoPixel pin ${pin} is not an advertised output`,
+      );
+    }
+
+    const onboard = descriptor.board.devices.neopixel;
+    assert.equal(Boolean(onboard), onboardBoards.has(boardId), `${boardId} onboard inventory`);
+    assert.equal("onboard" in capability, false, `${boardId} capability leaked inventory`);
+    if (onboard) {
+      assert.ok(capability.pins.includes(onboard.pin), `${boardId} onboard pin`);
+      assert.ok(capability.orders.includes(onboard.order), `${boardId} onboard order`);
+      assert.ok(onboard.length <= capability.maxLength, `${boardId} onboard length`);
+    }
+  }
+
+  const xiao = boardDescriptors.seeed_xiao_esp32s3;
+  assert.equal(xiao.features.onboardNeopixel, false);
+  assert.equal("neopixel" in xiao.board.devices, false);
+  assert.ok(xiao.modules.includes("neopixel"));
+  assert.ok(xiao.capabilities.neopixel);
+});
+
 test("ADC channels, aliases, calibration, and temperature metadata are truthful for every board", () => {
   const vsysBoards = new Set(["pico", "pico2"]);
 

@@ -12,9 +12,10 @@ npm run test:conformance
 ```
 
 The command runs descriptor checks, the schema-driven JavaScript cases, native
-registry/JerryScript tests, production GPIO/I2C/SPI/PWM bindings against SDK stubs,
-and REPL help/capability tests. `scripts/verify-release.sh --allow-dirty --docs`
-runs the same gate before the docs typecheck and production build.
+registry/JerryScript tests, production GPIO/I2C/SPI/PWM/NeoPixel bindings against
+SDK stubs, and REPL help/capability tests.
+`scripts/verify-release.sh --allow-dirty --docs` runs the same gate before the
+docs typecheck and production build.
 
 ## Test lanes
 
@@ -43,10 +44,13 @@ The framework checks these discovery views independently:
 5. `board.capability(name)` and `board.capabilities()`.
 
 A change to only one view therefore fails instead of being hidden by another
-projection of the same list. Native registry lanes compile the production
-GPIO/I2C/SPI/PWM factories for full RP, constrained RP2350, and ESP32, verify their
-linked symbols and exact exports, and use the selected production registry for
-advertised and known-unavailable modules.
+projection of the same list. Native registry lanes compile the production GPIO/I2C/SPI/PWM/NeoPixel factories
+for full RP, constrained RP2350, and ESP32, verify their linked symbols and exact
+exports, and use the selected production registry for advertised and
+known-unavailable modules. Dedicated RP and ESP NeoPixel lanes additionally run
+the real factories against PIO/RMT SDK stubs for strict options, both advertised
+orders, exact maximum/max+1 behavior, lifecycle, ownership, and operational
+errors.
 
 ## Boundary and result cases
 
@@ -189,3 +193,11 @@ Host/native tests prove strict options, scalar/array returns, 256-byte RP and
 64-byte ESP boundaries, format selection, lifecycle state, and SDK error
 mappings; only loopback/peripheral and analyzer evidence proves waveform mode,
 measured clock timing, and physical full-duplex byte integrity.
+
+NeoPixel electrical acceptance uses the separate
+[non-destructive NeoPixel electrical and runtime protocol](./neopixel-hardware-protocol.md).
+Host/native tests prove closed options, finite integer and RGB-byte validation,
+advertised order selection, exact strip boundaries, pin ownership, lifecycle,
+and SDK error mappings. Only a powered fixture plus labeled photographs and/or
+an analyzer proves physical colors, component-byte order, timing, voltage/signal
+integrity, power safety, and maximum-length watchdog/USB health.

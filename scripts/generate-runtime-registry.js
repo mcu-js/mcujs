@@ -78,7 +78,11 @@ function branchFor(boardId, first) {
   if (descriptor.capabilities.adc?.vsys === true) adcChannels.push(3);
   lines.push(`#define MCUJS_RUNTIME_ADC_CHANNEL_MASK ${pinMask(adcChannels)}`);
   lines.push(`#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL ${descriptor.capabilities.adc?.temperature?.rawChannel === true ? 1 : 0}`);
-  lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK ${pinMask(descriptor.capabilities.neopixel?.pins ?? [])}`);
+  const neopixel = descriptor.capabilities.neopixel;
+  lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK ${pinMask(neopixel?.pins ?? [])}`);
+  lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_MAX_LENGTH ${neopixel?.maxLength ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_ORDER_RGB ${neopixel?.orders.includes("RGB") ? 1 : 0}`);
+  lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_ORDER_GRB ${neopixel?.orders.includes("GRB") ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MIN_HZ ${descriptor.capabilities.pwm?.frequency.minHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MAX_HZ ${descriptor.capabilities.pwm?.frequency.maxHz ?? 0}`);
   const i2c = descriptor.capabilities.i2c;

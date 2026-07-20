@@ -104,6 +104,23 @@ extern int mcujs_test_spi_last_mode;
 extern int mcujs_test_spi_actual_frequency;
 extern unsigned mcujs_test_spi_remove_calls;
 extern size_t mcujs_test_spi_last_transfer_length;
+extern int mcujs_test_led_strip_new_result;
+extern int mcujs_test_led_strip_set_result;
+extern int mcujs_test_led_strip_refresh_result;
+extern int mcujs_test_led_strip_clear_result;
+extern int mcujs_test_led_strip_del_result;
+extern unsigned mcujs_test_led_strip_new_calls;
+extern unsigned mcujs_test_led_strip_set_calls;
+extern unsigned mcujs_test_led_strip_refresh_calls;
+extern unsigned mcujs_test_led_strip_clear_calls;
+extern unsigned mcujs_test_led_strip_del_calls;
+extern int mcujs_test_led_strip_last_pin;
+extern unsigned mcujs_test_led_strip_last_length;
+extern int mcujs_test_led_strip_last_order;
+extern unsigned mcujs_test_led_strip_last_index;
+extern unsigned mcujs_test_led_strip_last_red;
+extern unsigned mcujs_test_led_strip_last_green;
+extern unsigned mcujs_test_led_strip_last_blue;
 #endif
 
 void mcujs_test_reset_backend(void);

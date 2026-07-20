@@ -15,7 +15,6 @@ static jerry_value_t stub_module(void) {
 jerry_value_t js_create_fs_module(void) { return stub_module(); }
 jerry_value_t js_create_spi_module(void) { return stub_module(); }
 jerry_value_t js_create_adc_module(void) { return stub_module(); }
-jerry_value_t js_create_neopixel_module(void) { return stub_module(); }
 jerry_value_t js_create_image_module(void) { return stub_module(); }
 jerry_value_t js_create_keyboard_module(void) { return stub_module(); }
 jerry_value_t js_create_mouse_module(void) { return stub_module(); }
@@ -174,7 +173,8 @@ static const char s_test_source[] =
     "  var productionExports = {\n"
     "    gpio: ['OUTPUT', 'INPUT', 'INPUT_PULLUP', 'INPUT_PULLDOWN', 'init', 'set', 'get', 'toggle'],\n"
     "    pwm: ['init', 'setDuty', 'stop'],\n"
-    "    i2c: ['init', 'write', 'read']\n"
+    "    i2c: ['init', 'write', 'read'],\n"
+    "    neopixel: ['init', 'setPixel', 'show', 'clear']\n"
     "  };\n"
     "  Object.keys(productionExports).forEach(function (name) {\n"
     "    if (!modules.has(name)) return;\n"

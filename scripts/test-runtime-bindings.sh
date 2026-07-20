@@ -78,12 +78,14 @@ compile_binding_test() {
         "${ROOT}/host/bindings/bindings.c" \
         "${ROOT}/host/bindings/validation.c" \
         "${ROOT}/host/bindings/i2c_options.c" \
+        "${ROOT}/host/bindings/neopixel_options.c" \
         "${ROOT}/host/bindings/pwm_policy.c" \
         "${ROOT}/host/bindings/board_registry.c" \
         "${ROOT}/host/bindings/require.c" \
         "${ROOT}/${backend}/bindings/pin_policy.c" \
         "${ROOT}/${backend}/bindings/gpio.c" \
         "${ROOT}/${backend}/bindings/i2c.c" \
+        "${ROOT}/${backend}/bindings/neopixel.c" \
         "${ROOT}/${backend}/bindings/pwm.c" \
         -Wl,--gc-sections \
         "${JERRY_BUILD}/lib/libjerry-core.a" \
@@ -100,7 +102,7 @@ compile_binding_test "${FULL}" platform/rp2 \
     -DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
     -I"${ROOT}/tests/native_stubs/rp2"
-for factory in gpio i2c pwm; do
+for factory in gpio i2c neopixel pwm; do
     nm -g "${FULL}" | grep -Eq " T js_create_${factory}_module$"
 done
 "${FULL}"
@@ -109,7 +111,7 @@ compile_binding_test "${CONSTRAINED_RP}" platform/rp2 \
     -DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A=1 \
     -I"${ROOT}/tests/native_stubs/rp2"
-for factory in gpio i2c pwm; do
+for factory in gpio i2c neopixel pwm; do
     nm -g "${CONSTRAINED_RP}" | grep -Eq " T js_create_${factory}_module$"
 done
 "${CONSTRAINED_RP}"
@@ -119,7 +121,7 @@ compile_binding_test "${CONSTRAINED}" platform/esp32/main \
     -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1 \
     -I"${ROOT}/tests/native_stubs/esp32" \
     -I"${ROOT}/platform/esp32/main/bindings"
-for factory in gpio i2c pwm; do
+for factory in gpio i2c neopixel pwm; do
     nm -g "${CONSTRAINED}" | grep -Eq " T js_create_${factory}_module$"
 done
 "${CONSTRAINED}"

@@ -47,6 +47,11 @@ function cString(value) {
   return JSON.stringify(value);
 }
 
+function pinMask(pins) {
+  const mask = pins.reduce((value, pin) => value | (1n << BigInt(pin)), 0n);
+  return `0x${mask.toString(16)}ULL`;
+}
+
 function branchFor(boardId, first) {
   const descriptor = boardDescriptors[boardId];
   const manifest = manifestFor(boardId);
@@ -61,6 +66,21 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_REGISTRY_ONBOARD_NEOPIXEL ${descriptor.features.onboardNeopixel ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_SAFE_MODE ${descriptor.features.safeMode ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_STORAGE_READY ${descriptor.features.storageReady ? 1 : 0}`);
+  lines.push(`#define MCUJS_RUNTIME_GPIO_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.pins ?? [])}`);
+  lines.push(`#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.outputPins ?? [])}`);
+  lines.push(`#define MCUJS_RUNTIME_PWM_PIN_MASK ${pinMask(descriptor.capabilities.pwm?.pins ?? [])}`);
+  lines.push(`#define MCUJS_RUNTIME_PWM_MIN_HZ ${descriptor.capabilities.pwm?.frequency.minHz ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_PWM_MAX_HZ ${descriptor.capabilities.pwm?.frequency.maxHz ?? 0}`);
+  const i2cRoutes = descriptor.capabilities.i2c?.routes ?? [];
+  if (i2cRoutes.length === 0) {
+    lines.push("#define MCUJS_RUNTIME_I2C_ROUTES(X)");
+  } else {
+    lines.push("#define MCUJS_RUNTIME_I2C_ROUTES(X) " + String.fromCharCode(92));
+    i2cRoutes.forEach(({ bus, sda, scl }, index) => {
+      const suffix = index === i2cRoutes.length - 1 ? "" : ` ${String.fromCharCode(92)}`;
+      lines.push(`    X(${bus}, ${sda}, ${scl})${suffix}`);
+    });
+  }
   lines.push(`#define MCUJS_RUNTIME_API_VERSION ${cString(manifest.apiVersion)}`);
   lines.push(`#define MCUJS_RUNTIME_BOARD_JSON ${cString(JSON.stringify(manifest.board))}`);
   lines.push(`#define MCUJS_RUNTIME_MANIFEST_JSON ${cString(JSON.stringify(manifest))}`);

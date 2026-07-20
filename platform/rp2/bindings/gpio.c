@@ -7,6 +7,8 @@
 
 #include "bindings.h"
 #include "jerryscript.h"
+#include "pin_policy.h"
+#include "validation.h"
 
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
@@ -16,16 +18,25 @@ extern void js_set_function(jerry_value_t object, const char *name,
                             jerry_external_handler_t handler);
 extern void js_set_number(jerry_value_t object, const char *name, double value);
 extern void js_register_global(const char *name, jerry_value_t object);
-extern double js_get_number_arg(const jerry_value_t args[], jerry_length_t argc,
-                                jerry_length_t index, double default_value);
-extern bool js_get_boolean_arg(const jerry_value_t args[], jerry_length_t argc,
-                               jerry_length_t index, bool default_value);
+
 
 /* GPIO mode constants */
 #define GPIO_MODE_OUTPUT        0
 #define GPIO_MODE_INPUT         1
 #define GPIO_MODE_INPUT_PULLUP  2
 #define GPIO_MODE_INPUT_PULLDOWN 3
+
+static bool s_gpio_initialized[NUM_BANK0_GPIOS];
+static bool s_gpio_output[NUM_BANK0_GPIOS];
+
+static jerry_value_t throw_gpio_busy(int pin, const char *message) {
+    const mcujs_error_details_t details = {
+        .resource = "gpio",
+        .has_pin = true,
+        .pin = pin,
+    };
+    return mcujs_throw_operational_error(MCUJS_ERROR_BUSY, message, &details);
+}
 
 /*
  * GPIO.init(pin, mode)
@@ -35,41 +46,54 @@ static jerry_value_t gpio_init_handler(const jerry_call_info_t *call_info_p,
                                         const jerry_value_t args[],
                                         const jerry_length_t argc) {
     (void)call_info_p;
-    
-    if (argc < 2) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.init requires pin and mode");
+
+    int pin;
+    int mode;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO pin must be a finite number",
+                              "GPIO pin must be an integer");
     }
-    
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
-    int mode = (int)js_get_number_arg(args, argc, 1, GPIO_MODE_OUTPUT);
-    
-    /* Validate pin number */
-    if (pin >= NUM_BANK0_GPIOS) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
+    status = mcujs_get_integer(args, argc, 1, &mode);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO mode must be a finite number",
+                              "GPIO mode must be an integer");
     }
-    
-    gpio_init(pin);
-    
+    if (mode < GPIO_MODE_OUTPUT || mode > GPIO_MODE_INPUT_PULLDOWN) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO mode");
+    }
+    bool output = mode == GPIO_MODE_OUTPUT;
+    if (!(output ? mcujs_rp2_gpio_output_pin_allowed(pin)
+                 : mcujs_rp2_gpio_pin_allowed(pin))) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "GPIO pin is not available in this mode");
+    }
+    if (!mcujs_rp2_pin_claim(pin, MCUJS_RP2_PIN_OWNER_GPIO)) {
+        return throw_gpio_busy(pin, "GPIO pin is owned by another peripheral");
+    }
+
+    gpio_init((uint)pin);
     switch (mode) {
         case GPIO_MODE_OUTPUT:
-            gpio_set_dir(pin, GPIO_OUT);
+            gpio_set_dir((uint)pin, GPIO_OUT);
             break;
         case GPIO_MODE_INPUT:
-            gpio_set_dir(pin, GPIO_IN);
-            gpio_disable_pulls(pin);
+            gpio_set_dir((uint)pin, GPIO_IN);
+            gpio_disable_pulls((uint)pin);
             break;
         case GPIO_MODE_INPUT_PULLUP:
-            gpio_set_dir(pin, GPIO_IN);
-            gpio_pull_up(pin);
+            gpio_set_dir((uint)pin, GPIO_IN);
+            gpio_pull_up((uint)pin);
             break;
         case GPIO_MODE_INPUT_PULLDOWN:
-            gpio_set_dir(pin, GPIO_IN);
-            gpio_pull_down(pin);
+            gpio_set_dir((uint)pin, GPIO_IN);
+            gpio_pull_down((uint)pin);
             break;
-        default:
-            return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO mode");
     }
-    
+
+    s_gpio_initialized[pin] = true;
+    s_gpio_output[pin] = output;
+
     return jerry_undefined();
 }
 
@@ -81,20 +105,28 @@ static jerry_value_t gpio_set_handler(const jerry_call_info_t *call_info_p,
                                        const jerry_value_t args[],
                                        const jerry_length_t argc) {
     (void)call_info_p;
-    
-    if (argc < 2) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.set requires pin and value");
+
+    int pin;
+    bool value;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO pin must be a finite number",
+                              "GPIO pin must be an integer");
     }
-    
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
-    bool value = js_get_boolean_arg(args, argc, 1, false);
-    
-    if (pin >= NUM_BANK0_GPIOS) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
+    status = mcujs_get_boolean(args, argc, 1, &value);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO value must be boolean",
+                              "GPIO value must be boolean");
     }
-    
-    gpio_put(pin, value);
-    
+    if (!mcujs_rp2_gpio_output_pin_allowed(pin)) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "GPIO output pin is not available on this board");
+    }
+    if (!s_gpio_initialized[pin] || !s_gpio_output[pin]) {
+        return throw_gpio_busy(pin, "GPIO output pin is not initialized");
+    }
+
+    gpio_put((uint)pin, value);
     return jerry_undefined();
 }
 
@@ -106,20 +138,22 @@ static jerry_value_t gpio_get_handler(const jerry_call_info_t *call_info_p,
                                        const jerry_value_t args[],
                                        const jerry_length_t argc) {
     (void)call_info_p;
-    
-    if (argc < 1) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.get requires pin");
+
+    int pin;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO pin must be a finite number",
+                              "GPIO pin must be an integer");
     }
-    
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
-    
-    if (pin >= NUM_BANK0_GPIOS) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
+    if (!mcujs_rp2_gpio_pin_allowed(pin)) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "GPIO pin is not available on this board");
     }
-    
-    bool value = gpio_get(pin);
-    
-    return jerry_boolean(value);
+    if (!s_gpio_initialized[pin]) {
+        return throw_gpio_busy(pin, "GPIO pin is not initialized");
+    }
+
+    return jerry_boolean(gpio_get((uint)pin));
 }
 
 /*
@@ -130,20 +164,23 @@ static jerry_value_t gpio_toggle_handler(const jerry_call_info_t *call_info_p,
                                           const jerry_value_t args[],
                                           const jerry_length_t argc) {
     (void)call_info_p;
-    
-    if (argc < 1) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "GPIO.toggle requires pin");
+
+    int pin;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "GPIO pin must be a finite number",
+                              "GPIO pin must be an integer");
     }
-    
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
-    
-    if (pin >= NUM_BANK0_GPIOS) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
+    if (!mcujs_rp2_gpio_output_pin_allowed(pin)) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "GPIO output pin is not available on this board");
     }
-    
-    bool current = gpio_get(pin);
-    gpio_put(pin, !current);
-    
+    if (!s_gpio_initialized[pin] || !s_gpio_output[pin]) {
+        return throw_gpio_busy(pin, "GPIO output pin is not initialized");
+    }
+
+    bool current = gpio_get((uint)pin);
+    gpio_put((uint)pin, !current);
     return jerry_undefined();
 }
 

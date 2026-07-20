@@ -25,6 +25,7 @@ These display helpers are globals or built-in modules, depending on the board:
 ## MCU.js 0.2 portable contract
 
 - API names, types, units, capabilities, and errors: [Portable API contract](./api-design/portable-api-contract.md)
+- Error classes, stable codes, and diagnostics: [Error reference](./api-design/errors.md)
 - Updating 0.1 programs: [Migrating from MCU.js 0.1 to 0.2](./migration/0.2.md)
 - Machine-readable contract and capability-manifest schema: [MCU.js 0.2 JSON Schema](/schemas/mcujs-portable-api-0.2.schema.json)
 - Capability-gated nonportable compatibility methods, including RP `spi.writeBufferDMA()` and persistent `board.safeMode()`, are inventoried in the schema rather than silently treated as portable or removed.

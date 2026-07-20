@@ -16,6 +16,7 @@
 #include "bindings.h"
 #include "jerryscript.h"
 #include "fs.h"
+#include "validation.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,21 +75,25 @@ static jerry_value_t create_error(const char *code, const char *message) {
     return jerry_throw_value(error, true);
 }
 
-#ifdef MCUJS_PLATFORM_ESP32
 static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
+#ifdef MCUJS_PLATFORM_ESP32
     if (result == FS_ERROR_BUSY) {
-        return create_error("EBUSY",
-                            "filesystem is owned by the USB host; eject MCUJS first");
+        const mcujs_error_details_t details = {
+            .resource = "filesystem",
+            .owner = "usb-host",
+        };
+        return mcujs_throw_operational_error(
+            MCUJS_ERROR_BUSY,
+            "filesystem is owned by the USB host; eject MCUJS first",
+            &details);
     }
+#endif
     if (result == FS_ERROR_NO_SPACE) {
         return create_error("ENOSPC", "no space left on device");
     }
-    return create_error("EIO", fallback);
+    return mcujs_throw_operational_error(MCUJS_ERROR_IO, fallback, NULL);
 }
 #define CREATE_FS_ERROR(result, fallback) create_fs_error((result), (fallback))
-#else
-#define CREATE_FS_ERROR(result, fallback) create_error("EIO", (fallback))
-#endif
 
 #define RETURN_IF_PATH_TOO_LONG(length) \
     do { \

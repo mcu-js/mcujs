@@ -32,6 +32,7 @@ set(MCUJS_SOURCES
     ${MCUJS_ROOT}/host/module_loader.c
     ${MCUJS_ROOT}/host/runtime_registry.c
     ${MCUJS_ROOT}/host/bindings/bindings.c
+    ${MCUJS_ROOT}/host/bindings/validation.c
     ${MCUJS_ROOT}/host/bindings/board_registry.c
     ${MCUJS_ROOT}/host/bindings/console.c
     ${MCUJS_ROOT}/host/bindings/fs.c

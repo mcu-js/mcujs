@@ -13,8 +13,9 @@
     "release:verify": "bash scripts/verify-release.sh",
     "test": "bun test",
     "test:build-identity": "bash scripts/test-rp-build-identity.sh",
-    "test:registry": "node --test tests/runtime-registry.test.js && bash scripts/test-runtime-registry.sh && bash scripts/test-runtime-bindings.sh",
+    "test:registry": "node --test tests/runtime-registry.test.js && bash scripts/test-runtime-registry.sh && bash scripts/test-runtime-bindings.sh && bash scripts/test-runtime-validation.sh",
     "test:schema": "node --test tests/portable-api-schema.test.js",
+    "test:validation": "bash scripts/test-runtime-validation.sh",
     "validate:manifest": "node scripts/validate-portable-api-manifest.js",
     "verify": "bash scripts/verify-release.sh --docs"
   }

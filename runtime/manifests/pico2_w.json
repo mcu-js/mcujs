@@ -177,9 +177,9 @@
         "unit": "ratio"
       },
       "frequency": {
-        "minHz": 9,
-        "maxHz": 2288,
-        "resolutionVaries": false
+        "minHz": 10,
+        "maxHz": 2048,
+        "resolutionVaries": true
       }
     },
     "fs": {
@@ -247,6 +247,11 @@
           "bus": 0,
           "sda": 4,
           "scl": 5
+        },
+        {
+          "bus": 0,
+          "sda": 8,
+          "scl": 9
         },
         {
           "bus": 1,

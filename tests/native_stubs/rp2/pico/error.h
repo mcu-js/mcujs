@@ -1,0 +1,7 @@
+#ifndef MCUJS_TEST_RP2_ERROR_H
+#define MCUJS_TEST_RP2_ERROR_H
+
+#define PICO_ERROR_GENERIC (-1)
+#define PICO_ERROR_TIMEOUT (-2)
+
+#endif

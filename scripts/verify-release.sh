@@ -184,6 +184,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/test-rp-build-identity.sh"
         "${ROOT_DIR}/scripts/test-runtime-bindings.sh"
         "${ROOT_DIR}/scripts/test-runtime-registry.sh"
+        "${ROOT_DIR}/scripts/test-runtime-validation.sh"
         "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
         "${ROOT_DIR}/scripts/verify-release.sh"
         "${ROOT_DIR}/platform/esp32/build.sh"
@@ -236,7 +237,8 @@ check_runtime_registry() {
     node --test "${ROOT_DIR}/tests/runtime-registry.test.js"
     "${ROOT_DIR}/scripts/test-runtime-registry.sh"
     "${ROOT_DIR}/scripts/test-runtime-bindings.sh"
-    pass 'runtime registry and full/constrained native maps and Jerry bindings are consistent'
+    "${ROOT_DIR}/scripts/test-runtime-validation.sh"
+    pass 'runtime registry, native maps, Jerry bindings, validation, and errors are consistent'
 }
 
 check_release_artifacts() {

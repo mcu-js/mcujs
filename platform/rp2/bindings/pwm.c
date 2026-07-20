@@ -6,6 +6,8 @@
 
 #include "bindings.h"
 #include "jerryscript.h"
+#include "pin_policy.h"
+#include "validation.h"
 
 #include "pico/stdlib.h"
 #include "hardware/pwm.h"
@@ -15,11 +17,72 @@
 extern void js_set_function(jerry_value_t object, const char *name, 
                             jerry_external_handler_t handler);
 extern void js_register_global(const char *name, jerry_value_t object);
-extern double js_get_number_arg(const jerry_value_t args[], jerry_length_t argc,
-                                jerry_length_t index, double default_value);
 
-/* Default PWM wrap value for 16-bit resolution */
-#define PWM_WRAP_DEFAULT 65535
+#define PWM_DIVIDER_SCALE 16u
+#define PWM_DIVIDER_SCALED_MIN 16u
+#define PWM_DIVIDER_SCALED_MAX 4095u
+#define PWM_PERIOD_MAX 65536u
+#define PWM_SLICE_STORAGE ((NUM_BANK0_GPIOS + 1u) / 2u)
+
+static bool s_pwm_initialized[NUM_BANK0_GPIOS];
+static uint16_t s_pwm_slice_references[PWM_SLICE_STORAGE];
+static uint32_t s_pwm_slice_frequency[PWM_SLICE_STORAGE];
+static uint16_t s_pwm_slice_wrap[PWM_SLICE_STORAGE];
+
+typedef struct {
+    uint16_t divider_scaled;
+    uint16_t wrap;
+} pwm_frequency_config_t;
+
+static bool find_exact_frequency(uint32_t clock_frequency, uint32_t frequency,
+                                 pwm_frequency_config_t *config) {
+    uint64_t scaled_clock = (uint64_t)clock_frequency * PWM_DIVIDER_SCALE;
+    if (scaled_clock % frequency != 0) return false;
+
+    uint64_t divider_period_product = scaled_clock / frequency;
+    uint32_t first_divider = (uint32_t)(
+        (divider_period_product + PWM_PERIOD_MAX - 1u) / PWM_PERIOD_MAX);
+    if (first_divider < PWM_DIVIDER_SCALED_MIN) {
+        first_divider = PWM_DIVIDER_SCALED_MIN;
+    }
+    for (uint32_t divider = first_divider;
+         divider <= PWM_DIVIDER_SCALED_MAX; divider++) {
+        if (divider_period_product % divider != 0) continue;
+        uint64_t period = divider_period_product / divider;
+        if (period < 1 || period > PWM_PERIOD_MAX) continue;
+        config->divider_scaled = (uint16_t)divider;
+        config->wrap = (uint16_t)(period - 1u);
+        return true;
+    }
+    return false;
+}
+
+static jerry_value_t throw_pwm_error(mcujs_operational_error_t error, int pin,
+                                     const char *message) {
+    const mcujs_error_details_t details = {
+        .resource = "pwm",
+        .has_pin = true,
+        .pin = pin,
+    };
+    return mcujs_throw_operational_error(error, message, &details);
+}
+
+static void release_pwm_pin(uint pin) {
+    if (!s_pwm_initialized[pin]) return;
+    uint slice = pwm_gpio_to_slice_num(pin);
+    gpio_set_function(pin, GPIO_FUNC_SIO);
+    gpio_init(pin);
+    s_pwm_initialized[pin] = false;
+    if (slice < PWM_SLICE_STORAGE && s_pwm_slice_references[slice] > 0) {
+        s_pwm_slice_references[slice]--;
+        if (s_pwm_slice_references[slice] == 0) {
+            pwm_set_enabled(slice, false);
+            s_pwm_slice_frequency[slice] = 0;
+            s_pwm_slice_wrap[slice] = 0;
+        }
+    }
+    mcujs_rp2_pin_release((int)pin, MCUJS_RP2_PIN_OWNER_PWM);
+}
 
 /*
  * PWM.init(pin, frequency)
@@ -29,39 +92,71 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *call_info_p,
                                        const jerry_value_t args[],
                                        const jerry_length_t argc) {
     (void)call_info_p;
-    
-    if (argc < 2) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "PWM.init requires pin and frequency");
+
+    int pin;
+    int frequency;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "PWM pin must be a finite number",
+                              "PWM pin must be an integer");
     }
-    
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
-    uint32_t freq = (uint32_t)js_get_number_arg(args, argc, 1, 1000);
-    
-    /* Validate pin */
-    if (pin >= NUM_BANK0_GPIOS) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
+    status = mcujs_get_integer(args, argc, 1, &frequency);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "PWM frequency must be a finite number",
+                              "PWM frequency must be an integer");
     }
-    
-    /* Set up PWM */
-    gpio_set_function(pin, GPIO_FUNC_PWM);
-    
-    uint slice = pwm_gpio_to_slice_num(pin);
-    
-    /* Calculate divider for desired frequency */
+    if (!mcujs_rp2_pwm_pin_allowed(pin)) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "PWM pin is not available on this board");
+    }
+
     uint32_t clock_freq = clock_get_hz(clk_sys);
-    float divider = (float)clock_freq / (freq * (PWM_WRAP_DEFAULT + 1));
-    
-    if (divider < 1.0f) {
-        divider = 1.0f;
-    } else if (divider > 255.0f) {
-        divider = 255.0f;
+    if (frequency < MCUJS_RUNTIME_PWM_MIN_HZ ||
+        frequency > MCUJS_RUNTIME_PWM_MAX_HZ) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "PWM frequency is outside the board capability");
     }
-    
-    pwm_set_clkdiv(slice, divider);
-    pwm_set_wrap(slice, PWM_WRAP_DEFAULT);
-    pwm_set_gpio_level(pin, 0);
+
+    pwm_frequency_config_t frequency_config;
+    if (!find_exact_frequency(clock_freq, (uint32_t)frequency,
+                              &frequency_config)) {
+        return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, pin,
+                               "PWM frequency cannot be represented exactly");
+    }
+
+    uint slice = pwm_gpio_to_slice_num((uint)pin);
+    if (slice >= PWM_SLICE_STORAGE) {
+        return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, pin,
+                               "PWM pin cannot be mapped to a timer");
+    }
+    uint16_t own_reference = s_pwm_initialized[pin] ? 1u : 0u;
+    if (s_pwm_slice_references[slice] > own_reference &&
+        s_pwm_slice_frequency[slice] != (uint32_t)frequency) {
+        return throw_pwm_error(
+            MCUJS_ERROR_BUSY, pin,
+            "PWM timer is already configured at a different frequency");
+    }
+    if (!mcujs_rp2_pin_can_claim(pin, MCUJS_RP2_PIN_OWNER_PWM)) {
+        return throw_pwm_error(MCUJS_ERROR_BUSY, pin,
+                               "PWM pin is owned by another peripheral");
+    }
+    if (s_pwm_initialized[pin]) release_pwm_pin((uint)pin);
+    if (!mcujs_rp2_pin_claim(pin, MCUJS_RP2_PIN_OWNER_PWM)) {
+        return throw_pwm_error(MCUJS_ERROR_BUSY, pin, "PWM pin claim failed");
+    }
+
+    gpio_set_function((uint)pin, GPIO_FUNC_PWM);
+    pwm_set_clkdiv_int_frac(slice,
+                            (uint8_t)(frequency_config.divider_scaled >> 4u),
+                            (uint8_t)(frequency_config.divider_scaled & 0x0fu));
+    pwm_set_wrap(slice, frequency_config.wrap);
+    pwm_set_gpio_level((uint)pin, 0);
     pwm_set_enabled(slice, true);
-    
+
+    s_pwm_initialized[pin] = true;
+    s_pwm_slice_references[slice]++;
+    s_pwm_slice_frequency[slice] = (uint32_t)frequency;
+    s_pwm_slice_wrap[slice] = frequency_config.wrap;
     return jerry_undefined();
 }
 
@@ -73,31 +168,31 @@ static jerry_value_t pwm_set_duty_handler(const jerry_call_info_t *call_info_p,
                                            const jerry_value_t args[],
                                            const jerry_length_t argc) {
     (void)call_info_p;
-    
-    if (argc < 2) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "PWM.setDuty requires pin and duty");
+
+    int pin;
+    double duty;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "PWM pin must be a finite number",
+                              "PWM pin must be an integer");
     }
-    
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
-    double duty = js_get_number_arg(args, argc, 1, 0);
-    
-    if (pin >= NUM_BANK0_GPIOS) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
+    status = mcujs_get_number_range(args, argc, 1, 0.0, 1.0, &duty);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "PWM duty must be a finite number",
+                              "PWM duty must be 0..1");
     }
-    
-    /* Handle fractional duty (0.0-1.0) */
-    uint16_t level;
-    if (duty >= 0.0 && duty <= 1.0) {
-        level = (uint16_t)(duty * PWM_WRAP_DEFAULT);
-    } else {
-        level = (uint16_t)duty;
-        if (level > PWM_WRAP_DEFAULT) {
-            level = PWM_WRAP_DEFAULT;
-        }
+    if (!mcujs_rp2_pwm_pin_allowed(pin)) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "PWM pin is not available on this board");
     }
-    
-    pwm_set_gpio_level(pin, level);
-    
+    if (!s_pwm_initialized[pin]) {
+        return throw_pwm_error(MCUJS_ERROR_BUSY, pin,
+                               "PWM pin is not initialized");
+    }
+
+    uint slice = pwm_gpio_to_slice_num((uint)pin);
+    uint16_t level = (uint16_t)(duty * s_pwm_slice_wrap[slice]);
+    pwm_set_gpio_level((uint)pin, level);
     return jerry_undefined();
 }
 
@@ -109,24 +204,23 @@ static jerry_value_t pwm_stop_handler(const jerry_call_info_t *call_info_p,
                                        const jerry_value_t args[],
                                        const jerry_length_t argc) {
     (void)call_info_p;
-    
-    if (argc < 1) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "PWM.stop requires pin");
+
+    int pin;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "PWM pin must be a finite number",
+                              "PWM pin must be an integer");
     }
-    
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
-    
-    if (pin >= NUM_BANK0_GPIOS) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid GPIO pin number");
+    if (!mcujs_rp2_pwm_pin_allowed(pin)) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "PWM pin is not available on this board");
     }
-    
-    uint slice = pwm_gpio_to_slice_num(pin);
-    pwm_set_enabled(slice, false);
-    
-    /* Reset to GPIO function */
-    gpio_set_function(pin, GPIO_FUNC_SIO);
-    gpio_init(pin);
-    
+    if (!s_pwm_initialized[pin]) {
+        return throw_pwm_error(MCUJS_ERROR_BUSY, pin,
+                               "PWM pin is not initialized");
+    }
+
+    release_pwm_pin((uint)pin);
     return jerry_undefined();
 }
 

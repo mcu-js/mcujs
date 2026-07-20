@@ -162,6 +162,9 @@ Arrays and buffers above a capability limit throw. Values are never silently tru
 
 ## Stable errors
 
+See the [error reference](./errors.md) for executable handling examples and
+the diagnostic-property contract.
+
 Programming mistakes use JavaScript built-ins:
 
 - `TypeError`: missing arguments, wrong types, and non-finite numbers;

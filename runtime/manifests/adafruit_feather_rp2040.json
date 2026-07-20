@@ -164,8 +164,8 @@
       },
       "frequency": {
         "minHz": 8,
-        "maxHz": 1907,
-        "resolutionVaries": false
+        "maxHz": 1600,
+        "resolutionVaries": true
       }
     },
     "fs": {

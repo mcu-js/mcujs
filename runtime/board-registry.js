@@ -55,9 +55,9 @@ function pwmCapability(pins, chip) {
     timerCount: rp2350 ? 12 : 8,
     duty: { min: 0, max: 1, unit: "ratio" },
     frequency: {
-      minHz: rp2350 ? 9 : 8,
-      maxHz: rp2350 ? 2288 : 1907,
-      resolutionVaries: false,
+      minHz: rp2350 ? 10 : 8,
+      maxHz: rp2350 ? 2048 : 1600,
+      resolutionVaries: true,
     },
   };
 }
@@ -197,7 +197,11 @@ function rpDescriptor({
 
 const picoExposed = [...pinsBetween(0, 22), 25, 26, 27, 28];
 const picoBusAliases = { A0: 26, A1: 27, A2: 28, SDA: 4, SCL: 5, SCK: 18, MOSI: 19, MISO: 16 };
-const picoI2c = [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }];
+const picoI2c = [
+  { bus: 0, sda: 4, scl: 5 },
+  { bus: 0, sda: 8, scl: 9 },
+  { bus: 1, sda: 6, scl: 7 },
+];
 const picoSpi = [{ bus: 0, sck: 18, mosi: 19, miso: 16 }, { bus: 1, sck: 10, mosi: 11, miso: 12 }];
 
 const boardDescriptors = {

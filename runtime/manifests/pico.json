@@ -186,8 +186,8 @@
       },
       "frequency": {
         "minHz": 8,
-        "maxHz": 1907,
-        "resolutionVaries": false
+        "maxHz": 1600,
+        "resolutionVaries": true
       }
     },
     "fs": {
@@ -255,6 +255,11 @@
           "bus": 0,
           "sda": 4,
           "scl": 5
+        },
+        {
+          "bus": 0,
+          "sda": 8,
+          "scl": 9
         },
         {
           "bus": 1,

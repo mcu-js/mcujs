@@ -37,6 +37,7 @@ set(MCUJS_PLATFORM_BOOT_SOURCE
 )
 
 set(MCUJS_PLATFORM_HARDWARE_BINDING_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/bindings/pin_policy.c
     ${CMAKE_CURRENT_LIST_DIR}/bindings/gpio.c
     ${CMAKE_CURRENT_LIST_DIR}/bindings/timers.c
     ${CMAKE_CURRENT_LIST_DIR}/bindings/pwm.c

@@ -19,41 +19,41 @@ GPIO.init(DC, GPIO.OUTPUT);
 GPIO.init(RST, GPIO.OUTPUT);
 GPIO.init(BL, GPIO.OUTPUT);
 
-GPIO.set(CS, 1);   // Deselect initially
-GPIO.set(BL, 0);   // Backlight off
-GPIO.set(RST, 1);  // Reset inactive
+GPIO.set(CS, true);   // Deselect initially
+GPIO.set(BL, false);   // Backlight off
+GPIO.set(RST, true);  // Reset inactive
 
 // Initialize SPI
 console.log('Initializing SPI1...');
-SPI.init(1, SCK, MOSI, MISO, 40000000);  // 40 MHz
+SPI.init(1, SCK, MOSI, MISO, 31250000);  // Exact 31.25 MHz at 125 MHz clk_peri
 console.log('SPI initialized');
 
 // Hardware reset - IMPORTANT: CS goes LOW after reset and STAYS LOW
 console.log('Hardware reset...');
-GPIO.set(RST, 1);
+GPIO.set(RST, true);
 board.delay(100);
-GPIO.set(RST, 0);
+GPIO.set(RST, false);
 board.delay(100);
-GPIO.set(RST, 1);
-GPIO.set(CS, 0);  // CS LOW - stays low for all communication!
+GPIO.set(RST, true);
+GPIO.set(CS, false);  // CS LOW - stays low for all communication!
 board.delay(100);
 console.log('Reset complete, CS is LOW');
 
 // Helper: send command (CS stays LOW)
 function cmd(c) {
-  GPIO.set(DC, 0);  // Command mode
+  GPIO.set(DC, false);  // Command mode
   SPI.transfer(1, c);
 }
 
 // Helper: send data byte (CS stays LOW)
 function dat(d) {
-  GPIO.set(DC, 1);  // Data mode
+  GPIO.set(DC, true);  // Data mode
   SPI.transfer(1, d);
 }
 
 // Helper: send data array
 function datArr(arr) {
-  GPIO.set(DC, 1);  // Data mode
+  GPIO.set(DC, true);  // Data mode
   SPI.transfer(1, arr);
 }
 
@@ -135,7 +135,7 @@ console.log('Display ON, waiting 20ms...');
 board.delay(20);
 
 // Turn on backlight
-GPIO.set(BL, 1);
+GPIO.set(BL, true);
 console.log('Backlight ON');
 
 // Fill screen with RED
@@ -154,7 +154,7 @@ cmd(0x2C);  // Memory write
 
 // Send RED pixels (RGB565: 0xF800)
 // High byte = 0xF8, Low byte = 0x00
-GPIO.set(DC, 1);  // Data mode
+GPIO.set(DC, true);  // Data mode
 
 // Build a chunk of red pixels
 var chunk = [];

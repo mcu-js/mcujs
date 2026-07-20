@@ -315,7 +315,7 @@ test("capability-derived exact maxima and maximum-plus-one stay board-specific",
 
 test("schema availability drives absent modules and optional methods without board-name tests", () => {
   const constrained = expectedRuntimeSurface(contract, boardDescriptors["waveshare_rp2350_lcd_1.47_a"]);
-  assert.equal(Object.hasOwn(constrained.exports, "spi"), false);
+  assert.ok(constrained.exports.spi.includes("writeBufferDMA"));
   assert.equal(Object.hasOwn(constrained.exports, "adc"), false);
   const esp = expectedRuntimeSurface(contract, boardDescriptors.seeed_xiao_esp32s3);
   assert.ok(esp.exports.spi.includes("transfer"));
@@ -325,6 +325,90 @@ test("schema availability drives absent modules and optional methods without boa
   const feather = expectedRuntimeSurface(contract, boardDescriptors.adafruit_feather_rp2040);
   assert.ok(feather.exports.board.includes("neopixel"));
   assert.ok(feather.exports.spi.includes("writeBufferDMA"));
+
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    const surface = expectedRuntimeSurface(contract, descriptor);
+    assert.equal(
+      surface.exports.board.includes("led"),
+      Object.hasOwn(descriptor.board.devices, "led"),
+      `${boardId} onboard LED shortcut availability`,
+    );
+  }
+});
+
+test("touch and IMU interrupt endpoints remain input-only GPIO capabilities", () => {
+  for (const boardId of [
+    "waveshare_rp2040_touch_lcd_1.28",
+    "waveshare_rp2350_touch_lcd_1.69",
+  ]) {
+    const gpio = boardDescriptors[boardId].capabilities.gpio;
+    for (const pin of [21, 23, 24]) {
+      assert.ok(gpio.pins.includes(pin), `${boardId} input pin ${pin} missing`);
+      assert.equal(gpio.outputPins.includes(pin), false,
+        `${boardId} interrupt pin ${pin} advertised as push-pull output`);
+    }
+  }
+});
+
+test("blink examples feature-detect onboard LEDs, stay rerunnable, and write strict booleans", () => {
+  for (const filename of ["index.js", "blink.js"]) {
+    const source = readFileSync(join(__dirname, "..", "examples", "blink", filename), "utf8");
+    assert.doesNotMatch(source, /board\.(?:name|chip)|pico|rp2040|rp2350|esp32/i);
+    assert.doesNotMatch(source, /\b(?:let|const)\b/);
+
+    const clearedIntervals = [];
+    const clearedTimeouts = [];
+    const writes = [];
+    const gpio = {
+      OUTPUT: 0,
+      init(pin, mode) { assert.equal(pin, 21); assert.equal(mode, 0); },
+      set(pin, value) {
+        assert.equal(pin, 21);
+        assert.equal(typeof value, "boolean");
+        writes.push(value);
+      },
+    };
+    const context = {
+      console: { log() {} },
+      require(name) {
+        if (name === "board") {
+          return { devices: { led: { type: "gpio", pin: 21, activeLow: true } } };
+        }
+        if (name === "gpio") return gpio;
+        throw new Error(`unexpected module ${name}`);
+      },
+      setInterval() { return 11; },
+      clearInterval(id) { clearedIntervals.push(id); },
+      setTimeout() { return 12; },
+      clearTimeout(id) { clearedTimeouts.push(id); },
+    };
+    runInNewContext(source, context);
+    runInNewContext(source, context);
+    assert.deepEqual(writes, [true, true], `${filename} active-low initial writes`);
+    assert.deepEqual(clearedIntervals, [11], `${filename} stale interval cleanup`);
+    assert.deepEqual(clearedTimeouts, [12], `${filename} stale timeout cleanup`);
+
+    const managedWrites = [];
+    runInNewContext(source, {
+      console: { log() {} },
+      require(name) {
+        if (name !== "board") throw new Error(`unexpected module ${name}`);
+        return {
+          devices: { led: { type: "managed" } },
+          led(value) {
+            assert.equal(typeof value, "boolean");
+            managedWrites.push(value);
+          },
+        };
+      },
+      setInterval() { return 21; },
+      clearInterval() {},
+      setTimeout() { return 22; },
+      clearTimeout() {},
+    });
+    assert.deepEqual(managedWrites, [false], `${filename} managed LED initial write`);
+  }
 });
 
 test("validator rejects unknown has keys/cases, lane drift, and inconsistent summaries", () => {

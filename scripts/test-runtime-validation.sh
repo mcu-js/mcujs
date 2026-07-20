@@ -104,13 +104,96 @@ compile_validation_test "${VALIDATION_TEST}"
 RP2_BACKEND_TEST="${TMP_ROOT}/runtime-validation-rp2-backend"
 compile_backend_test "${RP2_BACKEND_TEST}" platform/rp2 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
+    -I"${ROOT}/board/pico" \
+    -I"${ROOT}/platform/rp2/bindings" \
     -I"${ROOT}/tests/native_stubs/rp2" \
     "${ROOT}/platform/rp2/bindings/pin_policy.c" \
-    "${ROOT}/platform/rp2/bindings/pwm.c"
-for factory in gpio i2c pwm; do
+    "${ROOT}/platform/rp2/bindings/pwm.c" \
+    "${ROOT}/platform/rp2/bindings/spi.c" \
+    "${ROOT}/platform/rp2/bindings/adc.c" \
+    "${ROOT}/platform/rp2/bindings/neopixel.c" \
+    "${ROOT}/platform/rp2/bindings/onboard_led.c"
+for factory in gpio i2c pwm spi adc neopixel; do
     nm -g "${RP2_BACKEND_TEST}" | grep -Eq " T js_create_${factory}_module$"
 done
 "${RP2_BACKEND_TEST}"
+
+compile_rp_board_surface_test() {
+    local output="$1"
+    local board_id="$2"
+    local board_macro="$3"
+    shift 3
+    cc -std=gnu17 -Wall -Wextra -Werror \
+        -ffunction-sections -fdata-sections \
+        -DMCUJS_PLATFORM_RP2=1 -D"${board_macro}"=1 \
+        -DMCUJS_VERSION='"0.1.0"' \
+        "$@" \
+        -I"${ROOT}/host" \
+        -I"${ROOT}/host/bindings" \
+        -I"${ROOT}/board" \
+        -I"${ROOT}/board/${board_id}" \
+        -I"${ROOT}/src/filesystem" \
+        -I"${ROOT}/platform/rp2/bindings" \
+        -I"${ROOT}/tests" \
+        -I"${ROOT}/tests/native_stubs/rp2" \
+        -I"${JERRY_ROOT}/jerry-core/include" \
+        "${ROOT}/tests/rp2_board_surface_test.c" \
+        "${ROOT}/tests/runtime_validation_backend_stubs.c" \
+        "${ROOT}/host/bindings/validation.c" \
+        "${ROOT}/platform/rp2/bindings/pin_policy.c" \
+        "${ROOT}/platform/rp2/bindings/gpio.c" \
+        "${ROOT}/platform/rp2/bindings/adc.c" \
+        "${ROOT}/platform/rp2/bindings/neopixel.c" \
+        "${ROOT}/platform/rp2/bindings/onboard_led.c" \
+        "${ROOT}/platform/rp2/bindings/board.c" \
+        -Wl,--gc-sections \
+        "${JERRY_BUILD}/lib/libjerry-core.a" \
+        "${JERRY_BUILD}/lib/libjerry-port.a" \
+        -lm \
+        -o "${output}"
+}
+
+RP2_NO_LED_SURFACE_TEST="${TMP_ROOT}/runtime-rp2-no-led-surface"
+compile_rp_board_surface_test "${RP2_NO_LED_SURFACE_TEST}" \
+    waveshare_rp2040_touch_lcd_1.28 MCUJS_BOARD_WAVESHARE_RP2040_TOUCH_LCD_1_28 \
+    -DMCUJS_TEST_EXPECT_LED_PIN=0 -DMCUJS_TEST_EXPECT_LED_METHOD=0 \
+    -DMCUJS_TEST_EXPECT_VSYS=0 -DMCUJS_TEST_EXPECT_NEOPIXEL=0 \
+    -DMCUJS_TEST_EXPECT_ADC_CHANNEL3=0 \
+    -DMCUJS_TEST_INPUT_ONLY_PIN_STRING='"21"'
+"${RP2_NO_LED_SURFACE_TEST}"
+
+RP2_INPUT_ONLY_SURFACE_TEST="${TMP_ROOT}/runtime-rp2-input-only-surface"
+compile_rp_board_surface_test "${RP2_INPUT_ONLY_SURFACE_TEST}" \
+    waveshare_rp2350_touch_lcd_1.69 MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_1_69 \
+    -DMCUJS_TEST_EXPECT_LED_PIN=0 -DMCUJS_TEST_EXPECT_LED_METHOD=0 \
+    -DMCUJS_TEST_EXPECT_VSYS=0 -DMCUJS_TEST_EXPECT_NEOPIXEL=0 \
+    -DMCUJS_TEST_EXPECT_ADC_CHANNEL3=0 \
+    -DMCUJS_TEST_INPUT_ONLY_PIN_STRING='"23"'
+"${RP2_INPUT_ONLY_SURFACE_TEST}"
+
+RP2_CYW43_SURFACE_TEST="${TMP_ROOT}/runtime-rp2-cyw43-surface"
+compile_rp_board_surface_test "${RP2_CYW43_SURFACE_TEST}" \
+    pico2_w MCUJS_BOARD_PICO2_W -DMCUJS_HAS_CYW43=1 \
+    -DMCUJS_TEST_EXPECT_LED_PIN=0 -DMCUJS_TEST_EXPECT_LED_METHOD=1 \
+    -DMCUJS_TEST_EXPECT_VSYS=0 -DMCUJS_TEST_EXPECT_NEOPIXEL=0 \
+    -DMCUJS_TEST_EXPECT_ADC_CHANNEL3=0
+"${RP2_CYW43_SURFACE_TEST}"
+
+RP2_NEOPIXEL_SURFACE_TEST="${TMP_ROOT}/runtime-rp2-neopixel-surface"
+compile_rp_board_surface_test "${RP2_NEOPIXEL_SURFACE_TEST}" \
+    adafruit_feather_rp2040 MCUJS_BOARD_ADAFRUIT_FEATHER_RP2040 \
+    -DMCUJS_TEST_EXPECT_LED_PIN=1 -DMCUJS_TEST_LED_PIN_STRING='"13"' \
+    -DMCUJS_TEST_EXPECT_LED_METHOD=1 -DMCUJS_TEST_EXPECT_VSYS=0 \
+    -DMCUJS_TEST_EXPECT_NEOPIXEL=1 -DMCUJS_TEST_EXPECT_ADC_CHANNEL3=1
+"${RP2_NEOPIXEL_SURFACE_TEST}"
+
+RP2_RGB_NEOPIXEL_SURFACE_TEST="${TMP_ROOT}/runtime-rp2-rgb-neopixel-surface"
+compile_rp_board_surface_test "${RP2_RGB_NEOPIXEL_SURFACE_TEST}" \
+    waveshare_rp2040_zero MCUJS_BOARD_WAVESHARE_RP2040_ZERO \
+    -DMCUJS_TEST_EXPECT_LED_PIN=0 -DMCUJS_TEST_EXPECT_LED_METHOD=0 \
+    -DMCUJS_TEST_EXPECT_VSYS=0 -DMCUJS_TEST_EXPECT_NEOPIXEL=1 \
+    -DMCUJS_TEST_EXPECT_ADC_CHANNEL3=1
+"${RP2_RGB_NEOPIXEL_SURFACE_TEST}"
 
 ESP32_BACKEND_TEST="${TMP_ROOT}/runtime-validation-esp32-backend"
 compile_backend_test "${ESP32_BACKEND_TEST}" platform/esp32/main \

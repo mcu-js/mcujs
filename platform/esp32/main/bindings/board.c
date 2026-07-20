@@ -5,6 +5,7 @@
 #include "board_config.h"
 #include "boot.h"
 #include "jerryscript.h"
+#include "validation.h"
 
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
@@ -109,9 +110,16 @@ static jerry_value_t board_storage_ready(const jerry_call_info_t *info,
 static jerry_value_t board_led(const jerry_call_info_t *info,
                                const jerry_value_t args[], jerry_length_t argc) {
     (void)info;
+    bool on = false;
+    if (argc > 0) {
+        mcujs_arg_status_t status = mcujs_get_boolean(args, argc, 0, &on);
+        if (status != MCUJS_ARG_OK) {
+            return jerry_throw_sz(JERRY_ERROR_TYPE, "LED state must be boolean");
+        }
+    }
+
     board_led_init();
     if (argc > 0) {
-        bool on = js_get_boolean_arg(args, argc, 0, false);
         gpio_set_level(MCUJS_LED_PIN, on ? 0 : 1);
         return jerry_undefined();
     }

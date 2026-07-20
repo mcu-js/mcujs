@@ -88,21 +88,46 @@ External-driver support and onboard hardware are separate. For example, every
 current target can enable the external `neopixel` module even when
 `board.devices.neopixel` is absent.
 
+### GPIO contract
+
+When `gpio` is present, its portable surface is exactly `init(pin, mode)`,
+`set(pin, value)`, `get(pin)`, and `toggle(pin)`, plus the four mode constants.
+Select pins from `board.capability('gpio').pins` and output pins from
+`.outputPins`; these lists contain only the board's safe exposed pins.
+
+`set()` accepts only the booleans `true` and `false`. Numeric `0`/`1`, strings,
+missing arguments, non-finite numbers, and fractional pins are rejected before
+hardware access. `get()` always returns a boolean. Every access requires a
+successful `init()` for that pin, and `set()`/`toggle()` additionally require
+output mode. Use before initialization throws `ResourceBusyError` with
+`code === 'EBUSY'` rather than silently initializing the pin.
+
+GPIO is a soft pin owner. PWM or a routed peripheral may deliberately take over
+an initialized GPIO after validating its complete configuration. From then on,
+stale GPIO calls throw `EBUSY`. Releasing the peripheral does not resurrect the
+old GPIO setup: call `gpio.init()` again before using the pin. An active
+peripheral owner cannot be stolen by GPIO or another peripheral.
+
 ## Example usage
 
 ```javascript
-const fs = require('fs');
-const GPIO = require('gpio');
-const neopixel = require('neopixel');
+(function () {
+  var boardApi = require('board');
+  var led = boardApi.devices.led;
+  if (!led) {
+    console.log('This board has no onboard LED');
+    return;
+  }
+  if (led.type !== 'gpio') {
+    boardApi.led(true);
+    return;
+  }
 
-fs.writeFileSync('/log.txt', 'Hello Pico');
-GPIO.init(25, GPIO.OUTPUT);
-GPIO.toggle(25);
-
-neopixel.init({ pin: 16, length: 1, order: 'GRB' });
-// order can be "GRB" (default) or "RGB"
-neopixel.setPixel(0, 255, 80, 10);
-neopixel.show();
+  var gpio = require('gpio');
+  gpio.init(led.pin, gpio.OUTPUT);
+  gpio.set(led.pin, led.activeLow ? false : true);
+  console.log('Logical LED state:', true);
+}());
 ```
 
 If your board has a built-in NeoPixel, use `board.neopixel` as a shortcut. It accepts:
@@ -181,7 +206,7 @@ GPIO.init(15, GPIO.INPUT_PULLUP);
 let wasPressed = false;
 
 setInterval(() => {
-    const pressed = GPIO.get(15) === 0;
+    const pressed = !GPIO.get(15);
     if (pressed && !wasPressed) {
         K.print('console.log("Hello!");');
         K.tap('enter');

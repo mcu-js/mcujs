@@ -24,21 +24,21 @@ var ROW_OFFSET = 0x22;  // ST7789 row offset
 var pins = { spiBus: 0, sck: 18, mosi: 19, cs: 17, dc: 16, rst: 20, bl: 21 };
 var buf = graphics.createBuffer({ width: W, height: H });
 
-function cmd(c) { GPIO.set(pins.dc, 0); GPIO.set(pins.cs, 0); SPI.transfer(pins.spiBus, c); GPIO.set(pins.cs, 1); }
-function dat(d) { GPIO.set(pins.dc, 1); GPIO.set(pins.cs, 0); SPI.transfer(pins.spiBus, d); GPIO.set(pins.cs, 1); }
+function cmd(c) { GPIO.set(pins.dc, false); GPIO.set(pins.cs, false); SPI.transfer(pins.spiBus, c); GPIO.set(pins.cs, true); }
+function dat(d) { GPIO.set(pins.dc, true); GPIO.set(pins.cs, false); SPI.transfer(pins.spiBus, d); GPIO.set(pins.cs, true); }
 
 function initScreen() {
   GPIO.init(pins.cs, GPIO.OUTPUT);
   GPIO.init(pins.dc, GPIO.OUTPUT);
   GPIO.init(pins.rst, GPIO.OUTPUT);
   GPIO.init(pins.bl, GPIO.OUTPUT);
-  GPIO.set(pins.cs, 1); GPIO.set(pins.bl, 0); GPIO.set(pins.rst, 1);
-  SPI.init(pins.spiBus, pins.sck, pins.mosi, 255, 40000000);
+  GPIO.set(pins.cs, true); GPIO.set(pins.bl, false); GPIO.set(pins.rst, true);
+  SPI.init(pins.spiBus, pins.sck, pins.mosi, 0, 37500000);
   
   // Hardware reset
-  GPIO.set(pins.rst, 1); board.delay(100);
-  GPIO.set(pins.rst, 0); board.delay(100);
-  GPIO.set(pins.rst, 1); board.delay(100);
+  GPIO.set(pins.rst, true); board.delay(100);
+  GPIO.set(pins.rst, false); board.delay(100);
+  GPIO.set(pins.rst, true); board.delay(100);
   
   // ST7789 init sequence
   cmd(0x11); board.delay(120);  // Sleep out
@@ -64,16 +64,16 @@ function initScreen() {
   flush();
   
   cmd(0x29); board.delay(20);  // Display on
-  GPIO.set(pins.bl, 1);
+  GPIO.set(pins.bl, true);
 }
 
 function flush() {
   cmd(0x2A); dat(0x00); dat(0x00); dat((W-1)>>8); dat((W-1)&0xFF);
   cmd(0x2B); dat(0x00); dat(ROW_OFFSET); dat((H-1+ROW_OFFSET)>>8); dat((H-1+ROW_OFFSET)&0xFF);
   cmd(0x2C);
-  GPIO.set(pins.dc, 1); GPIO.set(pins.cs, 0);
+  GPIO.set(pins.dc, true); GPIO.set(pins.cs, false);
   SPI.writeBufferDMA(pins.spiBus, buf, W*H*2);
-  GPIO.set(pins.cs, 1);
+  GPIO.set(pins.cs, true);
 }
 
 function rgb(r,g,b) { return graphics.color565(r,g,b); }

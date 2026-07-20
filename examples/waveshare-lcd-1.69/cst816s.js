@@ -75,9 +75,9 @@ function createTouchDriver(options) {
   
   // Hardware reset
   function reset() {
-    GPIO.set(rstPin, 0);
+    GPIO.set(rstPin, false);
     board.delay(10);
-    GPIO.set(rstPin, 1);
+    GPIO.set(rstPin, true);
     board.delay(50);
   }
   
@@ -87,7 +87,7 @@ function createTouchDriver(options) {
     
     // Initialize reset pin
     GPIO.init(rstPin, GPIO.OUTPUT);
-    GPIO.set(rstPin, 1);
+    GPIO.set(rstPin, true);
     
     // Initialize interrupt pin (optional, for detecting touch)
     GPIO.init(intPin, GPIO.INPUT);
@@ -109,7 +109,7 @@ function createTouchDriver(options) {
   // Check if touch is detected
   function isTouched() {
     // INT pin goes low when touched (active low)
-    return GPIO.get(intPin) === 0;
+    return !GPIO.get(intPin);
   }
   
   // Read touch data

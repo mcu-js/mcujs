@@ -233,14 +233,14 @@ console.log(__dirname);   // e.g., "/lib"
 ```javascript
 board.name;                       // Board name (e.g., "pico")
 board.chip;                       // Chip (e.g., "RP2040")
-board.ledPin;                     // Onboard LED pin number (-1 if none)
+board.ledPin;                     // Direct GPIO LED pin (absent for managed/no LED)
 board.led(true);                  // Control onboard LED
 board.led();                      // Read LED state
 board.neopixelPin;                // Onboard NeoPixel pin (if present)
 board.neopixelLength;             // Onboard NeoPixel count (if present)
 board.neopixel([255, 80, 10]);    // Convenience for onboard NeoPixel
 board.neopixel({ r: 255, g: 80, b: 10 });
-board.neopixel([[255, 0, 0], [0, 255, 0]]); // Truncated to onboard length
+board.neopixel([[255, 0, 0]]);   // Lists must not exceed onboard length
 board.freeMemory();               // Free JS heap memory in bytes
 board.uniqueId();                 // Board unique ID (hex string)
 board.millis();                   // Milliseconds since boot
@@ -249,7 +249,7 @@ board.reset();                    // Reset USB connection (reboot)
 board.enterUf2();                 // Reboot into UF2 bootloader
 ```
 
-Missing color values default to 0. Extra pixels are ignored. Object inputs are RGB; array inputs follow the active `neopixel.init()` order. Array-of-objects stays RGB.
+Missing color values default to 0. Color arrays longer than three bytes and pixel lists longer than the onboard length throw `RangeError`; they are never truncated. Object inputs are RGB; array inputs follow the active `neopixel.init()` order. Array-of-objects stays RGB.
 
 ### ADC
 ```javascript
@@ -261,8 +261,8 @@ adc.readVoltagePin(26);           // Voltage using 3.3V reference
 adc.readVoltageChannel(0);        // Voltage using 3.3V reference
 adc.readTempC();                  // Internal temperature sensor (°C)
 
-adc.TEMP;                         // Internal temperature channel
-adc.VSYS;                         // VSYS channel
+adc.TEMP;                         // Internal temperature channel when advertised
+adc.VSYS;                         // VSYS channel only when adc.vsys is true
 ```
 
 ### Process

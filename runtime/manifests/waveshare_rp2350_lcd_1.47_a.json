@@ -17,6 +17,12 @@
       8,
       9,
       14,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
       22
     ],
     "pins": {
@@ -31,9 +37,18 @@
       "D8": 8,
       "D9": 9,
       "D14": 14,
+      "D16": 16,
+      "D17": 17,
+      "D18": 18,
+      "D19": 19,
+      "D20": 20,
+      "D21": 21,
       "D22": 22,
       "SDA": 4,
       "SCL": 5,
+      "SCK": 18,
+      "MOSI": 19,
+      "MISO": 0,
       "NEOPIXEL": 22
     },
     "devices": {
@@ -59,6 +74,12 @@
         8,
         9,
         14,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
         22
       ],
       "outputPins": [
@@ -73,6 +94,12 @@
         8,
         9,
         14,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
         22
       ],
       "modes": [
@@ -151,6 +178,45 @@
         "maxHz": 1000000
       },
       "maxTransferBytes": 256
+    },
+    "spi": {
+      "buses": [
+        0
+      ],
+      "routes": [
+        {
+          "bus": 0,
+          "sck": 18,
+          "mosi": 19,
+          "miso": 0
+        }
+      ],
+      "defaultBus": 0,
+      "defaultRoute": {
+        "bus": 0,
+        "sck": 18,
+        "mosi": 19,
+        "miso": 0
+      },
+      "frequency": {
+        "minHz": 1,
+        "maxHz": 62500000
+      },
+      "maxTransferBytes": 256,
+      "modes": [
+        0
+      ],
+      "bitsPerWord": [
+        8
+      ],
+      "bitOrders": [
+        "msb"
+      ],
+      "fullDuplex": true,
+      "dma": true,
+      "compatibilityExtensions": [
+        "writeBufferDMA"
+      ]
     },
     "neopixel": {
       "pins": [

@@ -14,7 +14,11 @@ bool mcujs_rp2_pin_can_claim(int pin, mcujs_rp2_pin_owner_t owner) {
         return false;
     }
     mcujs_rp2_pin_owner_t current = s_pin_owners[pin];
-    return current == MCUJS_RP2_PIN_OWNER_NONE || current == owner;
+    /* GPIO is deliberately a soft owner. A peripheral may take over a pin
+     * after validating its complete route, while active peripheral owners
+     * remain exclusive until their binding tears them down. */
+    return current == MCUJS_RP2_PIN_OWNER_NONE || current == owner ||
+           current == MCUJS_RP2_PIN_OWNER_GPIO;
 }
 
 bool mcujs_rp2_pin_claim(int pin, mcujs_rp2_pin_owner_t owner) {

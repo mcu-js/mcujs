@@ -6,8 +6,8 @@ var image = require('image');
 var WIDTH = 172, HEIGHT = 320;
 var pins = { spiBus: 0, sck: 18, mosi: 19, cs: 17, dc: 16, rst: 20, bl: 21 };
 
-function cmd(c) { GPIO.set(pins.dc, 0); GPIO.set(pins.cs, 0); SPI.transfer(pins.spiBus, c); GPIO.set(pins.cs, 1); }
-function dat(d) { GPIO.set(pins.dc, 1); GPIO.set(pins.cs, 0); SPI.transfer(pins.spiBus, d); GPIO.set(pins.cs, 1); }
+function cmd(c) { GPIO.set(pins.dc, false); GPIO.set(pins.cs, false); SPI.transfer(pins.spiBus, c); GPIO.set(pins.cs, true); }
+function dat(d) { GPIO.set(pins.dc, true); GPIO.set(pins.cs, false); SPI.transfer(pins.spiBus, d); GPIO.set(pins.cs, true); }
 
 console.log('=== Image Features Test ===');
 
@@ -16,14 +16,14 @@ GPIO.init(pins.cs, GPIO.OUTPUT);
 GPIO.init(pins.dc, GPIO.OUTPUT);
 GPIO.init(pins.rst, GPIO.OUTPUT);
 GPIO.init(pins.bl, GPIO.OUTPUT);
-GPIO.set(pins.cs, 1);
-GPIO.set(pins.bl, 0);
+GPIO.set(pins.cs, true);
+GPIO.set(pins.bl, false);
 
-GPIO.set(pins.rst, 1); board.delay(100);
-GPIO.set(pins.rst, 0); board.delay(100);
-GPIO.set(pins.rst, 1); board.delay(150);
+GPIO.set(pins.rst, true); board.delay(100);
+GPIO.set(pins.rst, false); board.delay(100);
+GPIO.set(pins.rst, true); board.delay(150);
 
-SPI.init(pins.spiBus, pins.sck, pins.mosi, 255, 40000000);
+SPI.init(pins.spiBus, pins.sck, pins.mosi, 0, 37500000);
 
 cmd(0x11); board.delay(120);
 cmd(0x36); dat(0x00);
@@ -42,13 +42,13 @@ function flush() {
   dat(0); dat(0);
   dat((HEIGHT - 1) >> 8); dat((HEIGHT - 1) & 0xFF);
   cmd(0x2C);
-  GPIO.set(pins.dc, 1);
-  GPIO.set(pins.cs, 0);
+  GPIO.set(pins.dc, true);
+  GPIO.set(pins.cs, false);
   SPI.writeBufferDMA(pins.spiBus, handle, WIDTH * HEIGHT * 2);
-  GPIO.set(pins.cs, 1);
+  GPIO.set(pins.cs, true);
 }
 
-GPIO.set(pins.bl, 1);
+GPIO.set(pins.bl, true);
 
 // Test 1: Position icons in corners
 console.log('Test 1: Icon positioning');

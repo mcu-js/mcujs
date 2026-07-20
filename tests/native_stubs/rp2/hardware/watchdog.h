@@ -1,0 +1,3 @@
+#ifndef MCUJS_TEST_RP2_WATCHDOG_H
+#define MCUJS_TEST_RP2_WATCHDOG_H
+#endif

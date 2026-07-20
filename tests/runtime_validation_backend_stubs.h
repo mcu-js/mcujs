@@ -1,6 +1,7 @@
 #ifndef MCUJS_RUNTIME_VALIDATION_BACKEND_STUBS_H
 #define MCUJS_RUNTIME_VALIDATION_BACKEND_STUBS_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 extern int mcujs_test_i2c_result;
@@ -9,14 +10,34 @@ extern unsigned mcujs_test_i2c_read_calls;
 extern size_t mcujs_test_i2c_last_length;
 #if defined(MCUJS_PLATFORM_RP2)
 extern unsigned mcujs_test_gpio_init_calls;
+extern int mcujs_test_i2c_init_result;
 extern unsigned mcujs_test_i2c_init_calls;
 extern unsigned mcujs_test_pwm_config_calls;
 extern unsigned mcujs_test_pwm_divider_scaled;
 extern unsigned mcujs_test_pwm_wrap;
 extern unsigned mcujs_test_pwm_duty_calls;
 extern unsigned mcujs_test_pwm_level;
+extern int mcujs_test_spi_init_result;
+extern unsigned mcujs_test_spi_init_calls;
+extern unsigned mcujs_test_spi_deinit_calls;
+extern unsigned mcujs_test_adc_gpio_init_calls;
+extern unsigned mcujs_test_adc_last_pin;
+extern unsigned mcujs_test_adc_init_calls;
+extern unsigned mcujs_test_adc_select_calls;
+extern unsigned mcujs_test_adc_read_calls;
+extern bool mcujs_test_pio_can_add_program;
+extern unsigned mcujs_test_neopixel_init_calls;
+extern unsigned mcujs_test_neopixel_last_pin;
+extern unsigned mcujs_test_neopixel_write_calls;
+extern unsigned mcujs_test_neopixel_last_word;
+extern int mcujs_test_dma_claim_result;
+extern unsigned mcujs_test_dma_claim_calls;
+extern bool mcujs_test_dma_claim_required;
+extern unsigned mcujs_test_dma_configure_calls;
+extern size_t mcujs_test_dma_last_length;
 #endif
 #if defined(MCUJS_PLATFORM_ESP32)
+extern int mcujs_test_gpio_result;
 extern unsigned mcujs_test_i2c_param_config_calls;
 extern unsigned mcujs_test_i2c_driver_install_calls;
 extern unsigned mcujs_test_i2c_driver_delete_calls;

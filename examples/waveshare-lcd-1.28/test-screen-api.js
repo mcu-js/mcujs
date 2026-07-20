@@ -22,12 +22,12 @@ function createScreen(options) {
   var buffer = graphics.createBuffer({ width: width, height: height });
   
   function cmd(c) {
-    GPIO.set(pins.dc, 0);
+    GPIO.set(pins.dc, false);
     SPI.transfer(pins.spiBus, c);
   }
   
   function dat(d) {
-    GPIO.set(pins.dc, 1);
+    GPIO.set(pins.dc, true);
     SPI.transfer(pins.spiBus, d);
   }
   
@@ -36,18 +36,18 @@ function createScreen(options) {
     GPIO.init(pins.dc, GPIO.OUTPUT);
     GPIO.init(pins.rst, GPIO.OUTPUT);
     GPIO.init(pins.bl, GPIO.OUTPUT);
-    GPIO.set(pins.cs, 1);
-    GPIO.set(pins.bl, 0);
-    GPIO.set(pins.rst, 1);
+    GPIO.set(pins.cs, true);
+    GPIO.set(pins.bl, false);
+    GPIO.set(pins.rst, true);
     
-    SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 40000000);
+    SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 31250000);
     
-    GPIO.set(pins.rst, 1);
+    GPIO.set(pins.rst, true);
     board.delay(100);
-    GPIO.set(pins.rst, 0);
+    GPIO.set(pins.rst, false);
     board.delay(100);
-    GPIO.set(pins.rst, 1);
-    GPIO.set(pins.cs, 0);
+    GPIO.set(pins.rst, true);
+    GPIO.set(pins.cs, false);
     board.delay(100);
     
     // Init sequence
@@ -87,7 +87,7 @@ function createScreen(options) {
     board.delay(120);
     cmd(0x29);
     board.delay(20);
-    GPIO.set(pins.bl, 1);
+    GPIO.set(pins.bl, true);
     return screen;
   }
   
@@ -95,7 +95,7 @@ function createScreen(options) {
     cmd(0x2A); dat(0x00); dat(0x00); dat(0x00); dat(width - 1);
     cmd(0x2B); dat(0x00); dat(0x00); dat(0x00); dat(height - 1);
     cmd(0x2C);
-    GPIO.set(pins.dc, 1);
+    GPIO.set(pins.dc, true);
     SPI.writeBufferDMA(pins.spiBus, buffer, width * height * 2);
     return screen;
   }

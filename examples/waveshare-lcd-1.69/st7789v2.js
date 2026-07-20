@@ -37,7 +37,7 @@ function createST7789V2Driver(options) {
   var dc = options.dc !== undefined ? options.dc : DEFAULT_PINS.dc;
   var rst = options.rst !== undefined ? options.rst : DEFAULT_PINS.rst;
   var bl = options.bl !== undefined ? options.bl : DEFAULT_PINS.bl;
-  var baudrate = options.baudrate || 40000000;  // 40 MHz default
+  var baudrate = options.baudrate || 37500000;  // Exact at 150 MHz clk_peri
   var horizontal = options.horizontal !== undefined ? options.horizontal : false;  // Default portrait
   
   var initialized = false;
@@ -63,47 +63,47 @@ function createST7789V2Driver(options) {
     GPIO.init(dc, GPIO.OUTPUT);
     GPIO.init(rst, GPIO.OUTPUT);
     GPIO.init(bl, GPIO.OUTPUT);
-    GPIO.set(cs, 1);   // CS high (inactive)
-    GPIO.set(bl, 0);   // Backlight off initially
-    GPIO.set(rst, 1);  // Reset high (inactive)
+    GPIO.set(cs, true);   // CS high (inactive)
+    GPIO.set(bl, false);   // Backlight off initially
+    GPIO.set(rst, true);  // Reset high (inactive)
   }
   
   // Hardware reset
   function reset() {
-    GPIO.set(rst, 1);
+    GPIO.set(rst, true);
     board.delay(100);
-    GPIO.set(rst, 0);
+    GPIO.set(rst, false);
     board.delay(100);
-    GPIO.set(rst, 1);
+    GPIO.set(rst, true);
     board.delay(100);
   }
   
   // Send command byte (DC low)
   function command(cmd) {
-    GPIO.set(cs, 0);
-    GPIO.set(dc, 0);   // Command mode
+    GPIO.set(cs, false);
+    GPIO.set(dc, false);   // Command mode
     SPI.transfer(spiBus, cmd);
-    GPIO.set(cs, 1);
+    GPIO.set(cs, true);
   }
   
   // Send data byte (DC high)
   function dataByte(b) {
-    GPIO.set(cs, 0);
-    GPIO.set(dc, 1);   // Data mode
+    GPIO.set(cs, false);
+    GPIO.set(dc, true);   // Data mode
     SPI.transfer(spiBus, b);
-    GPIO.set(cs, 1);
+    GPIO.set(cs, true);
   }
   
   // Send data bytes (DC high)
   function data(bytes) {
-    GPIO.set(cs, 0);
-    GPIO.set(dc, 1);   // Data mode
+    GPIO.set(cs, false);
+    GPIO.set(dc, true);   // Data mode
     if (Array.isArray(bytes)) {
       SPI.transfer(spiBus, bytes);
     } else {
       SPI.transfer(spiBus, bytes);
     }
-    GPIO.set(cs, 1);
+    GPIO.set(cs, true);
   }
   
   // Send command followed by data
@@ -192,7 +192,7 @@ function createST7789V2Driver(options) {
     board.delay(20);
     
     // Turn on backlight
-    GPIO.set(bl, 1);
+    GPIO.set(bl, true);
     
     initialized = true;
   }
@@ -226,19 +226,19 @@ function createST7789V2Driver(options) {
     setWindow(0, 0, w - 1, h - 1);
     
     // Send pixel data via DMA
-    GPIO.set(dc, 1);   // Data mode
-    GPIO.set(cs, 0);   // Select
+    GPIO.set(dc, true);   // Data mode
+    GPIO.set(cs, false);   // Select
     SPI.writeBufferDMA(spiBus, bufferHandle, w * h * 2);
-    GPIO.set(cs, 1);   // Deselect
+    GPIO.set(cs, true);   // Deselect
   }
   
   // Set backlight on/off or PWM duty (0-100)
   function setBacklight(value) {
     if (typeof value === 'boolean') {
-      GPIO.set(bl, value ? 1 : 0);
+      GPIO.set(bl, !!value);
     } else {
       // PWM control if available
-      GPIO.set(bl, value > 0 ? 1 : 0);
+      GPIO.set(bl, value > 0);
     }
   }
   

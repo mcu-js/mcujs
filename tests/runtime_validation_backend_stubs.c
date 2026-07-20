@@ -6,6 +6,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(MCUJS_PLATFORM_RP2)
+#include "pico/unique_id.h"
+#endif
+
 int mcujs_test_i2c_result;
 unsigned mcujs_test_i2c_write_calls;
 unsigned mcujs_test_i2c_read_calls;
@@ -31,6 +35,32 @@ void js_set_number(jerry_value_t object, const char *name, double value) {
     jerry_value_free(number);
 }
 
+void js_set_string(jerry_value_t object, const char *name, const char *value) {
+    jerry_value_t string = jerry_string_sz(value);
+    js_set_property(object, name, string);
+    jerry_value_free(string);
+}
+
+jerry_value_t js_deep_freeze(jerry_value_t value) {
+    (void)value;
+    return jerry_undefined();
+}
+
+jerry_value_t js_define_immutable_property(jerry_value_t object,
+                                           const char *name,
+                                           jerry_value_t value) {
+    return jerry_object_set_sz(object, name, value);
+}
+
+bool js_board_apply_registry(jerry_value_t board,
+                             jerry_external_handler_t safe_mode_handler,
+                             jerry_external_handler_t storage_ready_handler) {
+    (void)board;
+    (void)safe_mode_handler;
+    (void)storage_ready_handler;
+    return true;
+}
+
 void js_register_global(const char *name, jerry_value_t object) {
     jerry_value_t global = jerry_current_realm();
     js_set_property(global, name, object);
@@ -52,9 +82,15 @@ bool js_get_boolean_arg(const jerry_value_t args[], jerry_length_t argc,
 
 #if defined(MCUJS_PLATFORM_RP2)
 
+#include "graphics.h"
+#include "hardware/adc.h"
+#include "hardware/dma.h"
 #include "hardware/i2c.h"
+#include "hardware/pio.h"
 #include "hardware/pwm.h"
+#include "hardware/spi.h"
 #include "hardware/clocks.h"
+#include "neopixel.pio.h"
 #include "pico/stdlib.h"
 
 static i2c_inst_t s_i2c_instances[] = {{.index = 0}, {.index = 1}};
@@ -62,12 +98,42 @@ i2c_inst_t *i2c0 = &s_i2c_instances[0];
 i2c_inst_t *i2c1 = &s_i2c_instances[1];
 static bool s_gpio_levels[NUM_BANK0_GPIOS];
 unsigned mcujs_test_gpio_init_calls;
+int mcujs_test_i2c_init_result;
 unsigned mcujs_test_i2c_init_calls;
 unsigned mcujs_test_pwm_config_calls;
 unsigned mcujs_test_pwm_divider_scaled;
 unsigned mcujs_test_pwm_wrap;
 unsigned mcujs_test_pwm_duty_calls;
 unsigned mcujs_test_pwm_level;
+int mcujs_test_spi_init_result;
+unsigned mcujs_test_spi_init_calls;
+unsigned mcujs_test_spi_deinit_calls;
+unsigned mcujs_test_adc_gpio_init_calls;
+unsigned mcujs_test_adc_last_pin;
+unsigned mcujs_test_adc_init_calls;
+unsigned mcujs_test_adc_select_calls;
+unsigned mcujs_test_adc_read_calls;
+bool mcujs_test_pio_can_add_program;
+unsigned mcujs_test_neopixel_init_calls;
+unsigned mcujs_test_neopixel_last_pin;
+unsigned mcujs_test_neopixel_write_calls;
+unsigned mcujs_test_neopixel_last_word;
+int mcujs_test_dma_claim_result;
+unsigned mcujs_test_dma_claim_calls;
+bool mcujs_test_dma_claim_required;
+unsigned mcujs_test_dma_configure_calls;
+size_t mcujs_test_dma_last_length;
+
+static spi_inst_t s_spi_instances[] = {{.index = 0}, {.index = 1}};
+spi_inst_t *spi0 = &s_spi_instances[0];
+spi_inst_t *spi1 = &s_spi_instances[1];
+static spi_hw_t s_spi_hardware[2];
+struct pio_hw mcujs_test_pio0 = {.index = 0};
+const pio_program_t mcujs_ws2812_program = {
+    .instructions = NULL,
+    .length = 1,
+    .origin = -1,
+};
 
 void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_result = 0;
@@ -75,12 +141,31 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_read_calls = 0;
     mcujs_test_i2c_last_length = 0;
     mcujs_test_gpio_init_calls = 0;
+    mcujs_test_i2c_init_result = -1;
     mcujs_test_i2c_init_calls = 0;
     mcujs_test_pwm_config_calls = 0;
     mcujs_test_pwm_divider_scaled = 0;
     mcujs_test_pwm_wrap = 0;
     mcujs_test_pwm_duty_calls = 0;
     mcujs_test_pwm_level = 0;
+    mcujs_test_spi_init_result = -1;
+    mcujs_test_spi_init_calls = 0;
+    mcujs_test_spi_deinit_calls = 0;
+    mcujs_test_adc_gpio_init_calls = 0;
+    mcujs_test_adc_last_pin = UINT32_MAX;
+    mcujs_test_adc_init_calls = 0;
+    mcujs_test_adc_select_calls = 0;
+    mcujs_test_adc_read_calls = 0;
+    mcujs_test_pio_can_add_program = true;
+    mcujs_test_neopixel_init_calls = 0;
+    mcujs_test_neopixel_last_pin = UINT32_MAX;
+    mcujs_test_neopixel_write_calls = 0;
+    mcujs_test_neopixel_last_word = 0;
+    mcujs_test_dma_claim_result = 0;
+    mcujs_test_dma_claim_calls = 0;
+    mcujs_test_dma_claim_required = false;
+    mcujs_test_dma_configure_calls = 0;
+    mcujs_test_dma_last_length = 0;
     for (size_t i = 0; i < NUM_BANK0_GPIOS; i++) s_gpio_levels[i] = false;
 }
 
@@ -96,7 +181,9 @@ void gpio_set_function(uint pin, uint function) { (void)pin; (void)function; }
 uint i2c_init(i2c_inst_t *instance, uint baudrate) {
     (void)instance;
     mcujs_test_i2c_init_calls++;
-    return baudrate;
+    return mcujs_test_i2c_init_result >= 0
+        ? (uint)mcujs_test_i2c_init_result
+        : baudrate;
 }
 
 int i2c_write_blocking(i2c_inst_t *instance, uint8_t address,
@@ -145,6 +232,142 @@ void pwm_set_gpio_level(uint pin, uint16_t level) {
 void pwm_set_enabled(uint slice, bool enabled) { (void)slice; (void)enabled; }
 uint32_t clock_get_hz(int clock) { (void)clock; return 125000000u; }
 
+uint spi_init(spi_inst_t *instance, uint baudrate) {
+    (void)instance;
+    mcujs_test_spi_init_calls++;
+    return mcujs_test_spi_init_result >= 0
+        ? (uint)mcujs_test_spi_init_result
+        : baudrate;
+}
+void spi_deinit(spi_inst_t *instance) {
+    (void)instance;
+    mcujs_test_spi_deinit_calls++;
+}
+void spi_set_format(spi_inst_t *instance, uint data_bits, int cpol, int cpha,
+                    int order) {
+    (void)instance;
+    (void)data_bits;
+    (void)cpol;
+    (void)cpha;
+    (void)order;
+}
+int spi_write_read_blocking(spi_inst_t *instance, const uint8_t *tx,
+                            uint8_t *rx, size_t length) {
+    (void)instance;
+    for (size_t i = 0; i < length; i++) rx[i] = tx[i];
+    return (int)length;
+}
+uint spi_get_dreq(spi_inst_t *instance, bool is_tx) {
+    (void)instance;
+    (void)is_tx;
+    return 0;
+}
+spi_hw_t *spi_get_hw(spi_inst_t *instance) {
+    return &s_spi_hardware[instance == spi1 ? 1 : 0];
+}
+bool spi_is_busy(spi_inst_t *instance) { (void)instance; return false; }
+
+int dma_claim_unused_channel(bool required) {
+    mcujs_test_dma_claim_calls++;
+    mcujs_test_dma_claim_required = required;
+    return mcujs_test_dma_claim_result;
+}
+dma_channel_config dma_channel_get_default_config(int channel) {
+    (void)channel;
+    return (dma_channel_config){0};
+}
+void channel_config_set_transfer_data_size(dma_channel_config *config, int size) {
+    (void)config;
+    (void)size;
+}
+void channel_config_set_dreq(dma_channel_config *config, unsigned dreq) {
+    (void)config;
+    (void)dreq;
+}
+void channel_config_set_read_increment(dma_channel_config *config, bool increment) {
+    (void)config;
+    (void)increment;
+}
+void channel_config_set_write_increment(dma_channel_config *config, bool increment) {
+    (void)config;
+    (void)increment;
+}
+void dma_channel_configure(int channel, const dma_channel_config *config,
+                           volatile void *write_address, const void *read_address,
+                           size_t transfer_count, bool trigger) {
+    (void)channel;
+    (void)config;
+    (void)write_address;
+    (void)read_address;
+    (void)trigger;
+    mcujs_test_dma_configure_calls++;
+    mcujs_test_dma_last_length = transfer_count;
+}
+void dma_channel_wait_for_finish_blocking(int channel) { (void)channel; }
+
+static uint16_t s_graphics_buffer[1];
+uint16_t *graphics_get_buffer_data(graphics_buffer_handle_t handle) {
+    return handle == 1 ? s_graphics_buffer : NULL;
+}
+uint32_t graphics_get_buffer_byte_length(graphics_buffer_handle_t handle) {
+    return handle == 1 ? sizeof(s_graphics_buffer) : 0;
+}
+
+void adc_init(void) { mcujs_test_adc_init_calls++; }
+void adc_gpio_init(uint pin) {
+    mcujs_test_adc_gpio_init_calls++;
+    mcujs_test_adc_last_pin = pin;
+}
+void adc_select_input(uint channel) { (void)channel; mcujs_test_adc_select_calls++; }
+uint16_t adc_read(void) { mcujs_test_adc_read_calls++; return 2048; }
+void adc_set_temp_sensor_enabled(bool enabled) { (void)enabled; }
+
+bool pio_can_add_program(PIO pio, const pio_program_t *program) {
+    (void)pio;
+    (void)program;
+    return mcujs_test_pio_can_add_program;
+}
+uint pio_add_program(PIO pio, const pio_program_t *program) {
+    (void)pio;
+    (void)program;
+    return 0;
+}
+void pio_sm_put_blocking(PIO pio, uint state_machine, uint32_t data) {
+    (void)pio;
+    (void)state_machine;
+    mcujs_test_neopixel_write_calls++;
+    mcujs_test_neopixel_last_word = data;
+}
+void pio_sm_set_enabled(PIO pio, uint state_machine, bool enabled) {
+    (void)pio;
+    (void)state_machine;
+    (void)enabled;
+}
+void mcujs_ws2812_program_init(PIO pio, uint state_machine, uint offset,
+                               uint pin, float frequency, bool rgbw) {
+    (void)pio;
+    (void)state_machine;
+    (void)offset;
+    (void)frequency;
+    (void)rgbw;
+    mcujs_test_neopixel_init_calls++;
+    mcujs_test_neopixel_last_pin = pin;
+}
+void sleep_us(uint64_t microseconds) { (void)microseconds; }
+void sleep_ms(uint32_t milliseconds) { (void)milliseconds; }
+void tight_loop_contents(void) {}
+absolute_time_t get_absolute_time(void) { return 1234; }
+uint64_t to_ms_since_boot(absolute_time_t time) { return time; }
+void pico_get_unique_board_id(pico_unique_board_id_t *id) {
+    for (size_t i = 0; i < PICO_UNIQUE_BOARD_ID_SIZE_BYTES; i++) {
+        id->id[i] = (uint8_t)i;
+    }
+}
+void usb_cdc_reset_usb(uint32_t delay_ms) { (void)delay_ms; }
+void board_enter_uf2(void) {}
+bool fs_host_owned(void) { return false; }
+void cyw43_arch_gpio_put(int pin, int value) { (void)pin; (void)value; }
+
 #elif defined(MCUJS_PLATFORM_ESP32)
 
 #include "driver/gpio.h"
@@ -152,6 +375,7 @@ uint32_t clock_get_hz(int clock) { (void)clock; return 125000000u; }
 #include "driver/ledc.h"
 
 static int s_gpio_levels[GPIO_NUM_MAX];
+int mcujs_test_gpio_result;
 unsigned mcujs_test_i2c_param_config_calls;
 unsigned mcujs_test_i2c_driver_install_calls;
 unsigned mcujs_test_i2c_driver_delete_calls;
@@ -170,6 +394,7 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_write_calls = 0;
     mcujs_test_i2c_read_calls = 0;
     mcujs_test_i2c_last_length = 0;
+    mcujs_test_gpio_result = ESP_OK;
     mcujs_test_i2c_param_config_calls = 0;
     mcujs_test_i2c_driver_install_calls = 0;
     mcujs_test_i2c_driver_delete_calls = 0;
@@ -188,11 +413,20 @@ void mcujs_test_reset_backend(void) {
 esp_err_t gpio_reset_pin(gpio_num_t pin) {
     (void)pin;
     mcujs_test_gpio_reset_calls++;
-    return ESP_OK;
+    return mcujs_test_gpio_result;
 }
-esp_err_t gpio_set_direction(gpio_num_t pin, int mode) { (void)pin; (void)mode; return ESP_OK; }
-esp_err_t gpio_set_pull_mode(gpio_num_t pin, int mode) { (void)pin; (void)mode; return ESP_OK; }
+esp_err_t gpio_set_direction(gpio_num_t pin, int mode) {
+    (void)pin;
+    (void)mode;
+    return mcujs_test_gpio_result;
+}
+esp_err_t gpio_set_pull_mode(gpio_num_t pin, int mode) {
+    (void)pin;
+    (void)mode;
+    return mcujs_test_gpio_result;
+}
 esp_err_t gpio_set_level(gpio_num_t pin, int level) {
+    if (mcujs_test_gpio_result != ESP_OK) return mcujs_test_gpio_result;
     if (pin >= 0 && pin < GPIO_NUM_MAX) s_gpio_levels[pin] = level;
     return ESP_OK;
 }

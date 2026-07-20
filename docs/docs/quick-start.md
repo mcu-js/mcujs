@@ -20,15 +20,29 @@ Create an `index.js` file on the `MCUJS` drive:
 Need help with terms? See the [Glossary](./glossary.md).
 
 ```javascript
-const LED = 25;
+(function () {
+  var boardApi = require('board');
+  var led = boardApi.devices.led;
+  if (!led) {
+    console.log('This board has no onboard LED');
+    return;
+  }
 
-GPIO.init(LED, GPIO.OUTPUT);
-
-setInterval(() => {
-  GPIO.toggle(LED);
-}, 500);
-
-console.log('Blinking!');
+  if (led.type === 'gpio') {
+    var gpio = require('gpio');
+    gpio.init(led.pin, gpio.OUTPUT);
+    var physicalOn = led.activeLow ? false : true;
+    setInterval(function () { gpio.toggle(led.pin); }, 500);
+    gpio.set(led.pin, physicalOn);
+  } else {
+    globalThis.quickStartLedOn = false;
+    setInterval(function () {
+      globalThis.quickStartLedOn = !globalThis.quickStartLedOn;
+      boardApi.led(globalThis.quickStartLedOn);
+    }, 500);
+  }
+  console.log('Blinking!');
+}());
 ```
 
 Reset the board. Your script runs automatically.

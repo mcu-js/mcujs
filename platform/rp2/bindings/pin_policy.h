@@ -12,6 +12,10 @@ typedef enum {
     MCUJS_RP2_PIN_OWNER_PWM,
     MCUJS_RP2_PIN_OWNER_I2C0,
     MCUJS_RP2_PIN_OWNER_I2C1,
+    MCUJS_RP2_PIN_OWNER_SPI0,
+    MCUJS_RP2_PIN_OWNER_SPI1,
+    MCUJS_RP2_PIN_OWNER_ADC,
+    MCUJS_RP2_PIN_OWNER_NEOPIXEL,
 } mcujs_rp2_pin_owner_t;
 
 static inline bool mcujs_rp2_pin_in_mask(int pin, uint64_t mask) {
@@ -28,6 +32,18 @@ static inline bool mcujs_rp2_gpio_output_pin_allowed(int pin) {
 
 static inline bool mcujs_rp2_pwm_pin_allowed(int pin) {
     return mcujs_rp2_pin_in_mask(pin, MCUJS_RUNTIME_PWM_PIN_MASK);
+}
+
+static inline bool mcujs_rp2_adc_pin_allowed(int pin) {
+    return mcujs_rp2_pin_in_mask(pin, MCUJS_RUNTIME_ADC_PIN_MASK);
+}
+
+static inline bool mcujs_rp2_adc_channel_allowed(int channel) {
+    return mcujs_rp2_pin_in_mask(channel, MCUJS_RUNTIME_ADC_CHANNEL_MASK);
+}
+
+static inline bool mcujs_rp2_neopixel_pin_allowed(int pin) {
+    return mcujs_rp2_pin_in_mask(pin, MCUJS_RUNTIME_NEOPIXEL_PIN_MASK);
 }
 
 mcujs_rp2_pin_owner_t mcujs_rp2_pin_owner(int pin);

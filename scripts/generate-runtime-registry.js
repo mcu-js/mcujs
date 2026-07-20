@@ -64,11 +64,19 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_HAS_DVI ${descriptor.features.dvi ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_ONBOARD_LED ${descriptor.features.onboardLed ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_ONBOARD_NEOPIXEL ${descriptor.features.onboardNeopixel ? 1 : 0}`);
+  lines.push(`#define MCUJS_REGISTRY_LED_PIN ${descriptor.board.devices.led?.type === "gpio" ? 1 : 0}`);
+  lines.push(`#define MCUJS_REGISTRY_ADC_VSYS ${descriptor.capabilities.adc?.vsys === true ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_SAFE_MODE ${descriptor.features.safeMode ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_STORAGE_READY ${descriptor.features.storageReady ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_GPIO_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.pins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.outputPins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_PIN_MASK ${pinMask(descriptor.capabilities.pwm?.pins ?? [])}`);
+  lines.push(`#define MCUJS_RUNTIME_ADC_PIN_MASK ${pinMask(descriptor.capabilities.adc?.pins ?? [])}`);
+  const adcChannels = (descriptor.capabilities.adc?.channels ?? []).map(({ channel }) => channel);
+  if (descriptor.capabilities.adc?.vsys === true) adcChannels.push(3);
+  lines.push(`#define MCUJS_RUNTIME_ADC_CHANNEL_MASK ${pinMask(adcChannels)}`);
+  lines.push(`#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL ${descriptor.capabilities.adc?.temperature?.rawChannel === true ? 1 : 0}`);
+  lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK ${pinMask(descriptor.capabilities.neopixel?.pins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MIN_HZ ${descriptor.capabilities.pwm?.frequency.minHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MAX_HZ ${descriptor.capabilities.pwm?.frequency.maxHz ?? 0}`);
   const i2cRoutes = descriptor.capabilities.i2c?.routes ?? [];
@@ -81,6 +89,18 @@ function branchFor(boardId, first) {
       lines.push(`    X(${bus}, ${sda}, ${scl})${suffix}`);
     });
   }
+  const spiRoutes = descriptor.capabilities.spi?.routes ?? [];
+  if (spiRoutes.length === 0) {
+    lines.push("#define MCUJS_RUNTIME_SPI_ROUTES(X)");
+  } else {
+    lines.push("#define MCUJS_RUNTIME_SPI_ROUTES(X) " + String.fromCharCode(92));
+    spiRoutes.forEach(({ bus, sck, mosi, miso }, index) => {
+      const suffix = index === spiRoutes.length - 1 ? "" : ` ${String.fromCharCode(92)}`;
+      lines.push(`    X(${bus}, ${sck}, ${mosi}, ${miso})${suffix}`);
+    });
+  }
+  lines.push(`#define MCUJS_RUNTIME_SPI_MIN_HZ ${descriptor.capabilities.spi?.frequency.minHz ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_SPI_MAX_HZ ${descriptor.capabilities.spi?.frequency.maxHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_API_VERSION ${cString(manifest.apiVersion)}`);
   lines.push(`#define MCUJS_RUNTIME_BOARD_JSON ${cString(JSON.stringify(manifest.board))}`);
   lines.push(`#define MCUJS_RUNTIME_MANIFEST_JSON ${cString(JSON.stringify(manifest))}`);

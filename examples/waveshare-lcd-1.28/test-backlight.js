@@ -7,15 +7,15 @@ console.log('=== Backlight Test ===');
 GPIO.init(25, GPIO.OUTPUT);
 
 console.log('Turning backlight ON...');
-GPIO.set(25, 1);
+GPIO.set(25, true);
 console.log('Backlight should be ON now');
 
 // Toggle test
 console.log('Toggling 3 times...');
 for (var i = 0; i < 3; i++) {
-  GPIO.set(25, 0);
+  GPIO.set(25, false);
   console.log('OFF');
-  GPIO.set(25, 1);
+  GPIO.set(25, true);
   console.log('ON');
 }
 

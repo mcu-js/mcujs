@@ -28,7 +28,7 @@ function createGC9A01ADriver(options) {
   var dc = options.dc !== undefined ? options.dc : DEFAULT_PINS.dc;
   var rst = options.rst !== undefined ? options.rst : DEFAULT_PINS.rst;
   var bl = options.bl !== undefined ? options.bl : DEFAULT_PINS.bl;
-  var baudrate = options.baudrate || 40000000;  // 40 MHz default
+  var baudrate = options.baudrate || 31250000;  // Exact 31.25 MHz at 125 MHz clk_peri
   
   var initialized = false;
   var width = 240;
@@ -40,37 +40,37 @@ function createGC9A01ADriver(options) {
     GPIO.init(dc, GPIO.OUTPUT);
     GPIO.init(rst, GPIO.OUTPUT);
     GPIO.init(bl, GPIO.OUTPUT);
-    GPIO.set(cs, 1);   // CS high (inactive)
-    GPIO.set(bl, 0);   // Backlight off initially
-    GPIO.set(rst, 1);  // Reset high (inactive)
+    GPIO.set(cs, true);   // CS high (inactive)
+    GPIO.set(bl, false);   // Backlight off initially
+    GPIO.set(rst, true);  // Reset high (inactive)
   }
   
   // Hardware reset - CS goes LOW after reset and stays LOW
   function reset() {
-    GPIO.set(rst, 1);
+    GPIO.set(rst, true);
     board.delay(100);
-    GPIO.set(rst, 0);
+    GPIO.set(rst, false);
     board.delay(100);
-    GPIO.set(rst, 1);
-    GPIO.set(cs, 0);   // CS LOW - stays low for all communication!
+    GPIO.set(rst, true);
+    GPIO.set(cs, false);   // CS LOW - stays low for all communication!
     board.delay(100);
   }
   
   // Send command byte (DC low) - CS stays LOW
   function command(cmd) {
-    GPIO.set(dc, 0);   // Command mode
+    GPIO.set(dc, false);   // Command mode
     SPI.transfer(spiBus, cmd);
   }
   
   // Send data byte (DC high) - CS stays LOW
   function dataByte(b) {
-    GPIO.set(dc, 1);   // Data mode
+    GPIO.set(dc, true);   // Data mode
     SPI.transfer(spiBus, b);
   }
   
   // Send data bytes (DC high) - CS stays LOW
   function data(bytes) {
-    GPIO.set(dc, 1);   // Data mode
+    GPIO.set(dc, true);   // Data mode
     if (Array.isArray(bytes)) {
       SPI.transfer(spiBus, bytes);
     } else {
@@ -177,7 +177,7 @@ function createGC9A01ADriver(options) {
     board.delay(20);
     
     // Turn on backlight
-    GPIO.set(bl, 1);
+    GPIO.set(bl, true);
     
     initialized = true;
   }
@@ -205,15 +205,15 @@ function createGC9A01ADriver(options) {
     setWindow(0, 0, w - 1, h - 1);
     
     // Send pixel data via DMA
-    GPIO.set(dc, 1);   // Data mode
-    GPIO.set(cs, 0);   // Select
+    GPIO.set(dc, true);   // Data mode
+    GPIO.set(cs, false);   // Select
     SPI.writeBufferDMA(spiBus, bufferHandle, w * h * 2);
-    GPIO.set(cs, 1);   // Deselect
+    GPIO.set(cs, true);   // Deselect
   }
   
   // Set backlight on/off
   function setBacklight(on) {
-    GPIO.set(bl, on ? 1 : 0);
+    GPIO.set(bl, !!on);
   }
   
   // Return public interface

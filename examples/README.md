@@ -1,10 +1,10 @@
 # mcujs Examples
 
-Example programs demonstrating mcujs features on Raspberry Pi Pico.
+Example programs demonstrating MCU.js features across supported boards.
 
 ## Usage
 
-Copy the `index.js` file from any example folder to your Pico's filesystem.
+Copy the `index.js` file from an example folder to the board's MCU.js filesystem.
 
 1. Mount the Pico filesystem: `udisksctl mount -b /dev/sda`
 2. Copy the example: `cp examples/blink/index.js /run/media/$USER/MCUJS/`
@@ -18,11 +18,11 @@ Basic hello world - prints board info and a periodic heartbeat message.
 **Concepts:** `console.log`, `board` object, `setInterval`
 
 ### blink/
-Classic LED blink - toggles the onboard LED every 500ms.
+Portable LED blink - uses onboard inventory and toggles the LED every 500ms for 30 seconds.
 
-**Concepts:** `GPIO.init`, `GPIO.set`, `GPIO.OUTPUT`, `setInterval`
+**Concepts:** `board.devices`, `gpio.init`, strict boolean `gpio.set`, `setInterval`
 
-**Hardware:** None (uses onboard LED on GPIO 25)
+**Hardware:** A board with a declared onboard LED; managed LEDs use `board.led()` and GPIO LEDs use their declared pin.
 
 ### button/
 Button input with software debounce - toggles LED on button press.

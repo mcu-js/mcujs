@@ -37,18 +37,18 @@ function createScreen(options) {
   
   // SPI command helper
   function cmd(c) {
-    GPIO.set(pins.dc, 0);
-    GPIO.set(pins.cs, 0);
+    GPIO.set(pins.dc, false);
+    GPIO.set(pins.cs, false);
     SPI.transfer(pins.spiBus, c);
-    GPIO.set(pins.cs, 1);
+    GPIO.set(pins.cs, true);
   }
   
   // SPI data helper
   function dat(d) {
-    GPIO.set(pins.dc, 1);
-    GPIO.set(pins.cs, 0);
+    GPIO.set(pins.dc, true);
+    GPIO.set(pins.cs, false);
     SPI.transfer(pins.spiBus, d);
-    GPIO.set(pins.cs, 1);
+    GPIO.set(pins.cs, true);
   }
   
   // Initialize the display
@@ -60,19 +60,19 @@ function createScreen(options) {
     GPIO.init(pins.dc, GPIO.OUTPUT);
     GPIO.init(pins.rst, GPIO.OUTPUT);
     GPIO.init(pins.bl, GPIO.OUTPUT);
-    GPIO.set(pins.cs, 1);
-    GPIO.set(pins.bl, 0);
-    GPIO.set(pins.rst, 1);
+    GPIO.set(pins.cs, true);
+    GPIO.set(pins.bl, false);
+    GPIO.set(pins.rst, true);
     
-    // Initialize SPI at 40MHz
-    SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 40000000);
+    // Initialize SPI at an exact 37.5 MHz for the 150 MHz peripheral clock
+    SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 37500000);
     
     // Hardware reset
-    GPIO.set(pins.rst, 1);
+    GPIO.set(pins.rst, true);
     board.delay(100);
-    GPIO.set(pins.rst, 0);
+    GPIO.set(pins.rst, false);
     board.delay(100);
-    GPIO.set(pins.rst, 1);
+    GPIO.set(pins.rst, true);
     board.delay(100);
     
     // Sleep out
@@ -139,15 +139,15 @@ function createScreen(options) {
     // Clear display RAM BEFORE Display ON to avoid garbage flash
     graphics.fill(buffer, 0x0000);
     setWindowAndWrite(0, 0, width, height);
-    GPIO.set(pins.dc, 1);
-    GPIO.set(pins.cs, 0);
+    GPIO.set(pins.dc, true);
+    GPIO.set(pins.cs, false);
     SPI.writeBufferDMA(pins.spiBus, buffer, width * height * 2);
-    GPIO.set(pins.cs, 1);
+    GPIO.set(pins.cs, true);
     
     // NOW turn on display and backlight
     cmd(0x29);
     board.delay(20);
-    GPIO.set(pins.bl, 1);
+    GPIO.set(pins.bl, true);
     
     initialized = true;
     return screen;
@@ -174,10 +174,10 @@ function createScreen(options) {
   // Flush buffer to display via DMA
   function flush() {
     setWindowAndWrite(0, 0, width, height);
-    GPIO.set(pins.dc, 1);
-    GPIO.set(pins.cs, 0);
+    GPIO.set(pins.dc, true);
+    GPIO.set(pins.cs, false);
     SPI.writeBufferDMA(pins.spiBus, buffer, width * height * 2);
-    GPIO.set(pins.cs, 1);
+    GPIO.set(pins.cs, true);
     return screen;
   }
   
@@ -307,7 +307,7 @@ function createScreen(options) {
   
   // Backlight control
   function setBacklight(on) {
-    GPIO.set(pins.bl, on ? 1 : 0);
+    GPIO.set(pins.bl, !!on);
     return screen;
   }
   

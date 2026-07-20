@@ -7,20 +7,20 @@
  */
 
 #include "bindings.h"
-#include "jerryscript.h"
 #include "board_config.h"
+#include "jerryscript.h"
+#include "pin_policy.h"
+#include "validation.h"
 
-#include "pico/stdlib.h"
 #include "hardware/adc.h"
 #include "hardware/gpio.h"
+#include "pico/stdlib.h"
 
 /* External helpers from bindings.c */
 extern void js_set_function(jerry_value_t object, const char *name,
                             jerry_external_handler_t handler);
 extern void js_set_number(jerry_value_t object, const char *name, double value);
 extern void js_register_global(const char *name, jerry_value_t object);
-extern double js_get_number_arg(const jerry_value_t args[], jerry_length_t argc,
-                                jerry_length_t index, double default_value);
 
 #define ADC_TEMP_CHANNEL 4
 #define ADC_MAX_VALUE 4095.0
@@ -43,6 +43,15 @@ static void adc_enable_temp_sensor(void) {
     }
 }
 
+static jerry_value_t throw_adc_busy(int pin, const char *message) {
+    const mcujs_error_details_t details = {
+        .resource = "adc",
+        .has_pin = true,
+        .pin = pin,
+    };
+    return mcujs_throw_operational_error(MCUJS_ERROR_BUSY, message, &details);
+}
+
 static bool adc_pin_to_channel(uint pin, uint *channel) {
     if (pin == MCUJS_ADC0_PIN) {
         *channel = 0;
@@ -63,6 +72,28 @@ static bool adc_pin_to_channel(uint pin, uint *channel) {
     return false;
 }
 
+static int adc_channel_to_pin(uint channel) {
+    switch (channel) {
+        case 0: return MCUJS_ADC0_PIN;
+        case 1: return MCUJS_ADC1_PIN;
+        case 2: return MCUJS_ADC2_PIN;
+        case 3: return MCUJS_ADC_VSYS_PIN;
+        default: return -1;
+    }
+}
+
+static jerry_value_t prepare_adc_pin(int pin) {
+    if (!mcujs_rp2_pin_can_claim(pin, MCUJS_RP2_PIN_OWNER_ADC)) {
+        return throw_adc_busy(pin, "ADC pin is owned by another peripheral");
+    }
+    if (!mcujs_rp2_pin_claim(pin, MCUJS_RP2_PIN_OWNER_ADC)) {
+        return throw_adc_busy(pin, "ADC pin claim failed");
+    }
+    adc_init_once();
+    adc_gpio_init((uint)pin);
+    return jerry_undefined();
+}
+
 static uint16_t adc_read_channel(uint channel) {
     adc_select_input(channel);
     return adc_read();
@@ -73,20 +104,22 @@ static jerry_value_t adc_read_pin_handler(const jerry_call_info_t *call_info_p,
                                           const jerry_length_t argc) {
     (void)call_info_p;
 
-    if (argc < 1) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "adc.readPin requires a pin");
+    int pin;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &pin);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "ADC pin must be a finite number",
+                              "ADC pin must be an integer");
     }
 
-    uint pin = (uint)js_get_number_arg(args, argc, 0, 0);
     uint channel = 0;
-
-    if (!adc_pin_to_channel(pin, &channel)) {
+    if (!mcujs_rp2_adc_pin_allowed(pin) ||
+        !adc_pin_to_channel((uint)pin, &channel)) {
         return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid ADC pin");
     }
 
-    adc_init_once();
-    adc_gpio_init(pin);
-
+    jerry_value_t prepared = prepare_adc_pin(pin);
+    if (jerry_value_is_exception(prepared)) return prepared;
+    jerry_value_free(prepared);
     return jerry_number((double)adc_read_channel(channel));
 }
 
@@ -95,58 +128,65 @@ static jerry_value_t adc_read_channel_handler(const jerry_call_info_t *call_info
                                               const jerry_length_t argc) {
     (void)call_info_p;
 
-    if (argc < 1) {
-        return jerry_throw_sz(JERRY_ERROR_TYPE, "adc.readChannel requires a channel");
+    int channel;
+    mcujs_arg_status_t status = mcujs_get_integer(args, argc, 0, &channel);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status, "ADC channel must be a finite number",
+                              "ADC channel must be an integer");
     }
-
-    uint channel = (uint)js_get_number_arg(args, argc, 0, 0);
-
-    if (channel > ADC_TEMP_CHANNEL) {
+    if (channel < 0 || channel > ADC_TEMP_CHANNEL) {
         return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid ADC channel");
     }
 
-    adc_init_once();
-
     if (channel == ADC_TEMP_CHANNEL) {
+#if MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL
+        adc_init_once();
         adc_enable_temp_sensor();
+#else
+        return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid ADC channel");
+#endif
+    } else {
+        if (!mcujs_rp2_adc_channel_allowed(channel)) {
+            return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid ADC channel");
+        }
+        int pin = adc_channel_to_pin((uint)channel);
+#if MCUJS_REGISTRY_ADC_VSYS
+        if (channel == 3) {
+            adc_init_once();
+            return jerry_number((double)adc_read_channel((uint)channel));
+        }
+#endif
+        if (pin < 0 || !mcujs_rp2_adc_pin_allowed(pin)) {
+            return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid ADC channel");
+        }
+        jerry_value_t prepared = prepare_adc_pin(pin);
+        if (jerry_value_is_exception(prepared)) return prepared;
+        jerry_value_free(prepared);
     }
-
-    return jerry_number((double)adc_read_channel(channel));
+    return jerry_number((double)adc_read_channel((uint)channel));
 }
 
 static double adc_raw_to_voltage(uint16_t raw) {
     return ((double)raw * ADC_DEFAULT_VREF) / ADC_MAX_VALUE;
 }
 
-static jerry_value_t adc_read_voltage_pin_handler(const jerry_call_info_t *call_info_p,
-                                                  const jerry_value_t args[],
-                                                  const jerry_length_t argc) {
-    (void)call_info_p;
-
+static jerry_value_t adc_read_voltage_pin_handler(
+    const jerry_call_info_t *call_info_p, const jerry_value_t args[],
+    const jerry_length_t argc) {
     jerry_value_t raw = adc_read_pin_handler(call_info_p, args, argc);
-    if (jerry_value_is_exception(raw)) {
-        return raw;
-    }
-
+    if (jerry_value_is_exception(raw)) return raw;
     double raw_value = jerry_value_as_number(raw);
     jerry_value_free(raw);
-
     return jerry_number(adc_raw_to_voltage((uint16_t)raw_value));
 }
 
-static jerry_value_t adc_read_voltage_channel_handler(const jerry_call_info_t *call_info_p,
-                                                      const jerry_value_t args[],
-                                                      const jerry_length_t argc) {
-    (void)call_info_p;
-
+static jerry_value_t adc_read_voltage_channel_handler(
+    const jerry_call_info_t *call_info_p, const jerry_value_t args[],
+    const jerry_length_t argc) {
     jerry_value_t raw = adc_read_channel_handler(call_info_p, args, argc);
-    if (jerry_value_is_exception(raw)) {
-        return raw;
-    }
-
+    if (jerry_value_is_exception(raw)) return raw;
     double raw_value = jerry_value_as_number(raw);
     jerry_value_free(raw);
-
     return jerry_number(adc_raw_to_voltage((uint16_t)raw_value));
 }
 
@@ -159,26 +199,22 @@ static jerry_value_t adc_read_temp_handler(const jerry_call_info_t *call_info_p,
 
     adc_init_once();
     adc_enable_temp_sensor();
-
     uint16_t raw = adc_read_channel(ADC_TEMP_CHANNEL);
     double voltage = adc_raw_to_voltage(raw);
-    double temp_c = 27.0 - (voltage - 0.706) / 0.001721;
-
-    return jerry_number(temp_c);
+    return jerry_number(27.0 - (voltage - 0.706) / 0.001721);
 }
 
 jerry_value_t js_create_adc_module(void) {
     jerry_value_t adc = jerry_object();
-
     js_set_function(adc, "readPin", adc_read_pin_handler);
     js_set_function(adc, "readChannel", adc_read_channel_handler);
     js_set_function(adc, "readVoltagePin", adc_read_voltage_pin_handler);
     js_set_function(adc, "readVoltageChannel", adc_read_voltage_channel_handler);
     js_set_function(adc, "readTempC", adc_read_temp_handler);
-
     js_set_number(adc, "TEMP", ADC_TEMP_CHANNEL);
+#if MCUJS_REGISTRY_ADC_VSYS
     js_set_number(adc, "VSYS", 3);
-
+#endif
     return adc;
 }
 

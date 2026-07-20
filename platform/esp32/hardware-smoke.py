@@ -4,13 +4,106 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import os
 from pathlib import Path
 import re
+import stat
 import time
 
 import serial
 
 PROMPT = "\r\n> "
+SG_IO = 0x2285
+SG_DXFER_NONE = -1
+
+
+class SgIoHeader(ctypes.Structure):
+    _fields_ = [
+        ("interface_id", ctypes.c_int),
+        ("dxfer_direction", ctypes.c_int),
+        ("cmd_len", ctypes.c_ubyte),
+        ("mx_sb_len", ctypes.c_ubyte),
+        ("iovec_count", ctypes.c_ushort),
+        ("dxfer_len", ctypes.c_uint),
+        ("dxferp", ctypes.c_void_p),
+        ("cmdp", ctypes.c_void_p),
+        ("sbp", ctypes.c_void_p),
+        ("timeout", ctypes.c_uint),
+        ("flags", ctypes.c_uint),
+        ("pack_id", ctypes.c_int),
+        ("usr_ptr", ctypes.c_void_p),
+        ("status", ctypes.c_ubyte),
+        ("masked_status", ctypes.c_ubyte),
+        ("msg_status", ctypes.c_ubyte),
+        ("sb_len_wr", ctypes.c_ubyte),
+        ("host_status", ctypes.c_ushort),
+        ("driver_status", ctypes.c_ushort),
+        ("resid", ctypes.c_int),
+        ("duration", ctypes.c_uint),
+        ("info", ctypes.c_uint),
+    ]
+
+
+def eject_storage(path: Path) -> None:
+    allowed_aliases = {
+        "/dev/mcujs-dev-disk",
+        "/dev/disk/by-id/usb-MCUJS_Runtime_Disk_MCUJS-DEV-0:0",
+    }
+    if str(path) not in allowed_aliases:
+        raise ValueError(f"refusing non-development-board disk alias: {path}")
+    resolved = path.resolve(strict=True)
+    device_stat = resolved.stat()
+    if not stat.S_ISBLK(device_stat.st_mode):
+        raise ValueError(f"MSC path is not a block device: {resolved}")
+
+    sys_block = Path("/sys/class/block") / resolved.name
+    vendor = (sys_block / "device/vendor").read_text().strip()
+    model = (sys_block / "device/model").read_text().strip()
+    size_bytes = int((sys_block / "size").read_text().strip()) * 512
+    if (
+        vendor != "MCUJS"
+        or model != "Runtime Disk"
+        or (
+            size_bytes != 0
+            and not 1024 * 1024 <= size_bytes <= 16 * 1024 * 1024
+        )
+    ):
+        raise ValueError(
+            f"refusing unexpected MSC device: vendor={vendor!r}, model={model!r}, "
+            f"size={size_bytes}"
+        )
+    if size_bytes == 0:
+        print(f"PASS: exact MCU.js runtime disk is already ejected: {path}")
+        return
+
+    command = (ctypes.c_ubyte * 6)(0x1B, 0, 0, 0, 0x02, 0)
+    sense = (ctypes.c_ubyte * 32)()
+    header = SgIoHeader(
+        interface_id=ord("S"),
+        dxfer_direction=SG_DXFER_NONE,
+        cmd_len=len(command),
+        mx_sb_len=len(sense),
+        cmdp=ctypes.cast(command, ctypes.c_void_p),
+        sbp=ctypes.cast(sense, ctypes.c_void_p),
+        timeout=5000,
+    )
+    descriptor = os.open(resolved, os.O_RDWR | os.O_CLOEXEC)
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        result = libc.ioctl(descriptor, SG_IO, ctypes.byref(header))
+        if result < 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error), str(resolved))
+    finally:
+        os.close(descriptor)
+    if header.status or header.host_status or header.driver_status:
+        raise OSError(
+            f"SCSI eject failed: status={header.status}, host={header.host_status}, "
+            f"driver={header.driver_status}"
+        )
+    print(f"PASS: ejected exact MCU.js runtime disk {path} ({size_bytes} bytes)")
+
 
 def wait_for_device(path: Path, timeout: float = 20.0) -> None:
     deadline = time.monotonic() + timeout
@@ -141,10 +234,12 @@ def verify_help_surface(port: serial.Serial) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", default="/dev/mcujs-dev")
+    parser.add_argument("--disk", default="/dev/mcujs-dev-disk")
     parser.add_argument("--resets", type=int, default=2)
     args = parser.parse_args()
 
     path = Path(args.port)
+    disk_path = Path(args.disk)
     port = open_console(path)
     try:
         verify_repl_crlf_and_completion(port)
@@ -159,14 +254,29 @@ def main() -> int:
         )
         evaluate(
             port,
+            "try{GPIO.set(21,1);false}catch(e){e instanceof TypeError}",
+            "true",
+        )
+        evaluate(
+            port,
+            "try{GPIO.get(3);false}catch(e){e.code==='EBUSY'}",
+            "true",
+        )
+        evaluate(
+            port,
             "try { GPIO.init(26, GPIO.OUTPUT); 'unsafe-open' } catch(e) { 'unsafe-rejected' }",
             "'unsafe-rejected'",
+        )
+        evaluate(
+            port,
+            "try{board.led(1);false}catch(e){e instanceof TypeError}",
+            "true",
         )
         evaluate(port, "board.led(true); board.led()", "true")
         evaluate(
             port,
             "require('mcujs:module').builtinModules.join(',')",
-            "'fs,process,gpio,pwm,i2c,spi,adc,neopixel,mcujs:module,node:module'",
+            "'board,fs,process,gpio,pwm,i2c,spi,adc,neopixel,mcujs:module,node:module'",
         )
         evaluate(
             port,
@@ -188,9 +298,22 @@ def main() -> int:
         )
         evaluate(
             port,
-            "var pwm=require('pwm');pwm.init(1,1000);pwm.setDuty(1,0.5);"
-            "var busy=false;try{GPIO.init(1,GPIO.OUTPUT)}catch(e){busy=true}"
-            "pwm.stop(1);GPIO.init(1,GPIO.OUTPUT);busy",
+            "var pwm=require('pwm');GPIO.init(1,GPIO.OUTPUT);pwm.init(1,1000);true",
+            "true",
+        )
+        evaluate(
+            port,
+            "try{GPIO.set(1,true);false}catch(e){e.code==='EBUSY'}",
+            "true",
+        )
+        evaluate(
+            port,
+            "pwm.stop(1);try{GPIO.set(1,true);false}catch(e){e.code==='EBUSY'}",
+            "true",
+        )
+        evaluate(
+            port,
+            "GPIO.init(1,GPIO.OUTPUT);GPIO.set(1,true);true",
             "true",
         )
         evaluate(
@@ -200,7 +323,7 @@ def main() -> int:
         )
         evaluate(
             port,
-            "var ps=[[1,1000],[3,2000],[4,3000],[5,4000]];"
+            "var ps=[[1,1000],[3,1300],[4,2000],[5,4000]];"
             "ps.forEach(function(x){pwm.init(x[0],x[1])});"
             "var exhausted=false;try{pwm.init(6,5000)}catch(e){exhausted=true}exhausted",
             "true",
@@ -274,6 +397,9 @@ def main() -> int:
         evaluate(port, "zeroTicks >= 2", "true")
         print("PASS: zero-delay interval remained repeating and was cleared")
 
+        wait_for_device(disk_path)
+        eject_storage(disk_path)
+        time.sleep(0.2)
         evaluate(port, "board.storageReady()", "true")
         evaluate(port, "board.safeMode()", "false")
         evaluate(
@@ -349,6 +475,9 @@ def main() -> int:
                 raise AssertionError(
                     f"reset did not restart uptime: before={uptime_before}, after={uptime_after}"
                 )
+            wait_for_device(disk_path)
+            eject_storage(disk_path)
+            time.sleep(0.2)
             evaluate(port, "2 + 2", "4")
             evaluate(port, "require('fs').readFileSync('/m3/persist.txt')", "'alpha-beta'")
             print(

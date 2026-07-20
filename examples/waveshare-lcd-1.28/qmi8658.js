@@ -61,7 +61,7 @@ function createIMUDriver(options) {
   var i2cBus = options.i2cBus !== undefined ? options.i2cBus : DEFAULT_PINS.i2cBus;
   var sda = options.sda !== undefined ? options.sda : DEFAULT_PINS.sda;
   var scl = options.scl !== undefined ? options.scl : DEFAULT_PINS.scl;
-  var baudrate = options.baudrate || 400000;
+  var baudrate = options.baudrate || 250000;  // Exact 250 kHz at 125 MHz clk_peri
   
   var initialized = false;
   var accScale = 2.0;   // g per LSB divisor

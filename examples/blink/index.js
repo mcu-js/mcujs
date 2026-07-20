@@ -1,23 +1,40 @@
-// LED Blink Example for mcujs
-// Copy this file to your Pico as index.js
-//
-// This blinks the onboard LED on Pico (GPIO 25)
+// Blink the declared onboard LED without board-name or hard-coded pin checks.
+// Re-running this file replaces the previous timers. The demo stops after 30s.
+(function () {
+    if (globalThis.blinkInterval !== undefined) clearInterval(globalThis.blinkInterval);
+    if (globalThis.blinkTimeout !== undefined) clearTimeout(globalThis.blinkTimeout);
 
-const LED_PIN = 25;  // Onboard LED on Pico/Pico 2
+    var boardApi = require('board');
+    var led = boardApi.devices.led;
+    if (!led) {
+        console.log('This board has no onboard LED.');
+        return;
+    }
 
-// Initialize LED pin as output
-GPIO.init(LED_PIN, GPIO.OUTPUT);
+    var writeLed;
+    if (led.type === 'gpio') {
+        var gpio = require('gpio');
+        gpio.init(led.pin, gpio.OUTPUT);
+        writeLed = function (on) {
+            gpio.set(led.pin, led.activeLow ? !on : on);
+        };
+    } else {
+        writeLed = function (on) { boardApi.led(on); };
+    }
 
-console.log("Blink example starting...");
-console.log("LED pin:", LED_PIN);
-
-// Blink LED every 500ms
-let ledState = false;
-
-setInterval(() => {
-    ledState = !ledState;
-    GPIO.set(LED_PIN, ledState);
-    console.log("LED:", ledState ? "ON" : "OFF");
-}, 500);
-
-console.log("Blinking LED on GPIO", LED_PIN);
+    globalThis.blinkLedOn = false;
+    writeLed(false);
+    console.log('Blinking onboard LED every 500 ms.');
+    globalThis.blinkInterval = setInterval(function () {
+        globalThis.blinkLedOn = !globalThis.blinkLedOn;
+        writeLed(globalThis.blinkLedOn);
+    }, 500);
+    globalThis.blinkTimeout = setTimeout(function () {
+        clearInterval(globalThis.blinkInterval);
+        globalThis.blinkInterval = undefined;
+        globalThis.blinkTimeout = undefined;
+        globalThis.blinkLedOn = false;
+        writeLed(false);
+        console.log('Demo complete!');
+    }, 30000);
+}());

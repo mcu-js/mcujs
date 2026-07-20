@@ -46,7 +46,7 @@
 
 #define MCUJS_SPI1_SCK_PIN      10
 #define MCUJS_SPI1_MOSI_PIN     11
-#define MCUJS_SPI1_MISO_PIN      2
+#define MCUJS_SPI1_MISO_PIN     12
 #define MCUJS_SPI1_CS_PIN       9
 
 /* LCD pins (GC9A01A) - from Waveshare official DEV_Config.h */

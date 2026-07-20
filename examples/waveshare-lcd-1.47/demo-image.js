@@ -13,7 +13,7 @@ var pins = {
   spiBus: 0,
   sck: 18,
   mosi: 19,
-  miso: 255,
+  miso: 0,
   cs: 17,
   dc: 16,
   rst: 20,
@@ -29,17 +29,17 @@ var buffer = graphics.createBuffer({ width: WIDTH, height: HEIGHT });
 
 // SPI helpers
 function cmd(c) {
-  GPIO.set(pins.dc, 0);
-  GPIO.set(pins.cs, 0);
+  GPIO.set(pins.dc, false);
+  GPIO.set(pins.cs, false);
   SPI.transfer(pins.spiBus, c);
-  GPIO.set(pins.cs, 1);
+  GPIO.set(pins.cs, true);
 }
 
 function dat(d) {
-  GPIO.set(pins.dc, 1);
-  GPIO.set(pins.cs, 0);
+  GPIO.set(pins.dc, true);
+  GPIO.set(pins.cs, false);
   SPI.transfer(pins.spiBus, d);
-  GPIO.set(pins.cs, 1);
+  GPIO.set(pins.cs, true);
 }
 
 // Initialize display
@@ -48,19 +48,19 @@ function initDisplay() {
   GPIO.init(pins.dc, GPIO.OUTPUT);
   GPIO.init(pins.rst, GPIO.OUTPUT);
   GPIO.init(pins.bl, GPIO.OUTPUT);
-  GPIO.set(pins.cs, 1);
-  GPIO.set(pins.bl, 0);
+  GPIO.set(pins.cs, true);
+  GPIO.set(pins.bl, false);
   
   // Hardware reset
-  GPIO.set(pins.rst, 1);
+  GPIO.set(pins.rst, true);
   board.delay(100);
-  GPIO.set(pins.rst, 0);
+  GPIO.set(pins.rst, false);
   board.delay(100);
-  GPIO.set(pins.rst, 1);
+  GPIO.set(pins.rst, true);
   board.delay(100);
   
   // Initialize SPI
-  SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 40000000);
+  SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 37500000);
   
   // Sleep out
   cmd(0x11);
@@ -94,7 +94,7 @@ function initDisplay() {
   board.delay(20);
   
   // Backlight on
-  GPIO.set(pins.bl, 1);
+  GPIO.set(pins.bl, true);
 }
 
 // Set display window
@@ -118,10 +118,10 @@ function setWindow(x, y, w, h) {
 // Flush buffer to display
 function flush() {
   setWindow(0, 0, WIDTH, HEIGHT);
-  GPIO.set(pins.dc, 1);
-  GPIO.set(pins.cs, 0);
+  GPIO.set(pins.dc, true);
+  GPIO.set(pins.cs, false);
   SPI.writeBufferDMA(pins.spiBus, buffer, WIDTH * HEIGHT * 2);
-  GPIO.set(pins.cs, 1);
+  GPIO.set(pins.cs, true);
 }
 
 // Main demo

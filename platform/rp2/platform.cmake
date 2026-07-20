@@ -45,6 +45,7 @@ set(MCUJS_PLATFORM_HARDWARE_BINDING_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/bindings/spi.c
     ${CMAKE_CURRENT_LIST_DIR}/bindings/adc.c
     ${CMAKE_CURRENT_LIST_DIR}/bindings/neopixel.c
+    ${CMAKE_CURRENT_LIST_DIR}/bindings/onboard_led.c
     ${CMAKE_CURRENT_LIST_DIR}/bindings/board.c
 )
 

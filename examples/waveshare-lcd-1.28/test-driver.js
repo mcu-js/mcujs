@@ -19,29 +19,29 @@ GPIO.init(cs, GPIO.OUTPUT);
 GPIO.init(dc, GPIO.OUTPUT);
 GPIO.init(rst, GPIO.OUTPUT);
 GPIO.init(bl, GPIO.OUTPUT);
-GPIO.set(cs, 1);
-GPIO.set(bl, 0);
-GPIO.set(rst, 1);
+GPIO.set(cs, true);
+GPIO.set(bl, false);
+GPIO.set(rst, true);
 
 // Initialize SPI
-SPI.init(spiBus, DEFAULT_PINS.sck, DEFAULT_PINS.mosi, DEFAULT_PINS.miso, 40000000);
+SPI.init(spiBus, DEFAULT_PINS.sck, DEFAULT_PINS.mosi, DEFAULT_PINS.miso, 31250000);
 
 // Hardware reset - CS goes LOW after reset
-GPIO.set(rst, 1);
+GPIO.set(rst, true);
 board.delay(100);
-GPIO.set(rst, 0);
+GPIO.set(rst, false);
 board.delay(100);
-GPIO.set(rst, 1);
-GPIO.set(cs, 0);  // CS LOW - stays low
+GPIO.set(rst, true);
+GPIO.set(cs, false);  // CS LOW - stays low
 board.delay(100);
 
 function cmd(c) {
-  GPIO.set(dc, 0);
+  GPIO.set(dc, false);
   SPI.transfer(spiBus, c);
 }
 
 function dat(d) {
-  GPIO.set(dc, 1);
+  GPIO.set(dc, true);
   SPI.transfer(spiBus, d);
 }
 
@@ -103,7 +103,7 @@ cmd(0x11);
 board.delay(120);
 cmd(0x29);
 board.delay(20);
-GPIO.set(bl, 1);
+GPIO.set(bl, true);
 console.log('Display initialized');
 
 // Create a graphics buffer
@@ -131,7 +131,7 @@ console.log('Flushing to display via DMA...');
 cmd(0x2A); dat(0x00); dat(0x00); dat(0x00); dat(0xEF);
 cmd(0x2B); dat(0x00); dat(0x00); dat(0x00); dat(0xEF);
 cmd(0x2C);
-GPIO.set(dc, 1);
+GPIO.set(dc, true);
 SPI.writeBufferDMA(spiBus, buf, 240 * 240 * 2);
 
 console.log('=== Test Complete ===');

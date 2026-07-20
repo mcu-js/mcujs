@@ -43,8 +43,8 @@ function pinAliases(exposedPins, additions = {}) {
   return { ...pins, ...additions };
 }
 
-function gpioCapability(pins) {
-  return { pins: [...pins], outputPins: [...pins], modes: ["input", "output", "inputPullup", "inputPulldown"] };
+function gpioCapability(pins, outputPins = pins) {
+  return { pins: [...pins], outputPins: [...outputPins], modes: ["input", "output", "inputPullup", "inputPulldown"] };
 }
 
 function rpPwmSlice(pin) {
@@ -152,7 +152,7 @@ const rpFeatureMaps = Object.freeze({
     "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "storageReady",
   ),
   "waveshare_rp2350_lcd_1.47_a": featureMap(
-    "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "neopixel",
+    "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "neopixel",
     "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardNeopixel", "storageReady",
   ),
   "waveshare_rp2350_touch_lcd_1.69": featureMap(
@@ -173,6 +173,7 @@ function rpDescriptor({
   devices = {},
   features,
   gpioPins = exposedPins,
+  gpioOutputPins = gpioPins,
   pwmPins = gpioPins,
   adcPins = [26, 27, 28],
   adcAliases = { 26: "A0", 27: "A1", 28: "A2" },
@@ -184,7 +185,7 @@ function rpDescriptor({
   neopixelPins = gpioPins,
 }) {
   const capabilities = {
-    gpio: gpioCapability(gpioPins),
+    gpio: gpioCapability(gpioPins, gpioOutputPins),
     pwm: pwmCapability(pwmPins, chip),
     fs: { implementation: "fat", writable: true, hostTransfer: true },
     usb: { classes: ["cdc", "msc", "keyboardHid", "mouseHid"] },
@@ -256,31 +257,46 @@ const boardDescriptors = {
   "waveshare_rp2040_touch_lcd_1.28": rpDescriptor({
     name: "waveshare_rp2040_touch_lcd_1.28", chip: "RP2040",
     features: rpFeatureMaps["waveshare_rp2040_touch_lcd_1.28"],
-    exposedPins: [...pinsBetween(0, 5), 14, 15, 16, 17, 18, 19, 20, 26, 27, 28],
-    aliases: pinAliases([...pinsBetween(0, 5), 14, 15, 16, 17, 18, 19, 20, 26, 27, 28], {
-      A0: 26, A1: 27, A2: 28, SDA: 4, SCL: 5, SCK: 18, MOSI: 19, MISO: 16,
+    exposedPins: pinsBetween(0, 28),
+    aliases: pinAliases(pinsBetween(0, 28), {
+      A0: 26, A1: 27, A2: 28, SDA: 6, SCL: 7, SCK: 10, MOSI: 11, MISO: 12,
     }),
-    i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }],
-    spiRoutes: [{ bus: 0, sck: 18, mosi: 19, miso: 16 }],
+    i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }],
+    i2cDefaultBus: 1,
+    spiRoutes: [{ bus: 1, sck: 10, mosi: 11, miso: 12 }],
+    spiDefaultBus: 1,
+    gpioOutputPins: [...pinsBetween(0, 20), 22, 25, 26, 27, 28],
+    pwmPins: [...pinsBetween(0, 5), 14, 15, 16, 17, 18, 19, 20, 26, 27, 28],
+    neopixelPins: [...pinsBetween(0, 5), 14, 15, 16, 17, 18, 19, 20, 26, 27, 28],
   }),
   "waveshare_rp2350_lcd_1.47_a": rpDescriptor({
     name: "waveshare_rp2350_lcd_1.47_a", chip: "RP2350",
     features: rpFeatureMaps["waveshare_rp2350_lcd_1.47_a"],
-    exposedPins: [...pinsBetween(0, 9), 14, 22],
-    aliases: pinAliases([...pinsBetween(0, 9), 14, 22], { SDA: 4, SCL: 5, NEOPIXEL: 22 }),
+    exposedPins: [...pinsBetween(0, 9), 14, 16, 17, 18, 19, 20, 21, 22],
+    aliases: pinAliases([...pinsBetween(0, 9), 14, 16, 17, 18, 19, 20, 21, 22], {
+      SDA: 4, SCL: 5, SCK: 18, MOSI: 19, MISO: 0, NEOPIXEL: 22,
+    }),
     devices: { neopixel: { type: "neopixel", pin: 22, length: 1, order: "GRB" } },
 
     i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }],
+    spiRoutes: [{ bus: 0, sck: 18, mosi: 19, miso: 0 }],
+    pwmPins: [...pinsBetween(0, 9), 14, 22],
+    neopixelPins: [...pinsBetween(0, 9), 14, 22],
   }),
   "waveshare_rp2350_touch_lcd_1.69": rpDescriptor({
     name: "waveshare_rp2350_touch_lcd_1.69", chip: "RP2350",
     features: rpFeatureMaps["waveshare_rp2350_touch_lcd_1.69"],
-    exposedPins: [0, 1, 4, 5, 16, 17, 18, 19, 26, 27, 28],
-    aliases: pinAliases([0, 1, 4, 5, 16, 17, 18, 19, 26, 27, 28], {
-      A0: 26, A1: 27, A2: 28, SDA: 4, SCL: 5, SCK: 18, MOSI: 19, MISO: 16,
+    exposedPins: [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28],
+    aliases: pinAliases([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28], {
+      A0: 26, A1: 27, A2: 28, SDA: 6, SCL: 7, SCK: 10, MOSI: 11, MISO: 12,
     }),
-    i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }],
-    spiRoutes: [{ bus: 0, sck: 18, mosi: 19, miso: 16 }],
+    i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }],
+    i2cDefaultBus: 1,
+    spiRoutes: [{ bus: 1, sck: 10, mosi: 11, miso: 12 }],
+    spiDefaultBus: 1,
+    gpioOutputPins: [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 22, 25, 26, 27, 28],
+    pwmPins: [0, 1, 4, 5, 16, 17, 18, 19, 26, 27, 28],
+    neopixelPins: [0, 1, 4, 5, 16, 17, 18, 19, 26, 27, 28],
   }),
   adafruit_feather_rp2040: rpDescriptor({
     name: "adafruit_feather_rp2040", chip: "RP2040",

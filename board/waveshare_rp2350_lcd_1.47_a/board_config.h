@@ -43,7 +43,7 @@
 /* SPI0 - LCD */
 #define MCUJS_SPI0_SCK_PIN      18
 #define MCUJS_SPI0_MOSI_PIN     19
-#define MCUJS_SPI0_MISO_PIN     255  /* Not used for LCD */
+#define MCUJS_SPI0_MISO_PIN     0    /* Declared full-duplex route; LCD ignores RX */
 #define MCUJS_SPI0_CS_PIN       17
 
 /* SPI1 - SD Card */
@@ -56,7 +56,7 @@
 #define MCUJS_LCD_SPI_BUS       0
 #define MCUJS_LCD_SCK_PIN       18
 #define MCUJS_LCD_MOSI_PIN      19
-#define MCUJS_LCD_MISO_PIN      255  /* Not used */
+#define MCUJS_LCD_MISO_PIN      0    /* Declared full-duplex route; LCD ignores RX */
 #define MCUJS_LCD_CS_PIN        17
 #define MCUJS_LCD_DC_PIN        16
 #define MCUJS_LCD_RST_PIN       20

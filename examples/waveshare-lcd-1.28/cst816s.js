@@ -43,7 +43,7 @@ function createTouchDriver(options) {
   var scl = options.scl !== undefined ? options.scl : DEFAULT_PINS.scl;
   var intPin = options.intPin !== undefined ? options.intPin : DEFAULT_PINS.intPin;
   var rstPin = options.rstPin !== undefined ? options.rstPin : DEFAULT_PINS.rstPin;
-  var baudrate = options.baudrate || 400000;  // 400 kHz
+  var baudrate = options.baudrate || 250000;  // Exact 250 kHz at 125 MHz clk_peri
   
   var initialized = false;
   
@@ -67,9 +67,9 @@ function createTouchDriver(options) {
   
   // Hardware reset
   function reset() {
-    GPIO.set(rstPin, 0);
+    GPIO.set(rstPin, false);
     board.delay(10);
-    GPIO.set(rstPin, 1);
+    GPIO.set(rstPin, true);
     board.delay(50);
   }
   
@@ -79,7 +79,7 @@ function createTouchDriver(options) {
     
     // Initialize reset pin
     GPIO.init(rstPin, GPIO.OUTPUT);
-    GPIO.set(rstPin, 1);
+    GPIO.set(rstPin, true);
     
     // Initialize interrupt pin (optional, for detecting touch)
     GPIO.init(intPin, GPIO.INPUT);
@@ -101,7 +101,7 @@ function createTouchDriver(options) {
   // Check if touch is detected
   function isTouched() {
     // INT pin goes low when touched (active low)
-    return GPIO.get(intPin) === 0;
+    return !GPIO.get(intPin);
   }
   
   // Read touch data

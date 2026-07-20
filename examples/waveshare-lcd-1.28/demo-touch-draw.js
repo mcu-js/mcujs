@@ -8,19 +8,19 @@ var W = 240, H = 240;
 var pins = { spiBus: 1, sck: 10, mosi: 11, miso: 12, cs: 9, dc: 8, rst: 13, bl: 25 };
 var buf = graphics.createBuffer({ width: W, height: H });
 
-function cmd(c) { GPIO.set(pins.dc, 0); SPI.transfer(pins.spiBus, c); }
-function dat(d) { GPIO.set(pins.dc, 1); SPI.transfer(pins.spiBus, d); }
+function cmd(c) { GPIO.set(pins.dc, false); SPI.transfer(pins.spiBus, c); }
+function dat(d) { GPIO.set(pins.dc, true); SPI.transfer(pins.spiBus, d); }
 
 function initScreen() {
   GPIO.init(pins.cs, GPIO.OUTPUT);
   GPIO.init(pins.dc, GPIO.OUTPUT);
   GPIO.init(pins.rst, GPIO.OUTPUT);
   GPIO.init(pins.bl, GPIO.OUTPUT);
-  GPIO.set(pins.cs, 1); GPIO.set(pins.bl, 0); GPIO.set(pins.rst, 1);
-  SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 40000000);
-  GPIO.set(pins.rst, 1); board.delay(100);
-  GPIO.set(pins.rst, 0); board.delay(100);
-  GPIO.set(pins.rst, 1); GPIO.set(pins.cs, 0); board.delay(100);
+  GPIO.set(pins.cs, true); GPIO.set(pins.bl, false); GPIO.set(pins.rst, true);
+  SPI.init(pins.spiBus, pins.sck, pins.mosi, pins.miso, 31250000);
+  GPIO.set(pins.rst, true); board.delay(100);
+  GPIO.set(pins.rst, false); board.delay(100);
+  GPIO.set(pins.rst, true); GPIO.set(pins.cs, false); board.delay(100);
   cmd(0xEF);cmd(0xEB);dat(0x14);cmd(0xFE);cmd(0xEF);cmd(0xEB);dat(0x14);
   cmd(0x84);dat(0x40);cmd(0x85);dat(0xFF);cmd(0x86);dat(0xFF);cmd(0x87);dat(0xFF);
   cmd(0x88);dat(0x0A);cmd(0x89);dat(0x21);cmd(0x8A);dat(0x00);cmd(0x8B);dat(0x80);
@@ -48,16 +48,16 @@ function initScreen() {
   graphics.fill(buf, 0x0000);
   cmd(0x2A);dat(0x00);dat(0x00);dat(0x00);dat(W-1);
   cmd(0x2B);dat(0x00);dat(0x00);dat(0x00);dat(H-1);
-  cmd(0x2C);GPIO.set(pins.dc, 1);
+  cmd(0x2C);GPIO.set(pins.dc, true);
   SPI.writeBufferDMA(pins.spiBus, buf, W*H*2);
   cmd(0x29); board.delay(20);
-  GPIO.set(pins.bl, 1);
+  GPIO.set(pins.bl, true);
 }
 
 function flush() {
   cmd(0x2A);dat(0x00);dat(0x00);dat(0x00);dat(W-1);
   cmd(0x2B);dat(0x00);dat(0x00);dat(0x00);dat(H-1);
-  cmd(0x2C);GPIO.set(pins.dc, 1);
+  cmd(0x2C);GPIO.set(pins.dc, true);
   SPI.writeBufferDMA(pins.spiBus, buf, W*H*2);
 }
 
@@ -84,18 +84,18 @@ var touchPins = { i2cBus: 1, sda: 6, scl: 7, intPin: 21, rstPin: 22 };
 function initTouch() {
   // Init reset pin
   GPIO.init(touchPins.rstPin, GPIO.OUTPUT);
-  GPIO.set(touchPins.rstPin, 1);
+  GPIO.set(touchPins.rstPin, true);
   
   // Init interrupt pin
   GPIO.init(touchPins.intPin, GPIO.INPUT);
   
   // Init I2C
-  I2C.init(touchPins.i2cBus, touchPins.sda, touchPins.scl, 400000);
+  I2C.init(touchPins.i2cBus, touchPins.sda, touchPins.scl, 250000);
   
   // Reset touch controller
-  GPIO.set(touchPins.rstPin, 0);
+  GPIO.set(touchPins.rstPin, false);
   board.delay(10);
-  GPIO.set(touchPins.rstPin, 1);
+  GPIO.set(touchPins.rstPin, true);
   board.delay(50);
   
   console.log('Touch initialized');

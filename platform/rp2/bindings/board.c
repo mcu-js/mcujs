@@ -6,12 +6,14 @@
 
 #include "bindings.h"
 #include "runtime_features.h"
+#include "validation.h"
 #include "jerryscript.h"
 #include "board_config.h"
 #include "board.h"
 #include "fs.h"
 #include "usb/usb_cdc.h"
 #include "neopixel.h"
+#include "onboard_led.h"
 
 #include <stdio.h>
 #include "pico/stdlib.h"
@@ -149,16 +151,18 @@ static jerry_value_t board_storage_ready_handler(const jerry_call_info_t *call_i
     return jerry_boolean(!fs_host_owned());
 }
 
-/*
- * board.led(on)
- * Control the onboard LED
- */
+#if MCUJS_REGISTRY_ONBOARD_LED
+#if !MCUJS_HAS_CYW43 && MCUJS_LED_PIN == 255
+#error "Onboard LED registry entry requires CYW43 or a GPIO LED pin"
+#endif
+
+/* board.led(on) controls only a physically declared onboard LED. */
+#if MCUJS_HAS_CYW43
 static jerry_value_t board_led_handler(const jerry_call_info_t *call_info_p,
                                         const jerry_value_t args[],
                                         const jerry_length_t argc) {
     (void)call_info_p;
 
-#if MCUJS_HAS_CYW43
     /* Pico W / Pico 2 W - LED is on CYW43 chip */
     static bool cyw43_led_state = false;
     
@@ -167,54 +171,68 @@ static jerry_value_t board_led_handler(const jerry_call_info_t *call_info_p,
         return jerry_boolean(cyw43_led_state);
     }
 
-    cyw43_led_state = jerry_value_to_boolean(args[0]);
+    bool on;
+    mcujs_arg_status_t status = mcujs_get_boolean(args, argc, 0, &on);
+    if (status != MCUJS_ARG_OK) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE, "LED state must be boolean");
+    }
+    cyw43_led_state = on;
     cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, cyw43_led_state ? 1 : 0);
 
     return jerry_undefined();
-#elif MCUJS_LED_PIN == 255
-    (void)args;
-    (void)argc;
-    return jerry_undefined();
-#else
-    if (argc < 1) {
-        /* No argument - return current state */
-        return jerry_boolean(gpio_get(MCUJS_LED_PIN));
-    }
-
-    bool on = jerry_value_to_boolean(args[0]);
-    gpio_put(MCUJS_LED_PIN, on ? 1 : 0);
-
-    return jerry_undefined();
-#endif
 }
+#else
+#define board_led_handler mcujs_rp2_board_led_handler
+#endif
+#endif
 
 #if MCUJS_HAS_NEOPIXEL
-static uint8_t board_neopixel_get_array_value(jerry_value_t array, uint32_t index) {
-    char index_str[8];
-    snprintf(index_str, sizeof(index_str), "%u", index);
-    jerry_value_t key = jerry_string_sz(index_str);
-    jerry_value_t val = jerry_object_get(array, key);
-    jerry_value_free(key);
+typedef struct {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+} board_neopixel_color_t;
 
-    uint8_t out = 0;
-    if (jerry_value_is_number(val)) {
-        out = (uint8_t)jerry_value_as_number(val);
+static jerry_value_t board_neopixel_get_array_value(jerry_value_t array,
+                                                     uint32_t index,
+                                                     uint8_t *out) {
+    jerry_value_t value = jerry_object_get_index(array, index);
+    if (jerry_value_is_exception(value)) return value;
+    if (jerry_value_is_undefined(value)) {
+        *out = 0;
+        jerry_value_free(value);
+        return jerry_undefined();
     }
-    jerry_value_free(val);
-    return out;
+    mcujs_arg_status_t status = mcujs_value_to_byte(value, out);
+    jerry_value_free(value);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status,
+                              "NeoPixel colors must be finite numbers",
+                              "NeoPixel colors must be integers 0..255");
+    }
+    return jerry_undefined();
 }
 
-static uint8_t board_neopixel_get_object_value(jerry_value_t obj, const char *key_name) {
+static jerry_value_t board_neopixel_get_object_value(jerry_value_t obj,
+                                                      const char *key_name,
+                                                      uint8_t *out) {
     jerry_value_t key = jerry_string_sz(key_name);
-    jerry_value_t val = jerry_object_get(obj, key);
+    jerry_value_t value = jerry_object_get(obj, key);
     jerry_value_free(key);
-
-    uint8_t out = 0;
-    if (jerry_value_is_number(val)) {
-        out = (uint8_t)jerry_value_as_number(val);
+    if (jerry_value_is_exception(value)) return value;
+    if (jerry_value_is_undefined(value)) {
+        *out = 0;
+        jerry_value_free(value);
+        return jerry_undefined();
     }
-    jerry_value_free(val);
-    return out;
+    mcujs_arg_status_t status = mcujs_value_to_byte(value, out);
+    jerry_value_free(value);
+    if (status != MCUJS_ARG_OK) {
+        return mcujs_throw_arg(status,
+                              "NeoPixel colors must be finite numbers",
+                              "NeoPixel colors must be integers 0..255");
+    }
+    return jerry_undefined();
 }
 
 /*
@@ -234,39 +252,72 @@ static void board_neopixel_set_pixel_rgb(uint32_t index, uint8_t r, uint8_t g, u
  * Helper: Set a single pixel from RGB object {r, g, b}.
  * Object keys always represent logical RGB.
  */
-static void board_neopixel_set_from_object(uint32_t index, jerry_value_t obj) {
-    uint8_t r = board_neopixel_get_object_value(obj, "r");
-    uint8_t g = board_neopixel_get_object_value(obj, "g");
-    uint8_t b = board_neopixel_get_object_value(obj, "b");
-    board_neopixel_set_pixel_rgb(index, r, g, b);
+static jerry_value_t board_neopixel_parse_object(
+    jerry_value_t object, board_neopixel_color_t *color) {
+    jerry_value_t keys = jerry_object_keys(object);
+    if (jerry_value_is_exception(keys)) return keys;
+    uint32_t key_count = jerry_array_length(keys);
+    for (uint32_t i = 0; i < key_count; i++) {
+        jerry_value_t key = jerry_object_get_index(keys, i);
+        if (jerry_value_is_exception(key)) {
+            jerry_value_free(keys);
+            return key;
+        }
+        jerry_size_t size = jerry_string_size(key, JERRY_ENCODING_UTF8);
+        char name[2] = {0};
+        if (size == 1) {
+            jerry_string_to_buffer(key, JERRY_ENCODING_UTF8,
+                                   (jerry_char_t *)name, size);
+        }
+        jerry_value_free(key);
+        if (size != 1 || (name[0] != 'r' && name[0] != 'g' && name[0] != 'b')) {
+            jerry_value_free(keys);
+            return jerry_throw_sz(JERRY_ERROR_RANGE,
+                                  "NeoPixel color objects allow only r, g, and b");
+        }
+    }
+    jerry_value_free(keys);
+
+    jerry_value_t result =
+        board_neopixel_get_object_value(object, "r", &color->r);
+    if (jerry_value_is_exception(result)) return result;
+    jerry_value_free(result);
+    result = board_neopixel_get_object_value(object, "g", &color->g);
+    if (jerry_value_is_exception(result)) return result;
+    jerry_value_free(result);
+    return board_neopixel_get_object_value(object, "b", &color->b);
 }
 
 /*
  * Helper: Set a single pixel from array [v0, v1, v2].
- * Array positions match the runtime-configured order from neopixel.init():
+ * Array positions match the onboard device's declared order:
  * - If order is 'GRB': [G, R, B] - index 0 is green, index 1 is red, index 2 is blue
  * - If order is 'RGB': [R, G, B] - index 0 is red, index 1 is green, index 2 is blue
  * After extracting logical RGB, uses board's compile-time order for wire conversion.
  */
-static void board_neopixel_set_from_array(uint32_t index, jerry_value_t arr) {
-    jerry_length_t length = jerry_array_length(arr);
-    uint8_t v0 = length > 0 ? board_neopixel_get_array_value(arr, 0) : 0;
-    uint8_t v1 = length > 1 ? board_neopixel_get_array_value(arr, 1) : 0;
-    uint8_t v2 = length > 2 ? board_neopixel_get_array_value(arr, 2) : 0;
-    
-    uint8_t r, g, b;
-    
-    /* Extract logical RGB based on runtime-configured order */
-    if (neopixel_is_grb()) {
+static jerry_value_t board_neopixel_parse_array(
+    jerry_value_t array, board_neopixel_color_t *color, bool grb) {
+    jerry_length_t length = jerry_array_length(array);
+    if (length > 3) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "NeoPixel color arrays contain at most three bytes");
+    }
+    uint8_t values[3] = {0, 0, 0};
+    for (jerry_length_t i = 0; i < length; i++) {
+        jerry_value_t result =
+            board_neopixel_get_array_value(array, i, &values[i]);
+        if (jerry_value_is_exception(result)) return result;
+        jerry_value_free(result);
+    }
+    /* Extract logical RGB based on the onboard device's declared order. */
+    if (grb) {
         /* User specified GRB: [G, R, B] */
-        g = v0; r = v1; b = v2;
+        color->g = values[0]; color->r = values[1]; color->b = values[2];
     } else {
         /* User specified RGB: [R, G, B] */
-        r = v0; g = v1; b = v2;
+        color->r = values[0]; color->g = values[1]; color->b = values[2];
     }
-    
-    /* Use board's compile-time order for wire conversion */
-    board_neopixel_set_pixel_rgb(index, r, g, b);
+    return jerry_undefined();
 }
 
 /*
@@ -288,85 +339,102 @@ static jerry_value_t board_neopixel_handler(const jerry_call_info_t *call_info_p
         return jerry_throw_sz(JERRY_ERROR_TYPE, "board.neopixel requires a value");
     }
 
-    if (!neopixel_is_ready()) {
-        neopixel_init(MCUJS_NEOPIXEL_PIN, MCUJS_NEOPIXEL_LENGTH);
-#if MCUJS_NEOPIXEL_ORDER_GRB
-        neopixel_set_order(true);
-#else
-        neopixel_set_order(false);
-#endif
-    }
-
-    if (!neopixel_is_ready()) {
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "neopixel init failed");
-    }
-
     jerry_value_t input = args[0];
+    board_neopixel_color_t colors[MCUJS_NEOPIXEL_LENGTH] = {0};
+    uint32_t color_count = 0;
+    jerry_value_t parsed;
+#if MCUJS_NEOPIXEL_ORDER_GRB
+    const bool onboard_grb = true;
+#else
+    const bool onboard_grb = false;
+#endif
 
-    /* Handle array input */
     if (jerry_value_is_array(input)) {
         jerry_length_t length = jerry_array_length(input);
         if (length == 0) {
-            return jerry_undefined();
-        }
+            parsed = board_neopixel_parse_array(input, &colors[0],
+                                                 onboard_grb);
+            color_count = 1;
+        } else {
+            jerry_value_t first = jerry_object_get_index(input, 0);
+            if (jerry_value_is_exception(first)) return first;
+            bool first_is_array = jerry_value_is_array(first);
+            bool first_is_object = !first_is_array && jerry_value_is_object(first);
+            bool single_color = jerry_value_is_number(first) ||
+                                jerry_value_is_undefined(first);
+            jerry_value_free(first);
 
-        /* Peek at first element to determine input type */
-        jerry_value_t first_key = jerry_string_sz("0");
-        jerry_value_t first = jerry_object_get(input, first_key);
-        jerry_value_free(first_key);
-        bool first_is_number = jerry_value_is_number(first);
-        bool first_is_array = jerry_value_is_array(first);
-        bool first_is_object = !first_is_array && jerry_value_is_object(first);
-        jerry_value_free(first);
-
-        /* Single pixel: [v0, v1, v2] - raw wire-order */
-        if (first_is_number) {
-            board_neopixel_set_from_array(0, input);
-            neopixel_show();
-            return jerry_undefined();
-        }
-
-        /* Multi-pixel array: [[...], ...] or [{...}, ...] */
-        if (first_is_array || first_is_object) {
-            uint32_t max_pixels = MCUJS_NEOPIXEL_LENGTH;
-            uint32_t count = length < max_pixels ? length : max_pixels;
-
-            for (uint32_t i = 0; i < count; i++) {
-                char index_str[8];
-                snprintf(index_str, sizeof(index_str), "%u", i);
-                jerry_value_t key = jerry_string_sz(index_str);
-                jerry_value_t item = jerry_object_get(input, key);
-                jerry_value_free(key);
-
-                if (jerry_value_is_array(item)) {
-                    board_neopixel_set_from_array(i, item);
-                } else if (jerry_value_is_object(item)) {
-                    board_neopixel_set_from_object(i, item);
+            if (single_color) {
+                parsed = board_neopixel_parse_array(input, &colors[0],
+                                                     onboard_grb);
+                color_count = 1;
+            } else if (first_is_array || first_is_object) {
+                if (length > MCUJS_NEOPIXEL_LENGTH) {
+                    return jerry_throw_sz(
+                        JERRY_ERROR_RANGE,
+                        "NeoPixel pixel list exceeds the onboard length");
                 }
-
-                jerry_value_free(item);
+                for (uint32_t i = 0; i < length; i++) {
+                    jerry_value_t item = jerry_object_get_index(input, i);
+                    if (jerry_value_is_exception(item)) return item;
+                    bool item_matches = first_is_array
+                        ? jerry_value_is_array(item)
+                        : (!jerry_value_is_array(item) &&
+                           jerry_value_is_object(item));
+                    if (!item_matches) {
+                        jerry_value_free(item);
+                        return jerry_throw_sz(
+                            JERRY_ERROR_TYPE,
+                            "NeoPixel pixel lists must use one color shape");
+                    }
+                    parsed = first_is_array
+                        ? board_neopixel_parse_array(item, &colors[i],
+                                                     onboard_grb)
+                        : board_neopixel_parse_object(item, &colors[i]);
+                    jerry_value_free(item);
+                    if (jerry_value_is_exception(parsed)) return parsed;
+                    jerry_value_free(parsed);
+                }
+                color_count = length;
+                parsed = jerry_undefined();
+            } else {
+                return jerry_throw_sz(
+                    JERRY_ERROR_TYPE,
+                    "board.neopixel expects byte colors or color objects");
             }
+        }
+    } else if (jerry_value_is_object(input)) {
+        parsed = board_neopixel_parse_object(input, &colors[0]);
+        color_count = 1;
+    } else {
+        return jerry_throw_sz(JERRY_ERROR_TYPE,
+                              "board.neopixel expects array or object input");
+    }
 
-            neopixel_show();
-            return jerry_undefined();
+    if (jerry_value_is_exception(parsed)) return parsed;
+    jerry_value_free(parsed);
+
+    if (!neopixel_is_ready() || neopixel_pin() != MCUJS_NEOPIXEL_PIN ||
+        neopixel_length() != MCUJS_NEOPIXEL_LENGTH) {
+        if (!neopixel_init(MCUJS_NEOPIXEL_PIN, MCUJS_NEOPIXEL_LENGTH)) {
+            return jerry_throw_sz(JERRY_ERROR_COMMON, "neopixel init failed");
         }
     }
-
-    /* Handle object input: {r, g, b} - logical RGB */
-    if (jerry_value_is_object(input)) {
-        board_neopixel_set_from_object(0, input);
-        neopixel_show();
-        return jerry_undefined();
+#if MCUJS_NEOPIXEL_ORDER_GRB
+    neopixel_set_order(true);
+#else
+    neopixel_set_order(false);
+#endif
+    for (uint32_t i = 0; i < color_count; i++) {
+        board_neopixel_set_pixel_rgb(i, colors[i].r, colors[i].g, colors[i].b);
     }
-
-    return jerry_throw_sz(JERRY_ERROR_TYPE, "board.neopixel expects array or object input");
+    neopixel_show();
+    return jerry_undefined();
 }
 #endif
 
-/*
- * Register board bindings
- */
-void js_bind_board(void) {
+/* Create the RP board object before registering its global compatibility alias. */
+jerry_value_t mcujs_rp2_create_board_module(void) {
     jerry_value_t board = jerry_object();
 
     /* Static properties */
@@ -375,9 +443,11 @@ void js_bind_board(void) {
     js_set_number(board, "flashSize", (double)MCUJS_FLASH_SIZE);
     js_set_number(board, "ramSize", (double)MCUJS_RAM_SIZE);
     js_set_number(board, "cpuFreq", (double)clock_get_hz(clk_sys));
-    js_set_number(board, "ledPin", MCUJS_LED_PIN == 255 ? -1 : (double)MCUJS_LED_PIN);
+#if MCUJS_REGISTRY_LED_PIN
+    js_set_number(board, "ledPin", (double)MCUJS_LED_PIN);
+#endif
 
-#if MCUJS_HAS_NEOPIXEL
+#if MCUJS_REGISTRY_ONBOARD_NEOPIXEL
     js_set_number(board, "neopixelPin", (double)MCUJS_NEOPIXEL_PIN);
     js_set_number(board, "neopixelLength", (double)MCUJS_NEOPIXEL_LENGTH);
 #endif
@@ -405,6 +475,19 @@ void js_bind_board(void) {
     #endif
 
     if (!js_board_apply_registry(board, NULL, board_storage_ready_handler)) {
+        jerry_value_free(board);
+        return jerry_throw_sz(JERRY_ERROR_COMMON,
+                              "Unable to apply the board registry");
+    }
+    return board;
+}
+
+/*
+ * Register board bindings
+ */
+void js_bind_board(void) {
+    jerry_value_t board = mcujs_rp2_create_board_module();
+    if (jerry_value_is_exception(board)) {
         jerry_value_free(board);
         return;
     }

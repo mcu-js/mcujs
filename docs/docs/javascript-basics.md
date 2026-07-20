@@ -126,19 +126,36 @@ console.log(note);
 
 ## A tiny mcujs script
 
-This is a complete LED blink program using GPIO.
+This is a complete portable LED blink program. GPIO is used only when the
+onboard inventory declares a real MCU pin; managed LEDs use `board.led()`.
 
 ```javascript
-const GPIO = require('gpio');
+(function () {
+  var boardApi = require('board');
+  var led = boardApi.devices.led;
+  if (!led) {
+    console.log('This board has no onboard LED');
+    return;
+  }
 
-const LED = 25;
-GPIO.init(LED, GPIO.OUTPUT);
+  var on = false;
+  var write;
+  if (led.type === 'gpio') {
+    var gpio = require('gpio');
+    gpio.init(led.pin, gpio.OUTPUT);
+    write = function (logicalOn) {
+      gpio.set(led.pin, led.activeLow ? !logicalOn : logicalOn);
+    };
+  } else {
+    write = function (logicalOn) { boardApi.led(logicalOn); };
+  }
 
-let on = false;
-setInterval(() => {
-  on = !on;
-  GPIO.set(LED, on);
-}, 500);
+  write(on);
+  setInterval(function () {
+    on = !on;
+    write(on);
+  }, 500);
+}());
 ```
 
 ## Next steps

@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 typedef unsigned int uint;
+typedef uint64_t absolute_time_t;
 
 #define NUM_BANK0_GPIOS 30u
 #define GPIO_OUT true
@@ -12,6 +13,7 @@ typedef unsigned int uint;
 #define GPIO_FUNC_I2C 3u
 #define GPIO_FUNC_PWM 4u
 #define GPIO_FUNC_SIO 5u
+#define GPIO_FUNC_SPI 6u
 
 void gpio_init(uint pin);
 void gpio_set_dir(uint pin, bool output);
@@ -21,5 +23,10 @@ void gpio_pull_down(uint pin);
 void gpio_put(uint pin, bool value);
 bool gpio_get(uint pin);
 void gpio_set_function(uint pin, uint function);
+absolute_time_t get_absolute_time(void);
+uint64_t to_ms_since_boot(absolute_time_t time);
+void sleep_ms(uint32_t milliseconds);
+void sleep_us(uint64_t microseconds);
+void tight_loop_contents(void);
 
 #endif

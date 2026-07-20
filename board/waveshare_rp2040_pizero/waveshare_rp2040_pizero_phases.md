@@ -42,7 +42,7 @@ Reference: https://www.waveshare.com/wiki/RP2040-PiZero
 - [ ] SPI communication works
 
 ### Notes
-- No onboard LED - use `board.led()` returns gracefully
+- No onboard LED - `board.led` is absent on this board. Feature-detect `board.devices.led` before using the onboard shortcut, or check `board.capabilities.gpio` and `board.exposedPins` before wiring an external LED; never expect a graceful no-op.
 - No NeoPixel - use external WS2812 on any GPIO
 - Large flash (16MB) provides ~15.4MB for user files
 

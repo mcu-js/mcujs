@@ -88,6 +88,7 @@ jerry_value_t js_create_adc_module(void);
  * board.name, board.chip, board.freeMemory()
  */
 void js_bind_board(void);
+jerry_value_t mcujs_rp2_create_board_module(void);
 
 /* Apply the selected descriptor and exact capability-gated board methods. */
 bool js_board_apply_registry(jerry_value_t board,

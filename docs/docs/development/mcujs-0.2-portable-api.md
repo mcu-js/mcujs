@@ -265,9 +265,14 @@ The boundary is deliberate: a frequency below `minHz` or above `maxHz` is a `Ran
 
 - Keep `init`, `set`, `get`, and `toggle` for 0.2.
 - Require successful initialization before access on every backend.
-- Adopt shared pin ownership on RP as well as ESP.
+- Adopt shared pin ownership on RP as well as ESP. GPIO is a soft owner that a
+  fully validated peripheral setup may take over; active peripheral owners stay
+  exclusive. Stale GPIO state must check the current owner, and release or
+  failed takeover never revives the previous GPIO setup without `init()`.
 - Use strict booleans for writes.
 - Expose only board-safe pins.
+- Register onboard LED shortcuts only when `board.devices.led` exists. There is
+  no success-returning no-op path for a board without an LED.
 - Consider resource handles later; do not block the capability contract on a native-object redesign.
 
 ### PWM

@@ -25,17 +25,28 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 1
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 1
+#define MCUJS_REGISTRY_ADC_VSYS 1
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
 #define MCUJS_RUNTIME_GPIO_PIN_MASK 0x1e7fffffULL
 #define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x1e7fffffULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x1e7fffffULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x1c000000ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0xfULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 1
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x1e7fffffULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 8
 #define MCUJS_RUNTIME_PWM_MAX_HZ 1600
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 4, 5) \
     X(0, 8, 9) \
     X(1, 6, 7)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(0, 18, 19, 16) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"pico\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16,\"LED\":25},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":25,\"activeLow\":false}}}"
 #define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"pico\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16,\"LED\":25},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":25,\"activeLow\":false}}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"maxOutputs\":16,\"timerCount\":8,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":8,\"maxHz\":1600,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":true},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":0,\"sda\":8,\"scl\":9},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
@@ -86,17 +97,28 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 1
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 1
+#define MCUJS_REGISTRY_ADC_VSYS 1
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
 #define MCUJS_RUNTIME_GPIO_PIN_MASK 0x1e7fffffULL
 #define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x1e7fffffULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x1e7fffffULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x1c000000ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0xfULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 1
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x1e7fffffULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 10
 #define MCUJS_RUNTIME_PWM_MAX_HZ 2048
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 4, 5) \
     X(0, 8, 9) \
     X(1, 6, 7)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(0, 18, 19, 16) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"pico2\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16,\"LED\":25},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":25,\"activeLow\":false}}}"
 #define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"pico2\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16,\"LED\":25},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":25,\"activeLow\":false}}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"maxOutputs\":16,\"timerCount\":8,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":true},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":0,\"sda\":8,\"scl\":9},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
@@ -147,17 +169,28 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 1
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 0
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
 #define MCUJS_RUNTIME_GPIO_PIN_MASK 0x1c7fffffULL
 #define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x1c7fffffULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x1c7fffffULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x1c000000ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0x7ULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 1
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x1c7fffffULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 10
 #define MCUJS_RUNTIME_PWM_MAX_HZ 2048
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 4, 5) \
     X(0, 8, 9) \
     X(1, 6, 7)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(0, 18, 19, 16) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"pico2_w\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{\"led\":{\"type\":\"managed\"}}}"
 #define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"pico2_w\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{\"led\":{\"type\":\"managed\"}}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28],\"maxOutputs\":16,\"timerCount\":8,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":0,\"sda\":8,\"scl\":9},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
@@ -208,17 +241,27 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 0
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 1
+#define MCUJS_REGISTRY_LED_PIN 0
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
 #define MCUJS_RUNTIME_GPIO_PIN_MASK 0x3c01ffffULL
 #define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x3c01ffffULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x3c01ffffULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x3c000000ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0xfULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 1
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x3c01ffffULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 8
 #define MCUJS_RUNTIME_PWM_MAX_HZ 1600
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 4, 5) \
     X(0, 8, 9) \
     X(1, 6, 7)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2040_zero\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,26,27,28,29],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D26\":26,\"D27\":27,\"D28\":28,\"D29\":29,\"A0\":26,\"A1\":27,\"A2\":28,\"A3\":29,\"SDA\":4,\"SCL\":5,\"SCK\":10,\"MOSI\":11,\"MISO\":12,\"NEOPIXEL\":16},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":16,\"length\":1,\"order\":\"RGB\"}}}"
 #define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2040_zero\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,26,27,28,29],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D26\":26,\"D27\":27,\"D28\":28,\"D29\":29,\"A0\":26,\"A1\":27,\"A2\":28,\"A3\":29,\"SDA\":4,\"SCL\":5,\"SCK\":10,\"MOSI\":11,\"MISO\":12,\"NEOPIXEL\":16},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":16,\"length\":1,\"order\":\"RGB\"}}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,26,27,28,29],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,26,27,28,29],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,26,27,28,29],\"maxOutputs\":16,\"timerCount\":8,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":8,\"maxHz\":1600,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28,29],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]},{\"channel\":3,\"pin\":29,\"aliases\":[\"A3\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":0,\"sda\":8,\"scl\":9},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[1],\"routes\":[{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,26,27,28,29],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
@@ -269,16 +312,27 @@
 #define MCUJS_HAS_DVI 1
 #define MCUJS_REGISTRY_ONBOARD_LED 0
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 0
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
 #define MCUJS_RUNTIME_GPIO_PIN_MASK 0x3fffffULL
 #define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x3fffffULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x3fffffULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x0ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0x0ULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 0
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x3fffffULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 8
 #define MCUJS_RUNTIME_PWM_MAX_HZ 1600
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 0, 1) \
     X(1, 2, 3)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(0, 18, 19, 16) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2040_pizero\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"SDA\":2,\"SCL\":3,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{}}"
 #define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2040_pizero\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"SDA\":2,\"SCL\":3,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],\"maxOutputs\":16,\"timerCount\":8,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":8,\"maxHz\":1600,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":0,\"scl\":1},{\"bus\":1,\"sda\":2,\"scl\":3}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sda\":2,\"scl\":3},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
@@ -327,18 +381,29 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 0
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 0
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
-#define MCUJS_RUNTIME_GPIO_PIN_MASK 0x1c1fc03fULL
-#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x1c1fc03fULL
+#define MCUJS_RUNTIME_GPIO_PIN_MASK 0x1fffffffULL
+#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x1e5fffffULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x1c1fc03fULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x1c000000ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0x7ULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 1
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x1c1fc03fULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 8
 #define MCUJS_RUNTIME_PWM_MAX_HZ 1600
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
-    X(0, 4, 5)
+    X(0, 4, 5) \
+    X(1, 6, 7)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
-#define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2040_touch_lcd_1.28\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{}}"
-#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2040_touch_lcd_1.28\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"outputPins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"maxOutputs\":11,\"timerCount\":6,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":8,\"maxHz\":1600,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false},\"i2c\":{\"buses\":[0],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
+#define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2040_touch_lcd_1.28\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D23\":23,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":6,\"SCL\":7,\"SCK\":10,\"MOSI\":11,\"MISO\":12},\"devices\":{}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2040_touch_lcd_1.28\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D23\":23,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":6,\"SCL\":7,\"SCK\":10,\"MOSI\":11,\"MISO\":12},\"devices\":{}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,22,25,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"maxOutputs\":11,\"timerCount\":6,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":8,\"maxHz\":1600,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sda\":6,\"scl\":7},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[1],\"routes\":[{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
 #define MCUJS_RUNTIME_BUILTIN_MODULES(X) \
     X("board") \
     X("fs") \
@@ -355,13 +420,13 @@
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
-    X("gpio", "{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"outputPins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]}") \
+    X("gpio", "{\"pins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,22,25,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]}") \
     X("pwm", "{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"maxOutputs\":11,\"timerCount\":6,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":8,\"maxHz\":1600,\"resolutionVaries\":true}}") \
     X("fs", "{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true}") \
     X("usb", "{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]}") \
     X("adc", "{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false}") \
-    X("i2c", "{\"buses\":[0],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256}") \
-    X("spi", "{\"buses\":[0],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]}") \
+    X("i2c", "{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sda\":6,\"scl\":7},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256}") \
+    X("spi", "{\"buses\":[1],\"routes\":[{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]}") \
     X("neopixel", "{\"pins\":[0,1,2,3,4,5,14,15,16,17,18,19,20,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}")
 #elif defined(MCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A)
 #define MCUJS_RUNTIME_BOARD_ID "waveshare_rp2350_lcd_1.47_a"
@@ -372,7 +437,7 @@
 #define MCUJS_FEATURE_GPIO 1
 #define MCUJS_FEATURE_PWM 1
 #define MCUJS_FEATURE_I2C 1
-#define MCUJS_FEATURE_SPI 0
+#define MCUJS_FEATURE_SPI 1
 #define MCUJS_FEATURE_ADC 0
 #define MCUJS_FEATURE_NEOPIXEL 1
 #define MCUJS_FEATURE_PROCESS 1
@@ -386,19 +451,29 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 0
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 1
+#define MCUJS_REGISTRY_LED_PIN 0
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
-#define MCUJS_RUNTIME_GPIO_PIN_MASK 0x4043ffULL
-#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x4043ffULL
+#define MCUJS_RUNTIME_GPIO_PIN_MASK 0x7f43ffULL
+#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x7f43ffULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x4043ffULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x0ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0x0ULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 0
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x4043ffULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 10
 #define MCUJS_RUNTIME_PWM_MAX_HZ 2048
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 4, 5) \
     X(1, 6, 7)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(0, 18, 19, 0)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
-#define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_lcd_1.47_a\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D14\":14,\"D22\":22,\"SDA\":4,\"SCL\":5,\"NEOPIXEL\":22},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":22,\"length\":1,\"order\":\"GRB\"}}}"
-#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_lcd_1.47_a\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D14\":14,\"D22\":22,\"SDA\":4,\"SCL\":5,\"NEOPIXEL\":22},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":22,\"length\":1,\"order\":\"GRB\"}}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"maxOutputs\":11,\"timerCount\":6,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"neopixel\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
+#define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_lcd_1.47_a\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,14,16,17,18,19,20,21,22],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D14\":14,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":0,\"NEOPIXEL\":22},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":22,\"length\":1,\"order\":\"GRB\"}}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_lcd_1.47_a\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,14,16,17,18,19,20,21,22],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D14\":14,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":0,\"NEOPIXEL\":22},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":22,\"length\":1,\"order\":\"GRB\"}}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,16,17,18,19,20,21,22],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,14,16,17,18,19,20,21,22],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"maxOutputs\":11,\"timerCount\":6,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":0}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":0},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
 #define MCUJS_RUNTIME_BUILTIN_MODULES(X) \
     X("board") \
     X("fs") \
@@ -406,6 +481,7 @@
     X("gpio") \
     X("pwm") \
     X("i2c") \
+    X("spi") \
     X("neopixel") \
     X("image") \
     X("keyboard") \
@@ -413,11 +489,12 @@
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
-    X("gpio", "{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]}") \
+    X("gpio", "{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,16,17,18,19,20,21,22],\"outputPins\":[0,1,2,3,4,5,6,7,8,9,14,16,17,18,19,20,21,22],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]}") \
     X("pwm", "{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"maxOutputs\":11,\"timerCount\":6,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}}") \
     X("fs", "{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true}") \
     X("usb", "{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]}") \
     X("i2c", "{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256}") \
+    X("spi", "{\"buses\":[0],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":0}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":0},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]}") \
     X("neopixel", "{\"pins\":[0,1,2,3,4,5,6,7,8,9,14,22],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}")
 #elif defined(MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_1_69)
 #define MCUJS_RUNTIME_BOARD_ID "waveshare_rp2350_touch_lcd_1.69"
@@ -442,18 +519,29 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 0
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 0
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
-#define MCUJS_RUNTIME_GPIO_PIN_MASK 0x1c0f0033ULL
-#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x1c0f0033ULL
+#define MCUJS_RUNTIME_GPIO_PIN_MASK 0x1feffff7ULL
+#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x1e4ffff7ULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x1c0f0033ULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x1c000000ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0x7ULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 1
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x1c0f0033ULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 10
 #define MCUJS_RUNTIME_PWM_MAX_HZ 2048
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
-    X(0, 4, 5)
+    X(0, 4, 5) \
+    X(1, 6, 7)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
-#define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_touch_lcd_1.69\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,4,5,16,17,18,19,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D4\":4,\"D5\":5,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{}}"
-#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_touch_lcd_1.69\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,4,5,16,17,18,19,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D4\":4,\"D5\":5,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"outputPins\":[0,1,4,5,16,17,18,19,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"maxOutputs\":9,\"timerCount\":5,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false},\"i2c\":{\"buses\":[0],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
+#define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_touch_lcd_1.69\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D21\":21,\"D22\":22,\"D23\":23,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":6,\"SCL\":7,\"SCK\":10,\"MOSI\":11,\"MISO\":12},\"devices\":{}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_touch_lcd_1.69\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D21\":21,\"D22\":22,\"D23\":23,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":6,\"SCL\":7,\"SCK\":10,\"MOSI\":11,\"MISO\":12},\"devices\":{}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28],\"outputPins\":[0,1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,22,25,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"maxOutputs\":9,\"timerCount\":5,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sda\":6,\"scl\":7},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[1],\"routes\":[{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
 #define MCUJS_RUNTIME_BUILTIN_MODULES(X) \
     X("board") \
     X("fs") \
@@ -470,13 +558,13 @@
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
-    X("gpio", "{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"outputPins\":[0,1,4,5,16,17,18,19,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]}") \
+    X("gpio", "{\"pins\":[0,1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28],\"outputPins\":[0,1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,22,25,26,27,28],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]}") \
     X("pwm", "{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"maxOutputs\":9,\"timerCount\":5,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":10,\"maxHz\":2048,\"resolutionVaries\":true}}") \
     X("fs", "{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true}") \
     X("usb", "{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]}") \
     X("adc", "{\"resolutionBits\":12,\"pins\":[26,27,28],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false}") \
-    X("i2c", "{\"buses\":[0],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":4,\"scl\":5},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256}") \
-    X("spi", "{\"buses\":[0],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":16},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]}") \
+    X("i2c", "{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":4,\"scl\":5},{\"bus\":1,\"sda\":6,\"scl\":7}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sda\":6,\"scl\":7},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256}") \
+    X("spi", "{\"buses\":[1],\"routes\":[{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]}") \
     X("neopixel", "{\"pins\":[0,1,4,5,16,17,18,19,26,27,28],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}")
 #elif defined(MCUJS_BOARD_ADAFRUIT_FEATHER_RP2040)
 #define MCUJS_RUNTIME_BOARD_ID "adafruit_feather_rp2040"
@@ -501,16 +589,27 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 1
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 1
+#define MCUJS_REGISTRY_LED_PIN 1
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 0
 #define MCUJS_REGISTRY_STORAGE_READY 1
 #define MCUJS_RUNTIME_GPIO_PIN_MASK 0x3f1d3f1fULL
 #define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x3f1d3f1fULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x3f1d3f1fULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x3c000000ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0xfULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 1
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x3f1d3f1fULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 8
 #define MCUJS_RUNTIME_PWM_MAX_HZ 1600
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 24, 25) \
     X(1, 2, 3)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(0, 18, 19, 20) \
+    X(1, 10, 11, 12)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"adafruit_feather_rp2040\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,8,9,10,11,12,13,16,18,19,20,24,25,26,27,28,29],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D16\":16,\"D18\":18,\"D19\":19,\"D20\":20,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"D29\":29,\"A0\":26,\"A1\":27,\"A2\":28,\"A3\":29,\"SDA\":2,\"SCL\":3,\"SCK\":18,\"MOSI\":19,\"MISO\":20,\"LED\":13,\"NEOPIXEL\":16},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":13,\"activeLow\":false},\"neopixel\":{\"type\":\"neopixel\",\"pin\":16,\"length\":1,\"order\":\"GRB\"}}}"
 #define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"adafruit_feather_rp2040\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,8,9,10,11,12,13,16,18,19,20,24,25,26,27,28,29],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D16\":16,\"D18\":18,\"D19\":19,\"D20\":20,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"D29\":29,\"A0\":26,\"A1\":27,\"A2\":28,\"A3\":29,\"SDA\":2,\"SCL\":3,\"SCK\":18,\"MOSI\":19,\"MISO\":20,\"LED\":13,\"NEOPIXEL\":16},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":13,\"activeLow\":false},\"neopixel\":{\"type\":\"neopixel\",\"pin\":16,\"length\":1,\"order\":\"GRB\"}}},\"capabilities\":{\"gpio\":{\"pins\":[0,1,2,3,4,8,9,10,11,12,13,16,18,19,20,24,25,26,27,28,29],\"outputPins\":[0,1,2,3,4,8,9,10,11,12,13,16,18,19,20,24,25,26,27,28,29],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[0,1,2,3,4,8,9,10,11,12,13,16,18,19,20,24,25,26,27,28,29],\"maxOutputs\":11,\"timerCount\":6,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":8,\"maxHz\":1600,\"resolutionVaries\":true}},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\",\"keyboardHid\",\"mouseHid\"]},\"adc\":{\"resolutionBits\":12,\"pins\":[26,27,28,29],\"channels\":[{\"channel\":0,\"pin\":26,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":27,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":28,\"aliases\":[\"A2\"]},{\"channel\":3,\"pin\":29,\"aliases\":[\"A3\"]}],\"voltage\":{\"supported\":true,\"calibrated\":false,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":true},\"vsys\":false},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":24,\"scl\":25},{\"bus\":1,\"sda\":2,\"scl\":3}],\"defaultBus\":1,\"defaultRoute\":{\"bus\":1,\"sda\":2,\"scl\":3},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":20},{\"bus\":1,\"sck\":10,\"mosi\":11,\"miso\":12}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":18,\"mosi\":19,\"miso\":20},\"frequency\":{\"minHz\":1,\"maxHz\":62500000},\"maxTransferBytes\":256,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":true,\"compatibilityExtensions\":[\"writeBufferDMA\"]},\"neopixel\":{\"pins\":[0,1,2,3,4,8,9,10,11,12,13,16,18,19,20,24,25,26,27,28,29],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]}}}"
@@ -561,16 +660,27 @@
 #define MCUJS_HAS_DVI 0
 #define MCUJS_REGISTRY_ONBOARD_LED 1
 #define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 1
+#define MCUJS_REGISTRY_ADC_VSYS 0
 #define MCUJS_REGISTRY_SAFE_MODE 1
 #define MCUJS_REGISTRY_STORAGE_READY 1
 #define MCUJS_RUNTIME_GPIO_PIN_MASK 0x2003feULL
 #define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x2003feULL
 #define MCUJS_RUNTIME_PWM_PIN_MASK 0x3feULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x3feULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0x1ffULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 0
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x3feULL
 #define MCUJS_RUNTIME_PWM_MIN_HZ 1
 #define MCUJS_RUNTIME_PWM_MAX_HZ 1000000
 #define MCUJS_RUNTIME_I2C_ROUTES(X) \
     X(0, 5, 6) \
     X(1, 3, 4)
+#define MCUJS_RUNTIME_SPI_ROUTES(X) \
+    X(0, 7, 9, 8) \
+    X(1, 4, 6, 5)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 1
+#define MCUJS_RUNTIME_SPI_MAX_HZ 40000000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"seeed_xiao_esp32s3\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[1,2,3,4,5,6,7,8,9,21],\"pins\":{\"D0\":1,\"D1\":2,\"D2\":3,\"D3\":4,\"D4\":5,\"D5\":6,\"D8\":7,\"D9\":8,\"D10\":9,\"A0\":1,\"A1\":2,\"A2\":3,\"A3\":4,\"A4\":5,\"A5\":6,\"A6\":7,\"A7\":8,\"A8\":9,\"SDA\":5,\"SCL\":6,\"SCK\":7,\"MISO\":8,\"MOSI\":9,\"LED\":21},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":21,\"activeLow\":true}}}"
 #define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"seeed_xiao_esp32s3\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[1,2,3,4,5,6,7,8,9,21],\"pins\":{\"D0\":1,\"D1\":2,\"D2\":3,\"D3\":4,\"D4\":5,\"D5\":6,\"D8\":7,\"D9\":8,\"D10\":9,\"A0\":1,\"A1\":2,\"A2\":3,\"A3\":4,\"A4\":5,\"A5\":6,\"A6\":7,\"A7\":8,\"A8\":9,\"SDA\":5,\"SCL\":6,\"SCK\":7,\"MISO\":8,\"MOSI\":9,\"LED\":21},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":21,\"activeLow\":true}}},\"capabilities\":{\"gpio\":{\"pins\":[1,2,3,4,5,6,7,8,9,21],\"outputPins\":[1,2,3,4,5,6,7,8,9,21],\"modes\":[\"input\",\"output\",\"inputPullup\",\"inputPulldown\"]},\"pwm\":{\"pins\":[1,2,3,4,5,6,7,8,9],\"maxOutputs\":8,\"timerCount\":4,\"duty\":{\"min\":0,\"max\":1,\"unit\":\"ratio\"},\"frequency\":{\"minHz\":1,\"maxHz\":1000000,\"resolutionVaries\":true}},\"adc\":{\"resolutionBits\":12,\"pins\":[1,2,3,4,5,6,7,8,9],\"channels\":[{\"channel\":0,\"pin\":1,\"aliases\":[\"A0\"]},{\"channel\":1,\"pin\":2,\"aliases\":[\"A1\"]},{\"channel\":2,\"pin\":3,\"aliases\":[\"A2\"]},{\"channel\":3,\"pin\":4,\"aliases\":[\"A3\"]},{\"channel\":4,\"pin\":5,\"aliases\":[\"A4\"]},{\"channel\":5,\"pin\":6,\"aliases\":[\"A5\"]},{\"channel\":6,\"pin\":7,\"aliases\":[\"A6\"]},{\"channel\":7,\"pin\":8,\"aliases\":[\"A7\"]},{\"channel\":8,\"pin\":9,\"aliases\":[\"A8\"]}],\"voltage\":{\"supported\":true,\"calibrated\":true,\"minVolts\":0,\"maxVolts\":3.3},\"temperature\":{\"supported\":true,\"rawChannel\":false},\"vsys\":false},\"boot\":{\"safeMode\":true},\"i2c\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sda\":5,\"scl\":6},{\"bus\":1,\"sda\":3,\"scl\":4}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sda\":5,\"scl\":6},\"frequency\":{\"minHz\":1,\"maxHz\":1000000},\"maxTransferBytes\":256},\"spi\":{\"buses\":[0,1],\"routes\":[{\"bus\":0,\"sck\":7,\"mosi\":9,\"miso\":8},{\"bus\":1,\"sck\":4,\"mosi\":6,\"miso\":5}],\"defaultBus\":0,\"defaultRoute\":{\"bus\":0,\"sck\":7,\"mosi\":9,\"miso\":8},\"frequency\":{\"minHz\":1,\"maxHz\":40000000},\"maxTransferBytes\":64,\"modes\":[0],\"bitsPerWord\":[8],\"bitOrders\":[\"msb\"],\"fullDuplex\":true,\"dma\":false},\"neopixel\":{\"pins\":[1,2,3,4,5,6,7,8,9],\"maxLength\":256,\"orders\":[\"RGB\",\"GRB\"]},\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\"]}}}"

@@ -24,6 +24,8 @@ extern int mcujs_test_ledc_result;
 extern unsigned mcujs_test_ledc_resolution;
 extern unsigned mcujs_test_ledc_configured_resolution;
 extern unsigned mcujs_test_ledc_actual_frequency;
+extern unsigned mcujs_test_ledc_stop_calls;
+extern unsigned mcujs_test_gpio_reset_calls;
 extern unsigned mcujs_test_ledc_duty_calls;
 extern unsigned mcujs_test_ledc_duty;
 #endif

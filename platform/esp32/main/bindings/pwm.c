@@ -20,6 +20,7 @@
 /* At the hardware maximum (14 bits on ESP32-S3), a 2^resolution duty
  * overflows LEDC. Keep one bit below it so exact 100% remains safe. */
 #define MCUJS_PWM_MAX_SAFE_RESOLUTION 13u
+#define MCUJS_PWM_DIVIDER_FRACTIONAL_BITS 8u
 
 typedef struct {
     bool used;
@@ -70,6 +71,36 @@ static bool find_exact_duty_value(double duty, uint32_t period,
         return false;
     }
     *value = candidate;
+    return true;
+}
+
+static bool find_exact_timer_resolution(uint32_t frequency,
+                                        uint32_t *resolution) {
+    uint32_t candidate =
+        ledc_find_suitable_duty_resolution(MCUJS_PWM_SOURCE_HZ, frequency);
+    if (candidate == 0) return false;
+    if (candidate > MCUJS_PWM_MAX_SAFE_RESOLUTION) {
+        candidate = MCUJS_PWM_MAX_SAFE_RESOLUTION;
+    }
+
+    /* IDF 5.3.2 uses an 8-bit fractional divider and rounds both the divider
+     * and ledc_get_freq(). ESP32-S3 AUTO_CLK tries the 80 MHz APB clock first,
+     * so mirror that calculation before any active channel is torn down. */
+    uint64_t precision = (uint64_t)1u << candidate;
+    uint64_t scaled_source =
+        (uint64_t)MCUJS_PWM_SOURCE_HZ << MCUJS_PWM_DIVIDER_FRACTIONAL_BITS;
+    uint64_t requested_denominator = (uint64_t)frequency * precision;
+    uint64_t divider =
+        (scaled_source + requested_denominator / 2u) /
+        requested_denominator;
+    if (divider == 0) return false;
+    uint64_t actual_denominator = precision * divider;
+    uint32_t actual_frequency =
+        (uint32_t)((scaled_source + actual_denominator / 2u) /
+                   actual_denominator);
+    if (actual_frequency != frequency) return false;
+
+    *resolution = candidate;
     return true;
 }
 
@@ -192,14 +223,9 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *info,
                       s_timers[timer_index].references == 1);
     uint32_t resolution = 0;
     if (new_timer) {
-        resolution = ledc_find_suitable_duty_resolution(MCUJS_PWM_SOURCE_HZ,
-                                                        frequency);
-        if (resolution == 0) {
+        if (!find_exact_timer_resolution(frequency, &resolution)) {
             return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, ESP_OK, pin, 0,
-                                   "PWM frequency is not achievable");
-        }
-        if (resolution > MCUJS_PWM_MAX_SAFE_RESOLUTION) {
-            resolution = MCUJS_PWM_MAX_SAFE_RESOLUTION;
+                                   "PWM frequency cannot be represented exactly");
         }
     }
 

@@ -206,6 +206,25 @@ int main(void) {
     assert(eval_source("PWM.stop(4);"));
     mcujs_test_ledc_resolution = 10;
 
+    mcujs_test_ledc_resolution = 14;
+    assert(eval_source("PWM.init(4, 1300); PWM.setDuty(4, 0.25);"));
+    unsigned pwm_stop_calls = mcujs_test_ledc_stop_calls;
+    unsigned gpio_reset_calls = mcujs_test_gpio_reset_calls;
+    unsigned preserved_duty_calls = mcujs_test_ledc_duty_calls;
+    mcujs_test_ledc_actual_frequency = 1599;
+    assert(assert_operational_error("PWM.init(4, 1600)",
+                                    "NotSupportedError", "ERR_NOT_SUPPORTED"));
+    mcujs_test_ledc_actual_frequency = 0;
+    assert(mcujs_test_ledc_stop_calls == pwm_stop_calls);
+    assert(mcujs_test_gpio_reset_calls == gpio_reset_calls);
+    assert(eval_source("PWM.setDuty(4, 0.5);"));
+    assert(mcujs_test_ledc_duty_calls == preserved_duty_calls + 1u);
+    assert(mcujs_test_ledc_duty == 4096u);
+    assert(assert_operational_error("GPIO.init(4, GPIO.OUTPUT)",
+                                    "ResourceBusyError", "EBUSY"));
+    assert(eval_source("PWM.stop(4);"));
+    mcujs_test_ledc_resolution = 10;
+
     assert(eval_source(
         "(function () { function expectRange(call, message) { var error; "
         "try { call(); } catch (caught) { error = caught; } "

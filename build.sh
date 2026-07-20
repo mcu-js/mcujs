@@ -116,7 +116,20 @@ while [[ $# -gt 0 ]]; do
 done
 
 VERSION="$(tr -d '[:space:]' < version.txt)"
+if ! GIT_SHA="$(git -C "${SCRIPT_DIR}" rev-parse --short HEAD 2>/dev/null)"; then
+    log_error "Could not determine source Git SHA for build identity"
+    exit 1
+fi
+if [[ ! "${GIT_SHA}" =~ ^[0-9a-f]{7,40}$ ]]; then
+    log_error "Source Git SHA for build identity is invalid: ${GIT_SHA}"
+    exit 1
+fi
+if ! command -v strings >/dev/null 2>&1; then
+    log_error "strings is required to verify ELF build identity"
+    exit 1
+fi
 log_info "mcujs version: ${VERSION}"
+log_info "Build identity: ${VERSION}+${GIT_SHA}"
 log_info "Target board: ${BOARD}"
 log_info "Build type: ${BUILD_TYPE}"
 
@@ -162,6 +175,7 @@ if [[ "${USE_DOCKER}" -eq 1 ]]; then
     docker run "${docker_run_args[@]}" \
         -v "${SCRIPT_DIR}:/workspace" \
         -u "$(id -u):$(id -g)" \
+        -e MCUJS_BUILD_GIT_SHA="${GIT_SHA}" \
         "${IMAGE_NAME}" \
         "${BOARD}" "${BUILD_TYPE}"
 else
@@ -178,7 +192,7 @@ else
         mkdir -p "cmake-build-${board}"
         cd "cmake-build-${board}"
 
-        cmake \
+        MCUJS_BUILD_GIT_SHA="${GIT_SHA}" cmake \
             -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
             -DBOARD="${board}" \
             ..
@@ -194,6 +208,30 @@ else
     else
         build_board "${BOARD}"
     fi
+fi
+
+verify_board_build_identity() {
+    local board="$1"
+    local elf="cmake-build-${board}/mcujs-${VERSION}-${board}.elf"
+    local expected="${VERSION}+${GIT_SHA}"
+
+    if [[ ! -f "${elf}" ]]; then
+        log_error "Build did not produce expected ELF: ${elf}"
+        exit 1
+    fi
+    if ! LC_ALL=C strings "${elf}" | grep -Fx "${expected}" >/dev/null; then
+        log_error "ELF build identity mismatch for ${board}; expected ${expected}"
+        exit 1
+    fi
+    log_info "Verified ELF build identity for ${board}: ${expected}"
+}
+
+if [[ "${BOARD}" == "all" ]]; then
+    for board in "${MCUJS_BOARDS[@]}"; do
+        verify_board_build_identity "${board}"
+    done
+else
+    verify_board_build_identity "${BOARD}"
 fi
 
 log_info "Build complete!"

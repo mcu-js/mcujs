@@ -27,6 +27,7 @@ Checks:
   - contributor and release docs share the development/release policy
   - MCU.js 0.2 portable API schema and docs remain consistent
   - generated runtime registry, manifests, native maps, and Jerry bindings agree
+  - RP Docker builds preserve source identity from normal and linked worktrees
   - shell entrypoints parse cleanly
 EOF
 }
@@ -180,6 +181,7 @@ check_shell_syntax() {
         "${ROOT_DIR}/scripts/package-release.sh"
         "${ROOT_DIR}/scripts/release.sh"
         "${ROOT_DIR}/scripts/test-repl.sh"
+        "${ROOT_DIR}/scripts/test-rp-build-identity.sh"
         "${ROOT_DIR}/scripts/test-runtime-bindings.sh"
         "${ROOT_DIR}/scripts/test-runtime-registry.sh"
         "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
@@ -201,6 +203,11 @@ check_shell_syntax() {
 check_repl_input() {
     "${ROOT_DIR}/scripts/test-repl.sh"
     pass 'REPL CRLF and tab-completion tests passed'
+}
+
+check_rp_build_identity() {
+    "${ROOT_DIR}/scripts/test-rp-build-identity.sh"
+    pass 'RP Docker build identity handoff tests passed'
 }
 
 check_python_syntax() {
@@ -260,6 +267,7 @@ check_docs_board_coverage
 check_development_policy
 check_shell_syntax
 check_repl_input
+check_rp_build_identity
 check_python_syntax
 check_api_schema
 check_runtime_registry

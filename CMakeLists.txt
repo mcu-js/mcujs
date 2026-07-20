@@ -35,16 +35,22 @@ set(CMAKE_CXX_STANDARD 17)
 # Initialize the selected platform SDK (must be after project())
 mcujs_platform_sdk_init()
 
-# Derive build ID from git
-execute_process(
-    COMMAND git rev-parse --short HEAD
-    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-    OUTPUT_VARIABLE MCUJS_GIT_SHA
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-)
+# Docker snapshots of linked worktrees cannot resolve their external .git file,
+# so the host passes its already-validated source SHA into the container.
+set(MCUJS_GIT_SHA "$ENV{MCUJS_BUILD_GIT_SHA}")
 if(NOT MCUJS_GIT_SHA)
-    set(MCUJS_GIT_SHA "unknown")
+    execute_process(
+        COMMAND git rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+        OUTPUT_VARIABLE MCUJS_GIT_SHA
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+endif()
+string(LENGTH "${MCUJS_GIT_SHA}" MCUJS_GIT_SHA_LENGTH)
+if(NOT MCUJS_GIT_SHA MATCHES "^[0-9a-f]+$" OR
+   MCUJS_GIT_SHA_LENGTH LESS 7 OR MCUJS_GIT_SHA_LENGTH GREATER 40)
+    message(FATAL_ERROR "Could not determine a valid source Git SHA for build identity")
 endif()
 set(MCUJS_BUILD_ID "${MCUJS_VERSION}+${MCUJS_GIT_SHA}")
 

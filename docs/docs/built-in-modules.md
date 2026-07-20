@@ -30,6 +30,42 @@ Do not branch on `board.name` to select an API. An unavailable module is absent;
 a present module throws a typed error when a requested route is invalid or a
 live resource is busy.
 
+## Board discovery
+
+`require('board')` is the canonical board API. The global `board` value remains
+the same object as a 0.x compatibility alias. `apiVersion` identifies the
+portable contract, `pins` contains semantic aliases, and `devices` describes
+only physically onboard hardware:
+
+```javascript
+(function () {
+  var boardApi = require('board');
+  var modules = require('mcujs:module');
+
+  if (!modules.has('i2c')) {
+    console.log('I2C is not compiled into this firmware');
+    return;
+  }
+
+  var capability = boardApi.capability('i2c');
+  var i2c = require('i2c');
+  console.log('Default route:', capability.defaultRoute);
+  console.log('I2C init available:', typeof i2c.init === 'function');
+}());
+```
+
+`board.capability(name)` parses and freezes only the requested descriptor so
+ordinary feature detection does not materialize the complete registry on the
+JerryScript heap. It returns `undefined` for an unknown capability.
+`board.capabilities()` returns a larger, deeply frozen snapshot for diagnostics
+and tooling. Capability names must be non-empty strings; invalid names throw
+`TypeError` or `RangeError` rather than being truncated.
+
+`builtinModules` lists every native module that the selected firmware can
+actually require, including compatibility aliases such as `node:module`.
+`modules.has(name)` is an exact predicate over that same frozen list; an absent
+module follows the normal module-not-found path from `require()`.
+
 ## Core modules
 
 - `console` for logging

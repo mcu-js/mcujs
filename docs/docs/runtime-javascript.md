@@ -34,16 +34,23 @@ clearInterval(intervalId);
 
 Timers are great for LED blinks and polling sensors. Keep intervals short and work lightweight.
 
-## Globals
+## Runtime objects
 
-- `process` for runtime metadata
-- `board` for device helpers
+- `require('process')` for runtime metadata
+- `require('board')` for board identity, semantic pins, onboard inventory, and
+  capability discovery
+
+The lowercase CommonJS modules are canonical in 0.2. The `process` and `board`
+globals remain compatibility aliases through the 0.x series.
 
 ### Example
 
 ```javascript
-console.log(process.version);
-console.log(board.name, board.freeMemory());
+const processApi = require('process');
+const boardApi = require('board');
+
+console.log(processApi.version);
+console.log(boardApi.name, boardApi.freeMemory());
 ```
 
 See [Built-in Modules](./built-in-modules.md) for module APIs like `fs`, `gpio`, and `adc`.

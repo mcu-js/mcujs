@@ -67,6 +67,26 @@ static jerry_value_t stub_handler(const jerry_call_info_t *call_info,
     return jerry_undefined();
 }
 
+static void print_exception(jerry_value_t exception);
+
+static size_t heap_used(void) {
+    jerry_heap_gc(JERRY_GC_PRESSURE_HIGH);
+    jerry_heap_stats_t stats;
+    assert(jerry_heap_stats(&stats));
+    return stats.allocated_bytes;
+}
+
+static bool eval_source(const char *source) {
+    jerry_value_t result = jerry_eval((const jerry_char_t *)source,
+                                      strlen(source), JERRY_PARSE_NO_OPTS);
+    if (jerry_value_is_exception(result)) {
+        print_exception(result);
+        return false;
+    }
+    jerry_value_free(result);
+    return true;
+}
+
 static void print_exception(jerry_value_t exception) {
     jerry_value_t value = jerry_exception_value(exception, true);
     jerry_value_t text = jerry_value_to_string(value);
@@ -144,8 +164,21 @@ static const char s_test_source[] =
     "  assertThrowsType(function () { modules.has(''); }, RangeError, 'empty has() name did not throw RangeError');\n"
     "  assertThrowsType(function () { modules.has(Array(129).join('x')); }, RangeError, 'oversized has() name did not throw RangeError');\n"
     "  assertThrowsType(function () { modules.has('fs\\x00shadow'); }, RangeError, 'null-byte has() name did not throw RangeError');\n"
+    "  modules.builtinModules.forEach(function (name) {\n"
+    "    assert(modules.has(name) === true, name + ' missing from has()');\n"
+    "    assert(require(name) !== undefined, name + ' cannot be required');\n"
+    "  });\n"
+    "  assert(modules.builtinModules.indexOf('image') !== -1 === (__mcujsHasImage === true), 'image list mismatch');\n"
+    "  if (!__mcujsHasImage) {\n"
+    "    assertThrowsType(function () { require('image'); }, Error, 'absent image module was require-able');\n"
+    "  }\n"
     "\n"
     "  var board = require('board');\n"
+    "  assert(board === globalThis.board, 'canonical board module is not the global compatibility alias');\n"
+    "  assert(board === require('board'), 'canonical board module identity is unstable');\n"
+    "  assert(board.apiVersion === '0.2', 'board API version mismatch');\n"
+    "  assert(('safeMode' in board) === __mcujsExpectedSafeMode, 'safeMode availability mismatch');\n"
+    "  assert(('storageReady' in board) === __mcujsExpectedStorageReady, 'storageReady availability mismatch');\n"
     "  ['apiVersion', 'exposedPins', 'pins', 'devices'].forEach(function (name) {\n"
     "    assertImmutableProperty(board, name, 'board.' + name);\n"
     "  });\n"
@@ -155,6 +188,21 @@ static const char s_test_source[] =
     "  attackFrozenTree(board.exposedPins, 'board.exposedPins');\n"
     "  attackFrozenTree(board.pins, 'board.pins');\n"
     "  attackFrozenTree(board.devices, 'board.devices');\n"
+    "  assert(JSON.stringify(board.pins) === JSON.stringify(__mcujsExpectedBoard.pins), 'semantic pin aliases diverged from registry');\n"
+    "  assert(JSON.stringify(board.devices) === JSON.stringify(__mcujsExpectedBoard.devices), 'physical device inventory diverged from registry');\n"
+    "  var gpioCapability = board.capability('gpio');\n"
+    "  assertFrozenTree(gpioCapability, 'board.capability(\\'gpio\\')');\n"
+    "  attackFrozenTree(gpioCapability, 'board.capability(\\'gpio\\')');\n"
+    "  var capabilities = board.capabilities();\n"
+    "  assertFrozenTree(capabilities, 'board.capabilities()');\n"
+    "  attackFrozenTree(capabilities, 'board.capabilities()');\n"
+    "  assert(JSON.stringify(capabilities.gpio) === JSON.stringify(gpioCapability), 'singular and snapshot capabilities diverged');\n"
+    "  assert(board.capability('__missing_capability__') === undefined, 'unknown capability is present');\n"
+    "  assertThrowsType(function () { board.capability(); }, TypeError, 'missing capability argument did not throw TypeError');\n"
+    "  assertThrowsType(function () { board.capability(1); }, TypeError, 'numeric capability argument did not throw TypeError');\n"
+    "  assertThrowsType(function () { board.capability(''); }, RangeError, 'empty capability name did not throw RangeError');\n"
+    "  assertThrowsType(function () { board.capability(Array(33).join('x')); }, RangeError, 'oversized capability name did not throw RangeError');\n"
+    "  assertThrowsType(function () { board.capability('gpio\\x00shadow'); }, RangeError, 'null-byte capability name did not throw RangeError');\n"
     "})();\n";
 
 int main(void) {
@@ -172,18 +220,35 @@ int main(void) {
     jerry_value_t has_image = jerry_boolean(MCUJS_FEATURE_IMAGE != 0);
     js_set_property(global, "__mcujsHasImage", has_image);
     jerry_value_free(has_image);
+    jerry_value_t expected_board = jerry_json_parse(
+        (const jerry_char_t *)registry->board_json, strlen(registry->board_json));
+    assert(!jerry_value_is_exception(expected_board));
+    js_set_property(global, "__mcujsExpectedBoard", expected_board);
+    jerry_value_free(expected_board);
+    jerry_value_t expected_safe_mode = jerry_boolean(registry->safe_mode);
+    js_set_property(global, "__mcujsExpectedSafeMode", expected_safe_mode);
+    jerry_value_free(expected_safe_mode);
+    jerry_value_t expected_storage_ready = jerry_boolean(registry->storage_ready);
+    js_set_property(global, "__mcujsExpectedStorageReady", expected_storage_ready);
+    jerry_value_free(expected_storage_ready);
+    jerry_value_t process = jerry_object();
+    js_set_property(global, "process", process);
+    jerry_value_free(process);
     jerry_value_free(global);
 
     js_bind_require();
-    jerry_value_t result = jerry_eval((const jerry_char_t *)s_test_source,
-                                      sizeof(s_test_source) - 1,
-                                      JERRY_PARSE_NO_OPTS);
-    if (jerry_value_is_exception(result)) {
-        print_exception(result);
-        jerry_cleanup();
-        return 1;
-    }
-    jerry_value_free(result);
+
+    size_t baseline = heap_used();
+    assert(eval_source("globalThis.__oneCapability = board.capability('usb');"));
+    size_t singular = heap_used();
+    assert(eval_source("globalThis.__allCapabilities = board.capabilities();"));
+    size_t complete = heap_used();
+    assert(singular > baseline);
+    assert(complete > singular);
+    printf("runtime Jerry binding heap for %s: base=%zu one=%zu all=%zu\n",
+           registry->board_id, baseline, singular, complete);
+
+    assert(eval_source(s_test_source));
     js_require_clear_cache();
     jerry_cleanup();
 

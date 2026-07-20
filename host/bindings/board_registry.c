@@ -14,12 +14,29 @@ static jerry_value_t current_board(void) {
     jerry_value_t global = jerry_current_realm();
     jerry_value_t board = object_get(global, "board");
     jerry_value_free(global);
+    if (!jerry_value_is_object(board)) {
+        jerry_value_free(board);
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "Board binding is unavailable");
+    }
     return board;
 }
 
 static jerry_value_t parse_json(const char *json) {
     return jerry_json_parse((const jerry_char_t *)json,
                             (jerry_size_t)strlen(json));
+}
+
+static jerry_value_t parse_frozen_json(const char *json) {
+    jerry_value_t value = parse_json(json);
+    if (jerry_value_is_exception(value)) return value;
+
+    jerry_value_t frozen = js_deep_freeze(value);
+    if (jerry_value_is_exception(frozen)) {
+        jerry_value_free(value);
+        return frozen;
+    }
+    jerry_value_free(frozen);
+    return value;
 }
 
 static bool freeze_and_publish(jerry_value_t object, const char *name,
@@ -53,12 +70,16 @@ static jerry_value_t board_capability_handler(const jerry_call_info_t *call_info
     }
     jerry_string_to_buffer(args[0], JERRY_ENCODING_UTF8,
                            (jerry_char_t *)name, length);
+    if (memchr(name, '\0', length) != NULL) {
+        return jerry_throw_sz(JERRY_ERROR_RANGE,
+                              "board capability name contains a null byte");
+    }
     name[length] = '\0';
 
     const mcujs_runtime_capability_t *capability =
         mcujs_runtime_find_capability(name);
     if (capability == NULL) return jerry_undefined();
-    return parse_json(capability->json);
+    return parse_frozen_json(capability->json);
 }
 
 static jerry_value_t board_capabilities_handler(const jerry_call_info_t *call_info,
@@ -71,7 +92,7 @@ static jerry_value_t board_capabilities_handler(const jerry_call_info_t *call_in
     jerry_value_t capabilities = jerry_object();
     for (size_t i = 0; i < registry->capability_count; i++) {
         const mcujs_runtime_capability_t *entry = &registry->capabilities[i];
-        jerry_value_t value = parse_json(entry->json);
+        jerry_value_t value = parse_frozen_json(entry->json);
         if (jerry_value_is_exception(value)) {
             jerry_value_free(capabilities);
             return value;
@@ -84,8 +105,21 @@ static jerry_value_t board_capabilities_handler(const jerry_call_info_t *call_in
             jerry_value_free(capabilities);
             return result;
         }
+        if (!jerry_value_is_true(result)) {
+            jerry_value_free(result);
+            jerry_value_free(capabilities);
+            return jerry_throw_sz(JERRY_ERROR_COMMON,
+                                  "Unable to create capability snapshot");
+        }
         jerry_value_free(result);
     }
+
+    jerry_value_t frozen = js_deep_freeze(capabilities);
+    if (jerry_value_is_exception(frozen)) {
+        jerry_value_free(capabilities);
+        return frozen;
+    }
+    jerry_value_free(frozen);
     return capabilities;
 }
 

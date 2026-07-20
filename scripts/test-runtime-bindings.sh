@@ -56,6 +56,7 @@ python3 "${JERRY_ROOT}/tools/build.py" \
     --strip=OFF \
     --cpointer-32bit=OFF \
     --error-messages=ON \
+    --cmake-param=-DJERRY_MEM_STATS=ON \
     --mem-heap=64 \
     >/dev/null
 

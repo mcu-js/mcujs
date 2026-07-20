@@ -155,6 +155,7 @@ unsigned mcujs_test_i2c_driver_install_calls;
 unsigned mcujs_test_i2c_driver_delete_calls;
 int mcujs_test_ledc_result;
 unsigned mcujs_test_ledc_resolution;
+unsigned mcujs_test_ledc_configured_resolution;
 unsigned mcujs_test_ledc_actual_frequency;
 unsigned mcujs_test_ledc_duty_calls;
 unsigned mcujs_test_ledc_duty;
@@ -170,6 +171,7 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_driver_delete_calls = 0;
     mcujs_test_ledc_result = ESP_OK;
     mcujs_test_ledc_resolution = 10;
+    mcujs_test_ledc_configured_resolution = 0;
     mcujs_test_ledc_actual_frequency = 0;
     mcujs_test_ledc_duty_calls = 0;
     mcujs_test_ledc_duty = 0;
@@ -243,6 +245,7 @@ esp_err_t ledc_timer_config(const ledc_timer_config_t *config) {
     if (mcujs_test_ledc_result == ESP_OK && !config->deconfigure &&
         config->timer_num >= 0 && config->timer_num < 4) {
         s_ledc_timer_frequency[config->timer_num] = config->freq_hz;
+        mcujs_test_ledc_configured_resolution = config->duty_resolution;
     }
     return mcujs_test_ledc_result;
 }

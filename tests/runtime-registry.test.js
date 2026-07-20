@@ -184,6 +184,38 @@ test("reserved implementation pins are absent from public RP maps", () => {
   assert.equal("adc" in piZero.capabilities, false);
 });
 
+test("RP PWM limits count distinct reachable hardware outputs and slices", () => {
+  const expected = {
+    pico: { maxOutputs: 16, timerCount: 8 },
+    pico2: { maxOutputs: 16, timerCount: 8 },
+    pico2_w: { maxOutputs: 16, timerCount: 8 },
+    waveshare_rp2040_zero: { maxOutputs: 16, timerCount: 8 },
+    waveshare_rp2040_pizero: { maxOutputs: 16, timerCount: 8 },
+    "waveshare_rp2040_touch_lcd_1.28": { maxOutputs: 11, timerCount: 6 },
+    "waveshare_rp2350_lcd_1.47_a": { maxOutputs: 11, timerCount: 6 },
+    "waveshare_rp2350_touch_lcd_1.69": { maxOutputs: 9, timerCount: 5 },
+    adafruit_feather_rp2040: { maxOutputs: 11, timerCount: 6 },
+  };
+
+  for (const [boardId, limits] of Object.entries(expected)) {
+    const pwm = boardDescriptors[boardId].capabilities.pwm;
+    const outputs = new Set();
+    const slices = new Set();
+    for (const pin of pwm.pins) {
+      const slice = pin < 32 ? ((pin >> 1) & 7) : 8 + ((pin >> 1) & 3);
+      outputs.add(`${slice}:${pin & 1}`);
+      slices.add(slice);
+    }
+    assert.equal(pwm.maxOutputs, outputs.size, `${boardId}.pwm.maxOutputs`);
+    assert.equal(pwm.timerCount, slices.size, `${boardId}.pwm.timerCount`);
+    assert.deepEqual(
+      { maxOutputs: pwm.maxOutputs, timerCount: pwm.timerCount },
+      limits,
+      `${boardId}.pwm physical limits`,
+    );
+  }
+});
+
 test("the checked-in C registry is generated exactly from board descriptors", () => {
   const generated = generateRuntimeRegistryHeader();
   const checkedIn = readFileSync(join(root, generatedHeaderPath), "utf8");

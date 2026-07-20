@@ -97,8 +97,8 @@
         14,
         22
       ],
-      "maxOutputs": 12,
-      "timerCount": 12,
+      "maxOutputs": 11,
+      "timerCount": 6,
       "duty": {
         "min": 0,
         "max": 1,

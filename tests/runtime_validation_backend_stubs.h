@@ -22,6 +22,7 @@ extern unsigned mcujs_test_i2c_driver_install_calls;
 extern unsigned mcujs_test_i2c_driver_delete_calls;
 extern int mcujs_test_ledc_result;
 extern unsigned mcujs_test_ledc_resolution;
+extern unsigned mcujs_test_ledc_configured_resolution;
 extern unsigned mcujs_test_ledc_actual_frequency;
 extern unsigned mcujs_test_ledc_duty_calls;
 extern unsigned mcujs_test_ledc_duty;

@@ -90,8 +90,8 @@
         27,
         28
       ],
-      "maxOutputs": 11,
-      "timerCount": 12,
+      "maxOutputs": 9,
+      "timerCount": 5,
       "duty": {
         "min": 0,
         "max": 1,

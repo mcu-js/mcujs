@@ -17,7 +17,9 @@
 #define MCUJS_PWM_CHANNEL_COUNT 8
 #define MCUJS_PWM_TIMER_COUNT 4
 #define MCUJS_PWM_SOURCE_HZ 80000000u
-#define MCUJS_PWM_MAX_RESOLUTION 14u
+/* At the hardware maximum (14 bits on ESP32-S3), a 2^resolution duty
+ * overflows LEDC. Keep one bit below it so exact 100% remains safe. */
+#define MCUJS_PWM_MAX_SAFE_RESOLUTION 13u
 
 typedef struct {
     bool used;
@@ -196,8 +198,8 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *info,
             return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, ESP_OK, pin, 0,
                                    "PWM frequency is not achievable");
         }
-        if (resolution > MCUJS_PWM_MAX_RESOLUTION) {
-            resolution = MCUJS_PWM_MAX_RESOLUTION;
+        if (resolution > MCUJS_PWM_MAX_SAFE_RESOLUTION) {
+            resolution = MCUJS_PWM_MAX_SAFE_RESOLUTION;
         }
     }
 

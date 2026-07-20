@@ -199,6 +199,13 @@ int main(void) {
         "throw new Error('expected PWM maximum-plus-one RangeError'); }());"));
 
 #if defined(MCUJS_PLATFORM_ESP32)
+    mcujs_test_ledc_resolution = 14;
+    assert(eval_source("PWM.init(4, 1300); PWM.setDuty(4, 1);"));
+    assert(mcujs_test_ledc_configured_resolution == 13u);
+    assert(mcujs_test_ledc_duty == 8192u);
+    assert(eval_source("PWM.stop(4);"));
+    mcujs_test_ledc_resolution = 10;
+
     assert(eval_source(
         "(function () { function expectRange(call, message) { var error; "
         "try { call(); } catch (caught) { error = caught; } "

@@ -47,12 +47,18 @@ function gpioCapability(pins) {
   return { pins: [...pins], outputPins: [...pins], modes: ["input", "output", "inputPullup", "inputPulldown"] };
 }
 
+function rpPwmSlice(pin) {
+  return pin < 32 ? ((pin >> 1) & 7) : 8 + ((pin >> 1) & 3);
+}
+
 function pwmCapability(pins, chip) {
   const rp2350 = chip === "RP2350";
+  const slices = new Set(pins.map((pin) => rpPwmSlice(pin)));
+  const outputs = new Set(pins.map((pin) => (rpPwmSlice(pin) * 2) + (pin & 1)));
   return {
     pins: [...pins],
-    maxOutputs: Math.min(pins.length, rp2350 ? 24 : 16),
-    timerCount: rp2350 ? 12 : 8,
+    maxOutputs: outputs.size,
+    timerCount: slices.size,
     duty: { min: 0, max: 1, unit: "ratio" },
     frequency: {
       minHz: rp2350 ? 10 : 8,

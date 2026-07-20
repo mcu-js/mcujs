@@ -94,11 +94,51 @@ var MELODY_6 = [
 
 var initialized = false;
 var playing = false;
+var pwmFrequency = board.capability('pwm').frequency;
+var exactFrequencyCache = {};
+
+// Select the nearest frequency the active PWM backend can represent exactly.
+// Rejected probes are non-mutating by contract, so this stays application-level
+// and capability-driven without weakening PWM.init() or sniffing board identity.
+function configureNearestFrequency(target) {
+  var requested = Math.round(target);
+  var center = Math.max(pwmFrequency.minHz,
+                        Math.min(pwmFrequency.maxHz, requested));
+  var cached = exactFrequencyCache[requested];
+  if (cached) {
+    PWM.init(BUZZER_PIN, cached);
+    return cached;
+  }
+
+  var maximumDistance = Math.max(center - pwmFrequency.minHz,
+                                 pwmFrequency.maxHz - center);
+  for (var distance = 0; distance <= maximumDistance; distance++) {
+    var lower = center - distance;
+    var upper = center + distance;
+    var candidates = distance === 0 ? [lower] : [lower, upper];
+    for (var i = 0; i < candidates.length; i++) {
+      var candidate = candidates[i];
+      if (candidate < pwmFrequency.minHz || candidate > pwmFrequency.maxHz) continue;
+      try {
+        PWM.init(BUZZER_PIN, candidate);
+        exactFrequencyCache[requested] = candidate;
+        return candidate;
+      } catch (error) {
+        if (!error || error.code !== 'ERR_NOT_SUPPORTED') throw error;
+      }
+    }
+  }
+
+  var unsupported = new Error('No representable PWM frequency for ' + target + ' Hz');
+  unsupported.name = 'NotSupportedError';
+  unsupported.code = 'ERR_NOT_SUPPORTED';
+  throw unsupported;
+}
 
 // Initialize buzzer
 function init() {
   if (initialized) return;
-  PWM.init(BUZZER_PIN, 440);
+  configureNearestFrequency(440);
   PWM.setDuty(BUZZER_PIN, 0);
   initialized = true;
 }
@@ -110,7 +150,7 @@ function tone(freq, duration) {
   if (freq === 0 || freq === NOTE.REST) {
     PWM.setDuty(BUZZER_PIN, 0);
   } else {
-    PWM.init(BUZZER_PIN, freq);
+    configureNearestFrequency(freq);
     PWM.setDuty(BUZZER_PIN, 0.5);
   }
   
@@ -148,7 +188,7 @@ function playMelody(melody, tempo) {
     if (freq === 0 || freq === NOTE.REST) {
       PWM.setDuty(BUZZER_PIN, 0);
     } else {
-      PWM.init(BUZZER_PIN, freq);
+      configureNearestFrequency(freq);
       PWM.setDuty(BUZZER_PIN, 0.5);
     }
     

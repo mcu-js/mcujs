@@ -340,7 +340,7 @@ boardDescriptors.seeed_xiao_esp32s3 = {
     pwm: {
       pins: pinsBetween(1, 9), maxOutputs: 8, timerCount: 4,
       duty: { min: 0, max: 1, unit: "ratio" },
-      frequency: { minHz: 1, maxHz: 1000000, resolutionVaries: true },
+      frequency: { minHz: 10, maxHz: 1000000, resolutionVaries: true },
     },
     adc: adcCapability(pinsBetween(1, 9), Object.fromEntries(pinsBetween(1, 9).map((pin) => [pin, `A${pin - 1}`])), {
       calibrated: true, rawChannel: false, vsys: false,

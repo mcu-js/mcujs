@@ -236,6 +236,14 @@ function validateSemanticManifest(manifest) {
         "must not exceed the number of PWM-capable pins",
       );
     }
+    if (capabilities.pwm.timerCount > capabilities.pwm.maxOutputs) {
+      semanticError(
+        errors,
+        "/capabilities/pwm/timerCount",
+        "pwm.timerCount",
+        "must not exceed the number of independently addressable PWM outputs",
+      );
+    }
   }
 
   if (capabilities.adc) {

@@ -162,7 +162,7 @@ clearInterval(id);
 const PWM = require('pwm');
 
 PWM.init(pin, frequency);         // Initialize PWM on pin
-PWM.setDuty(pin, duty);           // duty: 0-65535 or 0.0-1.0
+PWM.setDuty(pin, duty);           // duty: 0.0-1.0 ratio
 PWM.stop(pin);
 ```
 

@@ -4,6 +4,8 @@
 #include "bindings.h"
 #include "jerryscript.h"
 #include "pin_policy.h"
+#include "pwm_policy.h"
+#include "runtime_features.h"
 
 #include "driver/gpio.h"
 #include "driver/ledc.h"
@@ -21,22 +23,19 @@
  * overflows LEDC. Keep one bit below it so exact 100% remains safe. */
 #define MCUJS_PWM_MAX_SAFE_RESOLUTION 13u
 #define MCUJS_PWM_DIVIDER_FRACTIONAL_BITS 8u
+#define MCUJS_PWM_DIVIDER_MIN (1u << MCUJS_PWM_DIVIDER_FRACTIONAL_BITS)
+#define MCUJS_PWM_DIVIDER_MAX 0x3ffffu
 
 typedef struct {
     bool used;
-    uint32_t frequency;
-    ledc_timer_bit_t resolution;
-    uint8_t references;
-} pwm_timer_state_t;
-
-typedef struct {
-    bool used;
+    bool configured;
     int pin;
     ledc_channel_t channel;
     ledc_timer_t timer;
 } pwm_channel_state_t;
 
-static pwm_timer_state_t s_timers[MCUJS_PWM_TIMER_COUNT];
+static mcujs_pwm_timer_resource_t s_timers[MCUJS_PWM_TIMER_COUNT];
+static ledc_timer_bit_t s_timer_resolutions[MCUJS_PWM_TIMER_COUNT];
 static pwm_channel_state_t s_channels[MCUJS_PWM_CHANNEL_COUNT];
 
 static jerry_value_t throw_pwm_error(mcujs_operational_error_t error,
@@ -63,44 +62,20 @@ static mcujs_operational_error_t map_pwm_native_error(esp_err_t error) {
     return MCUJS_ERROR_IO;
 }
 
-static bool find_exact_duty_value(double duty, uint32_t period,
-                                  uint32_t *value) {
-    uint32_t candidate = (uint32_t)(duty * (double)period + 0.5);
-    if (candidate > period ||
-        (double)candidate / (double)period != duty) {
-        return false;
-    }
-    *value = candidate;
-    return true;
-}
-
 static bool find_exact_timer_resolution(uint32_t frequency,
                                         uint32_t *resolution) {
     uint32_t candidate =
         ledc_find_suitable_duty_resolution(MCUJS_PWM_SOURCE_HZ, frequency);
-    if (candidate == 0) return false;
-    if (candidate > MCUJS_PWM_MAX_SAFE_RESOLUTION) {
-        candidate = MCUJS_PWM_MAX_SAFE_RESOLUTION;
+    mcujs_pwm_esp_frequency_config_t config;
+    if (!mcujs_pwm_esp_find_exact_frequency(
+            MCUJS_PWM_SOURCE_HZ, frequency, candidate,
+            MCUJS_PWM_MAX_SAFE_RESOLUTION,
+            MCUJS_PWM_DIVIDER_FRACTIONAL_BITS, MCUJS_PWM_DIVIDER_MIN,
+            MCUJS_PWM_DIVIDER_MAX, &config)) {
+        return false;
     }
 
-    /* IDF 5.3.2 uses an 8-bit fractional divider and rounds both the divider
-     * and ledc_get_freq(). ESP32-S3 AUTO_CLK tries the 80 MHz APB clock first,
-     * so mirror that calculation before any active channel is torn down. */
-    uint64_t precision = (uint64_t)1u << candidate;
-    uint64_t scaled_source =
-        (uint64_t)MCUJS_PWM_SOURCE_HZ << MCUJS_PWM_DIVIDER_FRACTIONAL_BITS;
-    uint64_t requested_denominator = (uint64_t)frequency * precision;
-    uint64_t divider =
-        (scaled_source + requested_denominator / 2u) /
-        requested_denominator;
-    if (divider == 0) return false;
-    uint64_t actual_denominator = precision * divider;
-    uint32_t actual_frequency =
-        (uint32_t)((scaled_source + actual_denominator / 2u) /
-                   actual_denominator);
-    if (actual_frequency != frequency) return false;
-
-    *resolution = candidate;
+    *resolution = config.resolution;
     return true;
 }
 
@@ -123,25 +98,6 @@ static pwm_channel_state_t *find_free_channel(void) {
     return NULL;
 }
 
-static int find_timer(uint32_t frequency,
-                      const pwm_channel_state_t *existing) {
-    for (int i = 0; i < MCUJS_PWM_TIMER_COUNT; i++) {
-        if (s_timers[i].used && s_timers[i].frequency == frequency) {
-            return i;
-        }
-    }
-    for (int i = 0; i < MCUJS_PWM_TIMER_COUNT; i++) {
-        if (!s_timers[i].used) {
-            return i;
-        }
-    }
-    if (existing != NULL &&
-        s_timers[existing->timer].references == 1) {
-        return (int)existing->timer;
-    }
-    return -1;
-}
-
 static esp_err_t deconfigure_timer(int index) {
     esp_err_t result =
         ledc_timer_pause(LEDC_LOW_SPEED_MODE, (ledc_timer_t)index);
@@ -154,24 +110,46 @@ static esp_err_t deconfigure_timer(int index) {
     return ledc_timer_config(&config);
 }
 
-static esp_err_t release_channel(pwm_channel_state_t *channel) {
-    esp_err_t result = ledc_stop(LEDC_LOW_SPEED_MODE, channel->channel, 0);
+static esp_err_t drive_pin_output_low(int pin) {
+    esp_err_t result = gpio_reset_pin((gpio_num_t)pin);
     if (result != ESP_OK) return result;
-    result = gpio_reset_pin((gpio_num_t)channel->pin);
+    result = gpio_set_level((gpio_num_t)pin, 0);
+    if (result != ESP_OK) return result;
+    result = gpio_set_pull_mode((gpio_num_t)pin, GPIO_FLOATING);
+    if (result != ESP_OK) return result;
+    return gpio_set_direction((gpio_num_t)pin, GPIO_MODE_INPUT_OUTPUT);
+}
+
+static esp_err_t release_channel(pwm_channel_state_t *channel) {
+    esp_err_t result = ESP_OK;
+    if (channel->configured) {
+        result = ledc_stop(LEDC_LOW_SPEED_MODE, channel->channel, 0);
+        if (result != ESP_OK) return result;
+        channel->configured = false;
+    }
+    result = drive_pin_output_low(channel->pin);
     if (result != ESP_OK) return result;
 
     int timer_index = (int)channel->timer;
     bool last_reference = s_timers[timer_index].references == 1;
     if (last_reference) {
+        /* Pause and deconfigure are separate driver operations. Once cleanup
+         * starts, keep this timer unavailable to other channels until both
+         * complete so a paused/uncertain timer cannot be reused. */
+        s_timers[timer_index].pending_cleanup = true;
         result = deconfigure_timer(timer_index);
         if (result != ESP_OK) return result;
+        s_timers[timer_index].pending_cleanup = false;
     }
 
     mcujs_pin_release(channel->pin, MCUJS_PIN_OWNER_PWM);
     if (s_timers[timer_index].references > 0) {
         s_timers[timer_index].references--;
     }
-    if (last_reference) s_timers[timer_index] = (pwm_timer_state_t){0};
+    if (last_reference) {
+        s_timers[timer_index] = (mcujs_pwm_timer_resource_t){0};
+        s_timer_resolutions[timer_index] = 0;
+    }
     *channel = (pwm_channel_state_t){0};
     return ESP_OK;
 }
@@ -194,8 +172,11 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *info,
     if (!mcujs_pin_is_peripheral_output(pin)) {
         return jerry_throw_sz(JERRY_ERROR_RANGE, "Invalid PWM output pin (use GPIO1..GPIO9)");
     }
-    if (frequency_value < 1 || frequency_value > 1000000) {
-        return jerry_throw_sz(JERRY_ERROR_RANGE, "PWM frequency must be 1..1000000 Hz");
+    if (frequency_value < MCUJS_RUNTIME_PWM_MIN_HZ ||
+        frequency_value > MCUJS_RUNTIME_PWM_MAX_HZ) {
+        return jerry_throw_sz(
+            JERRY_ERROR_RANGE,
+            "PWM frequency is outside the board capability");
     }
     if (!mcujs_pin_can_claim(pin, MCUJS_PIN_OWNER_PWM)) {
         return throw_pwm_error(MCUJS_ERROR_BUSY, ESP_OK, pin, 0,
@@ -211,7 +192,9 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *info,
                                "No PWM channels available");
     }
     uint32_t frequency = (uint32_t)frequency_value;
-    int timer_index = find_timer(frequency, existing);
+    int current_timer = existing != NULL ? (int)existing->timer : -1;
+    int timer_index = mcujs_pwm_select_timer(
+        s_timers, MCUJS_PWM_TIMER_COUNT, frequency, current_timer);
     if (timer_index < 0) {
         return throw_pwm_error(MCUJS_ERROR_RESOURCE_EXHAUSTED, ESP_OK, pin,
                                MCUJS_PWM_TIMER_COUNT,
@@ -253,7 +236,7 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *info,
         };
         esp_err_t timer_error = ledc_timer_config(&timer);
         if (timer_error != ESP_OK) {
-            esp_err_t reset_error = gpio_reset_pin((gpio_num_t)pin);
+            esp_err_t reset_error = drive_pin_output_low(pin);
             if (reset_error != ESP_OK) {
                 return throw_pwm_error(map_pwm_native_error(reset_error),
                                        reset_error, pin, 0,
@@ -267,23 +250,33 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *info,
         uint32_t actual_frequency =
             ledc_get_freq(LEDC_LOW_SPEED_MODE, (ledc_timer_t)timer_index);
         if (actual_frequency != frequency) {
-            esp_err_t cleanup_error = deconfigure_timer(timer_index);
-            if (cleanup_error == ESP_OK) {
-                cleanup_error = gpio_reset_pin((gpio_num_t)pin);
-            }
+            /* The timer is live even though its observed frequency violated the
+             * contract. Publish a pending channel before rollback so any cleanup
+             * failure retains both pin ownership and a retryable timer handle. */
+            s_timers[timer_index].used = true;
+            s_timers[timer_index].pending_cleanup = true;
+            s_timers[timer_index].frequency = frequency;
+            s_timer_resolutions[timer_index] = (ledc_timer_bit_t)resolution;
+            channel->used = true;
+            channel->configured = false;
+            channel->pin = pin;
+            channel->timer = (ledc_timer_t)timer_index;
+            s_timers[timer_index].references++;
+
+            esp_err_t cleanup_error = release_channel(channel);
             if (cleanup_error != ESP_OK) {
                 return throw_pwm_error(map_pwm_native_error(cleanup_error),
                                        cleanup_error, pin, 0,
                                        "PWM frequency rollback failed");
             }
-            mcujs_pin_release(pin, MCUJS_PIN_OWNER_PWM);
             return throw_pwm_error(
                 MCUJS_ERROR_NOT_SUPPORTED, ESP_OK, pin, 0,
                 "PWM frequency cannot be represented exactly");
         }
         s_timers[timer_index].used = true;
+        s_timers[timer_index].pending_cleanup = false;
         s_timers[timer_index].frequency = frequency;
-        s_timers[timer_index].resolution = (ledc_timer_bit_t)resolution;
+        s_timer_resolutions[timer_index] = (ledc_timer_bit_t)resolution;
     }
 
     ledc_channel_config_t config = {
@@ -298,28 +291,30 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *info,
     };
     esp_err_t channel_error = ledc_channel_config(&config);
     if (channel_error != ESP_OK) {
-        if (new_timer) {
-            esp_err_t cleanup_error = deconfigure_timer(timer_index);
-            if (cleanup_error != ESP_OK) {
-                return throw_pwm_error(map_pwm_native_error(cleanup_error),
-                                       cleanup_error, pin, 0,
-                                       "PWM channel rollback failed");
-            }
-            s_timers[timer_index] = (pwm_timer_state_t){0};
+        /* Publish the resources that must remain owned before rollback. If
+         * GPIO reset or timer deconfiguration fails, a later init can find
+         * this pending channel, finish cleanup, and reconfigure the timer
+         * instead of attaching to stale paused hardware. */
+        channel->used = true;
+        channel->configured = false;
+        channel->pin = pin;
+        channel->timer = (ledc_timer_t)timer_index;
+        s_timers[timer_index].references++;
+        if (new_timer) s_timers[timer_index].pending_cleanup = true;
+
+        esp_err_t cleanup_error = release_channel(channel);
+        if (cleanup_error != ESP_OK) {
+            return throw_pwm_error(map_pwm_native_error(cleanup_error),
+                                   cleanup_error, pin, 0,
+                                   "PWM channel rollback failed");
         }
-        esp_err_t reset_error = gpio_reset_pin((gpio_num_t)pin);
-        if (reset_error != ESP_OK) {
-            return throw_pwm_error(map_pwm_native_error(reset_error),
-                                   reset_error, pin, 0,
-                                   "PWM channel pin rollback failed");
-        }
-        mcujs_pin_release(pin, MCUJS_PIN_OWNER_PWM);
         return throw_pwm_error(map_pwm_native_error(channel_error),
                                channel_error, pin, 0,
                                "PWM channel initialization failed");
     }
 
     channel->used = true;
+    channel->configured = true;
     channel->pin = pin;
     channel->timer = (ledc_timer_t)timer_index;
     s_timers[timer_index].references++;
@@ -348,14 +343,14 @@ static jerry_value_t pwm_set_duty_handler(const jerry_call_info_t *info,
                               "Invalid PWM output pin (use GPIO1..GPIO9)");
     }
     pwm_channel_state_t *channel = find_channel(pin);
-    if (channel == NULL) {
+    if (channel == NULL || !channel->configured) {
         return throw_pwm_error(MCUJS_ERROR_BUSY, ESP_OK, pin, 0,
                                "PWM pin is not initialized");
     }
-    uint32_t resolution = (uint32_t)s_timers[channel->timer].resolution;
+    uint32_t resolution = (uint32_t)s_timer_resolutions[channel->timer];
     uint32_t period = 1u << resolution;
     uint32_t duty;
-    if (!find_exact_duty_value(input, period, &duty)) {
+    if (!mcujs_pwm_ratio_to_level(input, period, UINT32_MAX, &duty)) {
         return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, ESP_OK, pin, 0,
                                "PWM duty cannot be represented exactly");
     }

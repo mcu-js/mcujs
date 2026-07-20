@@ -32,11 +32,11 @@ Button input with software debounce - toggles LED on button press.
 **Hardware:** Push button connected between GPIO 15 and GND
 
 ### pwm-fade/
-LED breathing effect using PWM - smoothly fades the LED up and down.
+Portable LED breathing effect using PWM - smoothly fades an advertised PWM-capable GPIO LED up and down for 15 seconds.
 
-**Concepts:** `PWM.init`, `PWM.setDuty`, smooth animations
+**Concepts:** `board.capability('pwm')`, `pwm.init`, ratio-only `pwm.setDuty`, safe reruns
 
-**Hardware:** None (uses onboard LED on GPIO 25)
+**Hardware:** A PWM-capable onboard GPIO LED, or set `globalThis.pwmFadePin` to an advertised PWM pin connected to an LED and resistor. Set `globalThis.pwmFadeActiveLow = true` for active-low wiring.
 
 ### i2c-scan/
 Scans the I2C bus for connected devices and identifies common chips.

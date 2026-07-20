@@ -216,6 +216,26 @@ test("RP PWM limits count distinct reachable hardware outputs and slices", () =>
   }
 });
 
+test("PWM descriptors expose exact ratio units and truthful physical limits", () => {
+  for (const boardId of shippingBoardIds) {
+    assert.deepEqual(
+      boardDescriptors[boardId].capabilities.pwm.duty,
+      { min: 0, max: 1, unit: "ratio" },
+      `${boardId}.pwm.duty`,
+    );
+  }
+
+  const pwm = boardDescriptors.seeed_xiao_esp32s3.capabilities.pwm;
+  assert.deepEqual(pwm.pins, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  assert.equal(pwm.maxOutputs, 8, "ESP32-S3 LEDC low-speed channel count");
+  assert.equal(pwm.timerCount, 4, "ESP32-S3 LEDC low-speed timer count");
+  assert.deepEqual(pwm.frequency, {
+    minHz: 10,
+    maxHz: 1000000,
+    resolutionVaries: true,
+  });
+});
+
 test("the checked-in C registry is generated exactly from board descriptors", () => {
   const generated = generateRuntimeRegistryHeader();
   const checkedIn = readFileSync(join(root, generatedHeaderPath), "utf8");

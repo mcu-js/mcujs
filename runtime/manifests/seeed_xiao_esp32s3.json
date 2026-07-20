@@ -104,7 +104,7 @@
         "unit": "ratio"
       },
       "frequency": {
-        "minHz": 1,
+        "minHz": 10,
         "maxHz": 1000000,
         "resolutionVaries": true
       }

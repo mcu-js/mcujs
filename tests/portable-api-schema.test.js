@@ -337,6 +337,13 @@ test("the mandatory manifest validator rejects contradictory capability descript
       constraint: "pwm.maxOutputs",
     },
     {
+      name: "PWM timer count above its output count",
+      mutate(manifest) {
+        manifest.capabilities.pwm.timerCount = 2;
+      },
+      constraint: "pwm.timerCount",
+    },
+    {
       name: "I2C default bus absent from buses and routes",
       mutate(manifest) {
         manifest.capabilities.i2c.defaultBus = 1;

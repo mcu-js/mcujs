@@ -171,3 +171,8 @@ lists. For 0.2:
 
 Backend-specific electrical assertions remain appropriate, but the JavaScript
 contract they verify is shared.
+
+PWM electrical acceptance uses the separate
+[non-destructive PWM waveform protocol](./pwm-waveform-protocol.md). Host/native
+tests prove validation, scaling, allocation, and lifecycle state; they do not
+claim measured waveform frequency, duty, edge quality, or rail levels.

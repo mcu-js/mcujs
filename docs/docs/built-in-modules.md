@@ -108,6 +108,41 @@ stale GPIO calls throw `EBUSY`. Releasing the peripheral does not resurrect the
 old GPIO setup: call `gpio.init()` again before using the pin. An active
 peripheral owner cannot be stolen by GPIO or another peripheral.
 
+### PWM contract
+
+The canonical PWM module is `require('pwm')`. Its portable surface is exactly
+`pwm.init(pin, frequency)`, `pwm.setDuty(pin, duty)`, and `pwm.stop(pin)`.
+Feature-detect the module with `require('mcujs:module').has('pwm')`, then select
+only pins listed by `board.capability('pwm').pins`; do not infer a pin from the
+board or chip name.
+
+`frequency` is an integer in the advertised `frequency.minHz..maxHz` range.
+Values outside that range throw uncoded `RangeError`. Hardware frequency sets
+are sparse: an in-range value that cannot be represented exactly throws
+`NotSupportedError` with `code === 'ERR_NOT_SUPPORTED'` instead of being
+rounded or clamped.
+
+`duty` is only a finite ratio from `0` through `1`. Values outside that range
+throw uncoded `RangeError`; a valid ratio that the selected PWM period cannot
+represent exactly throws `ERR_NOT_SUPPORTED`. Use capability-selected periods
+and simple binary ratios such as `1 / 64` when exact cross-board behavior is
+required.
+
+`maxOutputs` reports independently addressable PWM outputs and `timerCount`
+reports frequency-generating resources. Outputs may share a timer only at the
+same frequency. Exhausting either pool throws `ResourceExhaustedError` with
+`code === 'ERR_RESOURCE_EXHAUSTED'` and a numeric `limit`; conflicting RP slice
+frequencies or aliased output pins throw `ResourceBusyError` with `code ===
+'EBUSY'`. A successful same-pin reinitialization resets duty to zero before the
+new waveform is used. Failed representability checks leave the existing output
+unchanged.
+
+`pwm.stop(pin)` drives the output low and releases the pin. A shared timer stays
+active until its final output stops. Native teardown failure retains ownership
+and returns a typed operational error so `stop()` can be retried. As with every
+peripheral release, GPIO does not regain its previous configuration: call
+`gpio.init()` explicitly before reusing the pin.
+
 ## Example usage
 
 ```javascript

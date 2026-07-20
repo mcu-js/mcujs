@@ -171,25 +171,25 @@ int main(void) {
     assert(mcujs_test_i2c_last_length == 256);
 
 #if defined(MCUJS_PLATFORM_RP2)
-    assert(mcujs_test_pwm_level == 31250u);
+    assert(mcujs_test_pwm_level == (mcujs_test_pwm_wrap + 1u) / 2u);
     assert(eval_source("PWM.setDuty(9, 0);"));
     assert(mcujs_test_pwm_level == 0u);
     assert(eval_source("PWM.setDuty(9, 0.5);"));
-    assert(mcujs_test_pwm_level == 31250u);
+    assert(mcujs_test_pwm_level == (mcujs_test_pwm_wrap + 1u) / 2u);
     assert(eval_source("PWM.setDuty(9, 1);"));
-    assert(mcujs_test_pwm_level == 62500u);
+    assert(mcujs_test_pwm_level == mcujs_test_pwm_wrap + 1u);
     unsigned pwm_duty_calls = mcujs_test_pwm_duty_calls;
 #else
-    assert(mcujs_test_ledc_duty == 512u);
+    assert(mcujs_test_ledc_duty == 4096u);
     assert(eval_source("PWM.setDuty(9, 0);"));
     assert(mcujs_test_ledc_duty == 0u);
     assert(eval_source("PWM.setDuty(9, 0.5);"));
-    assert(mcujs_test_ledc_duty == 512u);
+    assert(mcujs_test_ledc_duty == 4096u);
     assert(eval_source("PWM.setDuty(9, 1);"));
-    assert(mcujs_test_ledc_duty == 1024u);
+    assert(mcujs_test_ledc_duty == 8192u);
     unsigned pwm_duty_calls = mcujs_test_ledc_duty_calls;
 #endif
-    assert(assert_operational_error("PWM.setDuty(9, 1 / 3)",
+    assert(assert_operational_error("PWM.setDuty(9, 1 / 7)",
                                     "NotSupportedError",
                                     "ERR_NOT_SUPPORTED"));
 #if defined(MCUJS_PLATFORM_RP2)
@@ -214,13 +214,18 @@ int main(void) {
 
     assert(eval_source("PWM.init(__pwmProbePin, __pwmMin);"));
 #if defined(MCUJS_PLATFORM_RP2)
-    assert((uint64_t)125000000u * 16u ==
+#if defined(MCUJS_BOARD_PICO2)
+    const uint32_t rp_clock_hz = 150000000u;
+#else
+    const uint32_t rp_clock_hz = 125000000u;
+#endif
+    assert((uint64_t)rp_clock_hz * 16u ==
            (uint64_t)MCUJS_RUNTIME_PWM_MIN_HZ *
                mcujs_test_pwm_divider_scaled * (mcujs_test_pwm_wrap + 1u));
 #endif
     assert(eval_source("PWM.stop(__pwmProbePin); PWM.init(__pwmProbePin, __pwmMax);"));
 #if defined(MCUJS_PLATFORM_RP2)
-    assert((uint64_t)125000000u * 16u ==
+    assert((uint64_t)rp_clock_hz * 16u ==
            (uint64_t)MCUJS_RUNTIME_PWM_MAX_HZ *
                mcujs_test_pwm_divider_scaled * (mcujs_test_pwm_wrap + 1u));
 #endif
@@ -247,19 +252,19 @@ int main(void) {
     assert(eval_source("GPIO.set(3, false); GPIO.toggle(3);"));
 
     mcujs_test_ledc_resolution = 14;
-    assert(eval_source("PWM.init(4, 1300); PWM.setDuty(4, 1);"));
+    assert(eval_source("PWM.init(4, 1250); PWM.setDuty(4, 1);"));
     assert(mcujs_test_ledc_configured_resolution == 13u);
     assert(mcujs_test_ledc_duty == 8192u);
     assert(eval_source("PWM.stop(4);"));
-    mcujs_test_ledc_resolution = 10;
+    mcujs_test_ledc_resolution = UINT32_MAX;
 
     mcujs_test_ledc_resolution = 14;
-    assert(eval_source("PWM.init(4, 1300); PWM.setDuty(4, 0.25);"));
+    assert(eval_source("PWM.init(4, 1250); PWM.setDuty(4, 0.25);"));
     unsigned pwm_stop_calls = mcujs_test_ledc_stop_calls;
     unsigned gpio_reset_calls = mcujs_test_gpio_reset_calls;
     unsigned preserved_duty_calls = mcujs_test_ledc_duty_calls;
-    mcujs_test_ledc_actual_frequency = 1599;
-    assert(assert_operational_error("PWM.init(4, 1600)",
+    mcujs_test_ledc_actual_frequency = 1600;
+    assert(assert_operational_error("PWM.init(4, 1601)",
                                     "NotSupportedError", "ERR_NOT_SUPPORTED"));
     mcujs_test_ledc_actual_frequency = 0;
     assert(mcujs_test_ledc_stop_calls == pwm_stop_calls);
@@ -270,7 +275,7 @@ int main(void) {
     assert(assert_operational_error("GPIO.init(4, GPIO.OUTPUT)",
                                     "ResourceBusyError", "EBUSY"));
     assert(eval_source("PWM.stop(4);"));
-    mcujs_test_ledc_resolution = 10;
+    mcujs_test_ledc_resolution = UINT32_MAX;
 
     assert(eval_source(
         "(function () { function expectRange(call, message) { var error; "
@@ -318,12 +323,12 @@ int main(void) {
     mcujs_test_ledc_resolution = 0;
     assert(assert_operational_error("PWM.init(4, 1100)",
                                     "NotSupportedError", "ERR_NOT_SUPPORTED"));
-    mcujs_test_ledc_resolution = 10;
-    assert(eval_source("PWM.init(4, 1100);"));
+    mcujs_test_ledc_resolution = UINT32_MAX;
+    assert(eval_source("PWM.init(4, 1250);"));
     mcujs_test_ledc_resolution = 0;
     assert(assert_operational_error("PWM.init(4, 1200)",
                                     "NotSupportedError", "ERR_NOT_SUPPORTED"));
-    mcujs_test_ledc_resolution = 10;
+    mcujs_test_ledc_resolution = UINT32_MAX;
     assert(eval_source("PWM.setDuty(4, 0.5);"));
     assert(eval_source(
         "(function () { try { PWM.setDuty(4, 2); } catch (error) { "
@@ -333,8 +338,8 @@ int main(void) {
     assert(assert_operational_error("PWM.setDuty(4, 0.5)",
                                     "ResourceBusyError", "EBUSY"));
     mcujs_test_ledc_result = 0;
-    assert(eval_source("PWM.init(7, 2000); PWM.init(8, 3000);"));
-    assert(assert_operational_error("PWM.init(2, 4000)",
+    assert(eval_source("PWM.init(7, 2000); PWM.init(8, 4000);"));
+    assert(assert_operational_error("PWM.init(2, 5000)",
                                     "ResourceExhaustedError",
                                     "ERR_RESOURCE_EXHAUSTED"));
     mcujs_test_i2c_result = -1;

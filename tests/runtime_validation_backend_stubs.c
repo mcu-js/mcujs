@@ -97,6 +97,8 @@ static i2c_inst_t s_i2c_instances[] = {{.index = 0}, {.index = 1}};
 i2c_inst_t *i2c0 = &s_i2c_instances[0];
 i2c_inst_t *i2c1 = &s_i2c_instances[1];
 static bool s_gpio_levels[NUM_BANK0_GPIOS];
+static bool s_gpio_outputs[NUM_BANK0_GPIOS];
+static int s_gpio_pulls[NUM_BANK0_GPIOS];
 unsigned mcujs_test_gpio_init_calls;
 int mcujs_test_i2c_init_result;
 unsigned mcujs_test_i2c_init_calls;
@@ -105,6 +107,8 @@ unsigned mcujs_test_pwm_divider_scaled;
 unsigned mcujs_test_pwm_wrap;
 unsigned mcujs_test_pwm_duty_calls;
 unsigned mcujs_test_pwm_level;
+unsigned mcujs_test_pwm_enable_calls;
+unsigned mcujs_test_pwm_disable_calls;
 int mcujs_test_spi_init_result;
 unsigned mcujs_test_spi_init_calls;
 unsigned mcujs_test_spi_deinit_calls;
@@ -148,6 +152,8 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_pwm_wrap = 0;
     mcujs_test_pwm_duty_calls = 0;
     mcujs_test_pwm_level = 0;
+    mcujs_test_pwm_enable_calls = 0;
+    mcujs_test_pwm_disable_calls = 0;
     mcujs_test_spi_init_result = -1;
     mcujs_test_spi_init_calls = 0;
     mcujs_test_spi_deinit_calls = 0;
@@ -166,14 +172,42 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_dma_claim_required = false;
     mcujs_test_dma_configure_calls = 0;
     mcujs_test_dma_last_length = 0;
-    for (size_t i = 0; i < NUM_BANK0_GPIOS; i++) s_gpio_levels[i] = false;
+    for (size_t i = 0; i < NUM_BANK0_GPIOS; i++) {
+        s_gpio_levels[i] = false;
+        s_gpio_outputs[i] = false;
+        s_gpio_pulls[i] = 0;
+    }
 }
 
-void gpio_init(uint pin) { (void)pin; mcujs_test_gpio_init_calls++; }
-void gpio_set_dir(uint pin, bool output) { (void)pin; (void)output; }
-void gpio_disable_pulls(uint pin) { (void)pin; }
-void gpio_pull_up(uint pin) { (void)pin; }
-void gpio_pull_down(uint pin) { (void)pin; }
+bool mcujs_test_gpio_is_output(unsigned pin) {
+    return pin < NUM_BANK0_GPIOS && s_gpio_outputs[pin];
+}
+int mcujs_test_gpio_level_at(unsigned pin) {
+    return pin < NUM_BANK0_GPIOS && s_gpio_levels[pin];
+}
+int mcujs_test_gpio_pull_at(unsigned pin) {
+    return pin < NUM_BANK0_GPIOS ? s_gpio_pulls[pin] : -1;
+}
+void gpio_init(uint pin) {
+    mcujs_test_gpio_init_calls++;
+    if (pin < NUM_BANK0_GPIOS) {
+        s_gpio_outputs[pin] = false;
+        s_gpio_levels[pin] = false;
+        s_gpio_pulls[pin] = 0;
+    }
+}
+void gpio_set_dir(uint pin, bool output) {
+    if (pin < NUM_BANK0_GPIOS) s_gpio_outputs[pin] = output;
+}
+void gpio_disable_pulls(uint pin) {
+    if (pin < NUM_BANK0_GPIOS) s_gpio_pulls[pin] = 0;
+}
+void gpio_pull_up(uint pin) {
+    if (pin < NUM_BANK0_GPIOS) s_gpio_pulls[pin] = 1;
+}
+void gpio_pull_down(uint pin) {
+    if (pin < NUM_BANK0_GPIOS) s_gpio_pulls[pin] = 2;
+}
 void gpio_put(uint pin, bool value) { if (pin < NUM_BANK0_GPIOS) s_gpio_levels[pin] = value; }
 bool gpio_get(uint pin) { return pin < NUM_BANK0_GPIOS && s_gpio_levels[pin]; }
 void gpio_set_function(uint pin, uint function) { (void)pin; (void)function; }
@@ -229,8 +263,22 @@ void pwm_set_gpio_level(uint pin, uint16_t level) {
     mcujs_test_pwm_duty_calls++;
     mcujs_test_pwm_level = level;
 }
-void pwm_set_enabled(uint slice, bool enabled) { (void)slice; (void)enabled; }
-uint32_t clock_get_hz(int clock) { (void)clock; return 125000000u; }
+void pwm_set_enabled(uint slice, bool enabled) {
+    (void)slice;
+    if (enabled) {
+        mcujs_test_pwm_enable_calls++;
+    } else {
+        mcujs_test_pwm_disable_calls++;
+    }
+}
+uint32_t clock_get_hz(int clock) {
+    (void)clock;
+#if defined(MCUJS_BOARD_PICO2)
+    return 150000000u;
+#else
+    return 125000000u;
+#endif
+}
 
 uint spi_init(spi_inst_t *instance, uint baudrate) {
     (void)instance;
@@ -375,6 +423,8 @@ void cyw43_arch_gpio_put(int pin, int value) { (void)pin; (void)value; }
 #include "driver/ledc.h"
 
 static int s_gpio_levels[GPIO_NUM_MAX];
+static int s_gpio_directions[GPIO_NUM_MAX];
+static int s_gpio_pulls[GPIO_NUM_MAX];
 int mcujs_test_gpio_result;
 unsigned mcujs_test_i2c_param_config_calls;
 unsigned mcujs_test_i2c_driver_install_calls;
@@ -385,8 +435,21 @@ unsigned mcujs_test_ledc_configured_resolution;
 unsigned mcujs_test_ledc_actual_frequency;
 unsigned mcujs_test_ledc_stop_calls;
 unsigned mcujs_test_gpio_reset_calls;
+unsigned mcujs_test_gpio_direction_calls;
+unsigned mcujs_test_gpio_pull_calls;
+unsigned mcujs_test_gpio_level_calls;
 unsigned mcujs_test_ledc_duty_calls;
 unsigned mcujs_test_ledc_duty;
+int mcujs_test_ledc_timer_result;
+int mcujs_test_ledc_timer_deconfigure_result;
+int mcujs_test_ledc_channel_result;
+int mcujs_test_ledc_stop_result;
+int mcujs_test_ledc_pause_result;
+int mcujs_test_gpio_reset_result;
+unsigned mcujs_test_ledc_timer_config_calls;
+unsigned mcujs_test_ledc_timer_deconfigure_calls;
+unsigned mcujs_test_ledc_timer_pause_calls;
+unsigned mcujs_test_ledc_channel_config_calls;
 static uint32_t s_ledc_timer_frequency[4];
 
 void mcujs_test_reset_backend(void) {
@@ -399,39 +462,75 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_i2c_driver_install_calls = 0;
     mcujs_test_i2c_driver_delete_calls = 0;
     mcujs_test_ledc_result = ESP_OK;
-    mcujs_test_ledc_resolution = 10;
+    mcujs_test_ledc_resolution = UINT32_MAX;
     mcujs_test_ledc_configured_resolution = 0;
     mcujs_test_ledc_actual_frequency = 0;
     mcujs_test_ledc_stop_calls = 0;
     mcujs_test_gpio_reset_calls = 0;
+    mcujs_test_gpio_direction_calls = 0;
+    mcujs_test_gpio_pull_calls = 0;
+    mcujs_test_gpio_level_calls = 0;
     mcujs_test_ledc_duty_calls = 0;
     mcujs_test_ledc_duty = 0;
+    mcujs_test_ledc_timer_result = ESP_OK;
+    mcujs_test_ledc_timer_deconfigure_result = ESP_OK;
+    mcujs_test_ledc_channel_result = ESP_OK;
+    mcujs_test_ledc_stop_result = ESP_OK;
+    mcujs_test_ledc_pause_result = ESP_OK;
+    mcujs_test_gpio_reset_result = ESP_OK;
+    mcujs_test_ledc_timer_config_calls = 0;
+    mcujs_test_ledc_timer_deconfigure_calls = 0;
+    mcujs_test_ledc_timer_pause_calls = 0;
+    mcujs_test_ledc_channel_config_calls = 0;
     for (size_t i = 0; i < 4; i++) s_ledc_timer_frequency[i] = 0;
-    for (size_t i = 0; i < GPIO_NUM_MAX; i++) s_gpio_levels[i] = 0;
+    for (size_t i = 0; i < GPIO_NUM_MAX; i++) {
+        s_gpio_levels[i] = 0;
+        s_gpio_directions[i] = GPIO_MODE_INPUT;
+        s_gpio_pulls[i] = GPIO_FLOATING;
+    }
 }
 
 esp_err_t gpio_reset_pin(gpio_num_t pin) {
-    (void)pin;
     mcujs_test_gpio_reset_calls++;
-    return mcujs_test_gpio_result;
+    if (mcujs_test_gpio_reset_result == ESP_OK && pin >= 0 &&
+        pin < GPIO_NUM_MAX) {
+        s_gpio_directions[pin] = GPIO_MODE_INPUT;
+        s_gpio_pulls[pin] = GPIO_PULLUP_ONLY;
+    }
+    return mcujs_test_gpio_reset_result;
 }
 esp_err_t gpio_set_direction(gpio_num_t pin, int mode) {
-    (void)pin;
-    (void)mode;
+    mcujs_test_gpio_direction_calls++;
+    if (mcujs_test_gpio_result == ESP_OK && pin >= 0 && pin < GPIO_NUM_MAX) {
+        s_gpio_directions[pin] = mode;
+    }
     return mcujs_test_gpio_result;
 }
 esp_err_t gpio_set_pull_mode(gpio_num_t pin, int mode) {
-    (void)pin;
-    (void)mode;
+    mcujs_test_gpio_pull_calls++;
+    if (mcujs_test_gpio_result == ESP_OK && pin >= 0 && pin < GPIO_NUM_MAX) {
+        s_gpio_pulls[pin] = mode;
+    }
     return mcujs_test_gpio_result;
 }
 esp_err_t gpio_set_level(gpio_num_t pin, int level) {
+    mcujs_test_gpio_level_calls++;
     if (mcujs_test_gpio_result != ESP_OK) return mcujs_test_gpio_result;
     if (pin >= 0 && pin < GPIO_NUM_MAX) s_gpio_levels[pin] = level;
     return ESP_OK;
 }
 int gpio_get_level(gpio_num_t pin) {
     return pin >= 0 && pin < GPIO_NUM_MAX ? s_gpio_levels[pin] : 0;
+}
+bool mcujs_test_gpio_is_output(unsigned pin) {
+    return pin < GPIO_NUM_MAX &&
+           s_gpio_directions[pin] == GPIO_MODE_INPUT_OUTPUT;
+}
+int mcujs_test_gpio_level_at(unsigned pin) {
+    return pin < GPIO_NUM_MAX ? s_gpio_levels[pin] : -1;
+}
+int mcujs_test_gpio_pull_at(unsigned pin) {
+    return pin < GPIO_NUM_MAX ? s_gpio_pulls[pin] : -1;
 }
 
 esp_err_t i2c_param_config(i2c_port_t port, const i2c_config_t *config) {
@@ -482,16 +581,26 @@ esp_err_t i2c_master_read_from_device(i2c_port_t port, uint8_t address,
 esp_err_t ledc_timer_pause(int speed_mode, ledc_timer_t timer) {
     (void)speed_mode;
     (void)timer;
-    return mcujs_test_ledc_result;
+    mcujs_test_ledc_timer_pause_calls++;
+    return mcujs_test_ledc_pause_result;
 }
 
 esp_err_t ledc_timer_config(const ledc_timer_config_t *config) {
-    if (mcujs_test_ledc_result == ESP_OK && !config->deconfigure &&
+    mcujs_test_ledc_timer_config_calls++;
+    if (config->deconfigure) mcujs_test_ledc_timer_deconfigure_calls++;
+    esp_err_t result = config->deconfigure
+                           ? mcujs_test_ledc_timer_deconfigure_result
+                           : mcujs_test_ledc_timer_result;
+    if (result == ESP_OK && !config->deconfigure &&
         config->timer_num >= 0 && config->timer_num < 4) {
         s_ledc_timer_frequency[config->timer_num] = config->freq_hz;
         mcujs_test_ledc_configured_resolution = config->duty_resolution;
     }
-    return mcujs_test_ledc_result;
+    if (result == ESP_OK && config->deconfigure && config->timer_num >= 0 &&
+        config->timer_num < 4) {
+        s_ledc_timer_frequency[config->timer_num] = 0;
+    }
+    return result;
 }
 
 uint32_t ledc_get_freq(int speed_mode, ledc_timer_t timer) {
@@ -508,19 +617,34 @@ esp_err_t ledc_stop(int speed_mode, ledc_channel_t channel,
     (void)channel;
     (void)idle_level;
     mcujs_test_ledc_stop_calls++;
-    return mcujs_test_ledc_result;
+    return mcujs_test_ledc_stop_result;
 }
 
 uint32_t ledc_find_suitable_duty_resolution(uint32_t source_clock,
                                             uint32_t frequency) {
-    (void)source_clock;
-    (void)frequency;
-    return mcujs_test_ledc_resolution;
+    if (mcujs_test_ledc_resolution != UINT32_MAX) {
+        return mcujs_test_ledc_resolution;
+    }
+    if (source_clock == 0u || frequency == 0u) return 0u;
+
+    for (uint32_t resolution = 14u; resolution > 0u; resolution--) {
+        uint64_t precision = (uint64_t)1u << resolution;
+        uint64_t scaled_source = (uint64_t)source_clock << 8u;
+        uint64_t denominator = (uint64_t)frequency * precision;
+        uint64_t divider = (scaled_source + denominator / 2u) / denominator;
+        if (divider >= (1u << 8u) && divider <= 0x3ffffu) {
+            return resolution;
+        }
+    }
+    return 0u;
 }
 
 esp_err_t ledc_channel_config(const ledc_channel_config_t *config) {
-    (void)config;
-    return mcujs_test_ledc_result;
+    mcujs_test_ledc_channel_config_calls++;
+    if (mcujs_test_ledc_channel_result == ESP_OK) {
+        mcujs_test_ledc_duty = config->duty;
+    }
+    return mcujs_test_ledc_channel_result;
 }
 
 esp_err_t ledc_set_duty(int speed_mode, ledc_channel_t channel,

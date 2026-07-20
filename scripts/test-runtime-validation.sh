@@ -74,6 +74,16 @@ compile_validation_test() {
         -o "${output}"
 }
 
+compile_pwm_policy_test() {
+    local output="$1"
+    cc -std=gnu17 -Wall -Wextra -Werror \
+        -I"${ROOT}/host/bindings" \
+        "${ROOT}/tests/pwm_policy_test.c" \
+        "${ROOT}/host/bindings/pwm_policy.c" \
+        -lm \
+        -o "${output}"
+}
+
 compile_backend_test() {
     local output="$1"
     local backend="$2"
@@ -88,8 +98,32 @@ compile_backend_test() {
         "${ROOT}/tests/runtime_validation_backend_test.c" \
         "${ROOT}/tests/runtime_validation_backend_stubs.c" \
         "${ROOT}/host/bindings/validation.c" \
+        "${ROOT}/host/bindings/pwm_policy.c" \
         "${ROOT}/${backend}/bindings/gpio.c" \
         "${ROOT}/${backend}/bindings/i2c.c" \
+        -Wl,--gc-sections \
+        "${JERRY_BUILD}/lib/libjerry-core.a" \
+        "${JERRY_BUILD}/lib/libjerry-port.a" \
+        -lm \
+        -o "${output}"
+}
+
+compile_pwm_resource_backend_test() {
+    local output="$1"
+    local backend="$2"
+    shift 2
+    cc -std=gnu17 -Wall -Wextra -Werror \
+        -ffunction-sections -fdata-sections \
+        "$@" \
+        -I"${ROOT}/host" \
+        -I"${ROOT}/host/bindings" \
+        -I"${ROOT}/tests" \
+        -I"${JERRY_ROOT}/jerry-core/include" \
+        "${ROOT}/tests/pwm_resource_backend_test.c" \
+        "${ROOT}/tests/runtime_validation_backend_stubs.c" \
+        "${ROOT}/host/bindings/validation.c" \
+        "${ROOT}/host/bindings/pwm_policy.c" \
+        "${ROOT}/${backend}/bindings/gpio.c" \
         -Wl,--gc-sections \
         "${JERRY_BUILD}/lib/libjerry-core.a" \
         "${JERRY_BUILD}/lib/libjerry-port.a" \
@@ -100,6 +134,10 @@ compile_backend_test() {
 VALIDATION_TEST="${TMP_ROOT}/runtime-validation-shared"
 compile_validation_test "${VALIDATION_TEST}"
 "${VALIDATION_TEST}"
+
+PWM_POLICY_TEST="${TMP_ROOT}/pwm-policy"
+compile_pwm_policy_test "${PWM_POLICY_TEST}"
+"${PWM_POLICY_TEST}"
 
 RP2_BACKEND_TEST="${TMP_ROOT}/runtime-validation-rp2-backend"
 compile_backend_test "${RP2_BACKEND_TEST}" platform/rp2 \
@@ -117,6 +155,43 @@ for factory in gpio i2c pwm spi adc neopixel; do
     nm -g "${RP2_BACKEND_TEST}" | grep -Eq " T js_create_${factory}_module$"
 done
 "${RP2_BACKEND_TEST}"
+
+RP2_PWM_RESOURCE_TEST="${TMP_ROOT}/pwm-resource-rp2"
+compile_pwm_resource_backend_test "${RP2_PWM_RESOURCE_TEST}" platform/rp2 \
+    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
+    -I"${ROOT}/board/pico" \
+    -I"${ROOT}/platform/rp2/bindings" \
+    -I"${ROOT}/tests/native_stubs/rp2" \
+    "${ROOT}/platform/rp2/bindings/pin_policy.c" \
+    "${ROOT}/platform/rp2/bindings/pwm.c"
+"${RP2_PWM_RESOURCE_TEST}"
+
+RP2350_BACKEND_TEST="${TMP_ROOT}/runtime-validation-rp2350-backend"
+compile_backend_test "${RP2350_BACKEND_TEST}" platform/rp2 \
+    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO2=1 \
+    -I"${ROOT}/board/pico2" \
+    -I"${ROOT}/platform/rp2/bindings" \
+    -I"${ROOT}/tests/native_stubs/rp2" \
+    "${ROOT}/platform/rp2/bindings/pin_policy.c" \
+    "${ROOT}/platform/rp2/bindings/pwm.c" \
+    "${ROOT}/platform/rp2/bindings/spi.c" \
+    "${ROOT}/platform/rp2/bindings/adc.c" \
+    "${ROOT}/platform/rp2/bindings/neopixel.c" \
+    "${ROOT}/platform/rp2/bindings/onboard_led.c"
+for factory in gpio i2c pwm spi adc neopixel; do
+    nm -g "${RP2350_BACKEND_TEST}" | grep -Eq " T js_create_${factory}_module$"
+done
+"${RP2350_BACKEND_TEST}"
+
+RP2350_PWM_RESOURCE_TEST="${TMP_ROOT}/pwm-resource-rp2350"
+compile_pwm_resource_backend_test "${RP2350_PWM_RESOURCE_TEST}" platform/rp2 \
+    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO2=1 \
+    -I"${ROOT}/board/pico2" \
+    -I"${ROOT}/platform/rp2/bindings" \
+    -I"${ROOT}/tests/native_stubs/rp2" \
+    "${ROOT}/platform/rp2/bindings/pin_policy.c" \
+    "${ROOT}/platform/rp2/bindings/pwm.c"
+"${RP2350_PWM_RESOURCE_TEST}"
 
 compile_rp_board_surface_test() {
     local output="$1"
@@ -206,3 +281,12 @@ for factory in gpio i2c pwm; do
     nm -g "${ESP32_BACKEND_TEST}" | grep -Eq " T js_create_${factory}_module$"
 done
 "${ESP32_BACKEND_TEST}"
+
+ESP32_PWM_RESOURCE_TEST="${TMP_ROOT}/pwm-resource-esp32"
+compile_pwm_resource_backend_test "${ESP32_PWM_RESOURCE_TEST}" platform/esp32/main \
+    -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1 \
+    -I"${ROOT}/tests/native_stubs/esp32" \
+    -I"${ROOT}/platform/esp32/main/bindings" \
+    "${ROOT}/platform/esp32/main/bindings/pin_policy.c" \
+    "${ROOT}/platform/esp32/main/bindings/pwm.c"
+"${ESP32_PWM_RESOURCE_TEST}"

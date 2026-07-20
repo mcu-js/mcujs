@@ -767,6 +767,7 @@
         "pwm.pinsExposed": "Every PWM-capable pin appears in board.exposedPins.",
         "pwm.frequencyRange": "pwm.frequency.minHz is less than or equal to maxHz.",
         "pwm.maxOutputs": "pwm.maxOutputs does not exceed the number of PWM-capable pins.",
+        "pwm.timerCount": "pwm.timerCount does not exceed pwm.maxOutputs.",
         "adc.pinsExposed": "Every ADC-capable pin appears in board.exposedPins.",
         "adc.channelPins": "Every ADC channel pin appears in adc.pins.",
         "adc.uniqueChannels": "ADC channel numbers are unique.",

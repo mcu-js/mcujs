@@ -40,7 +40,8 @@ If something feels missing, check the source or open an issue so we can document
 ## Example map
 
 - Want timers or console? Start at [Runtime JavaScript](./runtime-javascript.md)
-- Want GPIO, files, or NeoPixels? Start at [Built-in Modules](./built-in-modules.md)
+- Want GPIO, PWM, files, or NeoPixels? Start at [Built-in Modules](./built-in-modules.md), including the [PWM contract](./built-in-modules.md#pwm-contract)
+- Measuring PWM on supported boards? Follow the [non-destructive PWM waveform protocol](./development/pwm-waveform-protocol.md)
 
 ## Key terms
 

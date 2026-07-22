@@ -132,8 +132,15 @@ unsigned mcujs_test_adc_last_pin;
 unsigned mcujs_test_adc_init_calls;
 unsigned mcujs_test_adc_select_calls;
 bool mcujs_test_pio_can_add_program;
+unsigned mcujs_test_pio_claimed_sm_mask;
+unsigned mcujs_test_pio_claim_calls;
+unsigned mcujs_test_pio_unclaim_calls;
+int mcujs_test_pio_last_claimed_sm;
+int mcujs_test_pio_last_unclaimed_sm;
 unsigned mcujs_test_neopixel_init_calls;
 unsigned mcujs_test_neopixel_last_pin;
+unsigned mcujs_test_neopixel_last_sm;
+unsigned mcujs_test_neopixel_disable_calls;
 unsigned mcujs_test_neopixel_write_calls;
 unsigned mcujs_test_neopixel_last_word;
 int mcujs_test_dma_claim_result;
@@ -190,8 +197,15 @@ void mcujs_test_reset_backend(void) {
     mcujs_test_adc_calibrated_calls = 0;
     mcujs_test_adc_raw_value = 2048;
     mcujs_test_pio_can_add_program = true;
+    mcujs_test_pio_claimed_sm_mask = 0;
+    mcujs_test_pio_claim_calls = 0;
+    mcujs_test_pio_unclaim_calls = 0;
+    mcujs_test_pio_last_claimed_sm = -1;
+    mcujs_test_pio_last_unclaimed_sm = -1;
     mcujs_test_neopixel_init_calls = 0;
     mcujs_test_neopixel_last_pin = UINT32_MAX;
+    mcujs_test_neopixel_last_sm = UINT32_MAX;
+    mcujs_test_neopixel_disable_calls = 0;
     mcujs_test_neopixel_write_calls = 0;
     mcujs_test_neopixel_last_word = 0;
     mcujs_test_dma_claim_result = 0;
@@ -423,26 +437,53 @@ uint pio_add_program(PIO pio, const pio_program_t *program) {
     (void)program;
     return 0;
 }
+int pio_claim_unused_sm(PIO pio, bool required) {
+    assert(pio == pio0);
+    assert(!required);
+    mcujs_test_pio_claim_calls++;
+    for (int state_machine = 0; state_machine < 4; state_machine++) {
+        unsigned mask = 1u << (unsigned)state_machine;
+        if ((mcujs_test_pio_claimed_sm_mask & mask) == 0) {
+            mcujs_test_pio_claimed_sm_mask |= mask;
+            mcujs_test_pio_last_claimed_sm = state_machine;
+            return state_machine;
+        }
+    }
+    return -1;
+}
+void pio_sm_unclaim(PIO pio, uint state_machine) {
+    assert(pio == pio0);
+    assert(state_machine < 4);
+    unsigned mask = 1u << state_machine;
+    assert((mcujs_test_pio_claimed_sm_mask & mask) != 0);
+    mcujs_test_pio_claimed_sm_mask &= ~mask;
+    mcujs_test_pio_unclaim_calls++;
+    mcujs_test_pio_last_unclaimed_sm = (int)state_machine;
+}
 void pio_sm_put_blocking(PIO pio, uint state_machine, uint32_t data) {
-    (void)pio;
-    (void)state_machine;
+    assert(pio == pio0);
+    assert(state_machine < 4);
+    assert((mcujs_test_pio_claimed_sm_mask & (1u << state_machine)) != 0);
     mcujs_test_neopixel_write_calls++;
     mcujs_test_neopixel_last_word = data;
 }
 void pio_sm_set_enabled(PIO pio, uint state_machine, bool enabled) {
-    (void)pio;
-    (void)state_machine;
-    (void)enabled;
+    assert(pio == pio0);
+    assert(state_machine < 4);
+    assert((mcujs_test_pio_claimed_sm_mask & (1u << state_machine)) != 0);
+    if (!enabled) mcujs_test_neopixel_disable_calls++;
 }
 void mcujs_ws2812_program_init(PIO pio, uint state_machine, uint offset,
                                uint pin, float frequency, bool rgbw) {
-    (void)pio;
-    (void)state_machine;
+    assert(pio == pio0);
+    assert(state_machine < 4);
+    assert((mcujs_test_pio_claimed_sm_mask & (1u << state_machine)) != 0);
     (void)offset;
     (void)frequency;
     (void)rgbw;
     mcujs_test_neopixel_init_calls++;
     mcujs_test_neopixel_last_pin = pin;
+    mcujs_test_neopixel_last_sm = state_machine;
 }
 void sleep_us(uint64_t microseconds) { (void)microseconds; }
 void sleep_ms(uint32_t milliseconds) { (void)milliseconds; }

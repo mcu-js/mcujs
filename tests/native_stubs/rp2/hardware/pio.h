@@ -21,6 +21,8 @@ extern struct pio_hw mcujs_test_pio0;
 
 bool pio_can_add_program(PIO pio, const pio_program_t *program);
 uint pio_add_program(PIO pio, const pio_program_t *program);
+int pio_claim_unused_sm(PIO pio, bool required);
+void pio_sm_unclaim(PIO pio, uint state_machine);
 void pio_sm_put_blocking(PIO pio, uint state_machine, uint32_t data);
 void pio_sm_set_enabled(PIO pio, uint state_machine, bool enabled);
 

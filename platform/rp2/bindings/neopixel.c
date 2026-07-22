@@ -18,7 +18,8 @@
 #endif
 
 static PIO s_pio = pio0;
-static uint s_sm = 0;
+static int s_sm = -1;
+static bool s_sm_claimed = false;
 static uint s_offset = 0;
 static bool s_program_loaded = false;
 static bool s_rgb_order_grb = true;
@@ -45,8 +46,8 @@ static jerry_value_t throw_neopixel_error(mcujs_operational_error_t error,
     return mcujs_throw_operational_error(error, message, &details);
 }
 
-static void neopixel_cleanup(void) {
-    if (s_ready) pio_sm_set_enabled(s_pio, s_sm, false);
+static void neopixel_cleanup(bool release_state_machine) {
+    if (s_ready) pio_sm_set_enabled(s_pio, (uint)s_sm, false);
     if (s_pin >= 0) {
         gpio_set_function((uint)s_pin, GPIO_FUNC_SIO);
         gpio_init((uint)s_pin);
@@ -60,6 +61,11 @@ static void neopixel_cleanup(void) {
     s_buffer_len = 0;
     s_length = 0;
     s_ready = false;
+    if (release_state_machine && s_sm_claimed) {
+        pio_sm_unclaim(s_pio, (uint)s_sm);
+        s_sm = -1;
+        s_sm_claimed = false;
+    }
 }
 
 bool neopixel_init(uint32_t pin, uint32_t length) {
@@ -75,9 +81,19 @@ bool neopixel_init(uint32_t pin, uint32_t length) {
         return false;
     }
 
-    neopixel_cleanup();
+    neopixel_cleanup(false);
+    if (!s_sm_claimed) {
+        int state_machine = pio_claim_unused_sm(s_pio, false);
+        if (state_machine < 0) {
+            s_last_init_failure = NEOPIXEL_INIT_FAILURE_RESOURCE_EXHAUSTED;
+            return false;
+        }
+        s_sm = state_machine;
+        s_sm_claimed = true;
+    }
     if (!mcujs_rp2_pin_claim((int)pin, MCUJS_RP2_PIN_OWNER_NEOPIXEL)) {
         s_last_init_failure = NEOPIXEL_INIT_FAILURE_BUSY;
+        neopixel_cleanup(true);
         return false;
     }
     s_pin = (int)pin;
@@ -86,21 +102,21 @@ bool neopixel_init(uint32_t pin, uint32_t length) {
     s_pixels = (uint32_t *)calloc(s_buffer_len, sizeof(uint32_t));
     if (s_pixels == NULL) {
         s_last_init_failure = NEOPIXEL_INIT_FAILURE_RESOURCE_EXHAUSTED;
-        neopixel_cleanup();
+        neopixel_cleanup(true);
         return false;
     }
 
     if (!s_program_loaded) {
         if (!pio_can_add_program(s_pio, &mcujs_ws2812_program)) {
             s_last_init_failure = NEOPIXEL_INIT_FAILURE_RESOURCE_EXHAUSTED;
-            neopixel_cleanup();
+            neopixel_cleanup(true);
             return false;
         }
         s_offset = pio_add_program(s_pio, &mcujs_ws2812_program);
         s_program_loaded = true;
     }
 
-    mcujs_ws2812_program_init(s_pio, s_sm, s_offset, pin,
+    mcujs_ws2812_program_init(s_pio, (uint)s_sm, s_offset, pin,
                               MCUJS_NEOPIXEL_DEFAULT_FREQ, false);
     s_ready = true;
     return true;
@@ -137,7 +153,7 @@ void neopixel_clear(void) {
 void neopixel_show(void) {
     if (!s_ready || s_pixels == NULL) return;
     for (uint32_t i = 0; i < s_length; i++) {
-        pio_sm_put_blocking(s_pio, s_sm, s_pixels[i] << 8u);
+        pio_sm_put_blocking(s_pio, (uint)s_sm, s_pixels[i] << 8u);
     }
     sleep_us(80);
 }

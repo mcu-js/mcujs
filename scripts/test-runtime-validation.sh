@@ -311,8 +311,8 @@ assert_global_text_symbol "${RP2_SPI_DEFAULT_BUS_1_TEST}" \
 
 RP2_NEOPIXEL_TEST="${TMP_ROOT}/neopixel-rp2"
 compile_neopixel_backend_test "${RP2_NEOPIXEL_TEST}" platform/rp2 \
-    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
-    -I"${ROOT}/board/pico" \
+    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_WAVESHARE_RP2040_PIZERO=1 \
+    -I"${ROOT}/board/waveshare_rp2040_pizero" \
     -I"${ROOT}/platform/rp2/bindings" \
     -I"${ROOT}/tests/native_stubs/rp2"
 assert_global_text_symbol "${RP2_NEOPIXEL_TEST}" "js_create_neopixel_module"

@@ -98,6 +98,7 @@ static const char s_strict_source[] =
 
 static void inject_create_failure(void) {
 #if defined(MCUJS_PLATFORM_RP2)
+    mcujs_test_pio_claimed_sm_mask = 0x7u;
     mcujs_test_pio_can_add_program = false;
 #else
     mcujs_test_led_strip_new_result = ESP_ERR_NO_MEM;
@@ -161,7 +162,27 @@ int main(void) {
         "if (busy.code === 'EBUSY') return; throw busy; } "
         "throw new Error('failed init left module initialized'); }());"));
     assert(pin_is_free(3));
+#if defined(MCUJS_PLATFORM_RP2)
+    assert(mcujs_test_pio_claim_calls == 1u);
+    assert(mcujs_test_pio_unclaim_calls == 1u);
+    assert(mcujs_test_pio_last_claimed_sm == 3);
+    assert(mcujs_test_pio_last_unclaimed_sm == 3);
+    assert(mcujs_test_pio_claimed_sm_mask == 0x7u);
+#endif
     clear_create_failure();
+
+#if defined(MCUJS_PLATFORM_RP2)
+    mcujs_test_pio_claimed_sm_mask = 0xfu;
+    assert(eval_source(
+        "(function () { var error; try { neopixel.init({pin: 3, length: 1}); } catch (caught) { error = caught; } "
+        "if (!(error instanceof Error) || error.name !== 'ResourceExhaustedError' || "
+        "error.code !== 'ERR_RESOURCE_EXHAUSTED' || error.resource !== 'neopixel') "
+        "throw new Error('state-machine exhaustion was not normalized: ' + error); }());"));
+    assert(pin_is_free(3));
+    assert(mcujs_test_neopixel_init_calls == 0u);
+    assert(mcujs_test_pio_claimed_sm_mask == 0xfu);
+    mcujs_test_pio_claimed_sm_mask = 0x7u;
+#endif
 
     assert(eval_source(
         "neopixel.init({pin: 3, length: __neopixelMax}); "
@@ -175,6 +196,9 @@ int main(void) {
     assert(pin_is_neopixel(3));
 
 #if defined(MCUJS_PLATFORM_RP2)
+    assert(mcujs_test_pio_claimed_sm_mask == 0xfu);
+    assert(mcujs_test_pio_last_claimed_sm == 3);
+    assert(mcujs_test_neopixel_last_sm == 3u);
     assert(mcujs_test_neopixel_last_pin == 3u);
     assert(mcujs_test_neopixel_write_calls ==
            2u * MCUJS_RUNTIME_NEOPIXEL_MAX_LENGTH);
@@ -192,19 +216,40 @@ int main(void) {
 #endif
 
     assert(claim_busy_pin(5));
+#if defined(MCUJS_PLATFORM_RP2)
+    unsigned claim_calls_before_busy_reinit = mcujs_test_pio_claim_calls;
+    unsigned disable_calls_before_busy_reinit =
+        mcujs_test_neopixel_disable_calls;
+#endif
     assert(eval_source(
         "(function () { var error; try { neopixel.init({pin: 5, length: 1, order: 'RGB'}); } catch (caught) { error = caught; } "
         "if (!error || error.name !== 'ResourceBusyError' || error.code !== 'EBUSY' || error.pin !== 5) "
         "throw new Error('busy reinit was not normalized'); neopixel.show(); }());"));
     assert(pin_is_neopixel(3));
+#if defined(MCUJS_PLATFORM_RP2)
+    assert(mcujs_test_pio_claim_calls == claim_calls_before_busy_reinit);
+    assert(mcujs_test_neopixel_disable_calls == disable_calls_before_busy_reinit);
+    assert(mcujs_test_pio_claimed_sm_mask == 0xfu);
+#endif
     release_busy_pin(5);
 
+#if defined(MCUJS_PLATFORM_RP2)
+    unsigned claim_calls_before_reinit = mcujs_test_pio_claim_calls;
+    unsigned unclaim_calls_before_reinit = mcujs_test_pio_unclaim_calls;
+    unsigned disable_calls_before_reinit = mcujs_test_neopixel_disable_calls;
+#endif
     assert(eval_source(
         "neopixel.init({pin: 4, length: 1, order: 'RGB'}); "
         "neopixel.setPixel(0, 4, 5, 6); neopixel.clear(); neopixel.show();"));
     assert(pin_is_free(3));
     assert(pin_is_neopixel(4));
-#if defined(MCUJS_PLATFORM_ESP32)
+#if defined(MCUJS_PLATFORM_RP2)
+    assert(mcujs_test_pio_claim_calls == claim_calls_before_reinit);
+    assert(mcujs_test_pio_unclaim_calls == unclaim_calls_before_reinit);
+    assert(mcujs_test_neopixel_disable_calls == disable_calls_before_reinit + 1u);
+    assert(mcujs_test_pio_claimed_sm_mask == 0xfu);
+    assert(mcujs_test_neopixel_last_sm == 3u);
+#else
     assert(mcujs_test_led_strip_last_order == LED_STRIP_COLOR_COMPONENT_FMT_RGB);
     assert(mcujs_test_led_strip_del_calls == 1u);
     assert(mcujs_test_led_strip_clear_calls >= 2u);
@@ -240,7 +285,7 @@ int main(void) {
 
     jerry_cleanup();
 #if defined(MCUJS_PLATFORM_RP2)
-    puts("production RP NeoPixel strict options, limits, order, lifecycle, and ownership passed");
+    puts("production RP NeoPixel occupied-SM selection, exhaustion, reinit, cleanup, and retention passed");
 #else
     puts("production ESP32 NeoPixel strict options, limits, order, lifecycle, ownership, and errors passed");
 #endif

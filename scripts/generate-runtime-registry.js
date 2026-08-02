@@ -72,7 +72,7 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_REGISTRY_ADC_VOLTAGE ${descriptor.capabilities.adc?.voltage?.supported === true ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_ADC_TEMPERATURE ${descriptor.capabilities.adc?.temperature?.supported === true ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_SAFE_MODE ${descriptor.features.safeMode ? 1 : 0}`);
-  lines.push(`#define MCUJS_REGISTRY_STORAGE_READY ${descriptor.features.storageReady ? 1 : 0}`);
+  lines.push(`#define MCUJS_REGISTRY_STORAGE_READY ${descriptor.capabilities.fs ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_GPIO_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.pins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.outputPins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_PIN_MASK ${pinMask(descriptor.capabilities.pwm?.pins ?? [])}`);

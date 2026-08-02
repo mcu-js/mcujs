@@ -12,18 +12,19 @@ static jerry_value_t stub_module(void) {
     return jerry_object();
 }
 
-jerry_value_t js_create_fs_module(void) { return stub_module(); }
 jerry_value_t js_create_spi_module(void) { return stub_module(); }
 jerry_value_t js_create_adc_module(void) { return stub_module(); }
 jerry_value_t js_create_image_module(void) { return stub_module(); }
 jerry_value_t js_create_keyboard_module(void) { return stub_module(); }
 jerry_value_t js_create_mouse_module(void) { return stub_module(); }
 
+static fs_result_t s_fs_operation_result = FS_ERROR_NOT_FOUND;
+
 fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     (void)file;
     (void)path;
     (void)mode;
-    return FS_ERROR_NOT_FOUND;
+    return s_fs_operation_result;
 }
 
 fs_result_t fs_close(fs_file_t *file) {
@@ -36,18 +37,64 @@ fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_re
     (void)buffer;
     (void)size;
     if (bytes_read != NULL) *bytes_read = 0;
-    return FS_ERROR_IO;
+    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
+}
+
+fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
+                     size_t *bytes_written) {
+    (void)file;
+    (void)buffer;
+    if (bytes_written != NULL) *bytes_written = size;
+    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
 }
 
 fs_result_t fs_size(fs_file_t *file, size_t *size) {
     (void)file;
     if (size != NULL) *size = 0;
-    return FS_ERROR_IO;
+    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
 }
 
 fs_result_t fs_exists(const char *path) {
     (void)path;
-    return FS_ERROR_NOT_FOUND;
+    return s_fs_operation_result;
+}
+
+fs_result_t fs_remove(const char *path) {
+    (void)path;
+    return s_fs_operation_result;
+}
+
+fs_result_t fs_rename(const char *old_path, const char *new_path) {
+    (void)old_path;
+    (void)new_path;
+    return s_fs_operation_result;
+}
+
+fs_result_t fs_mkdir(const char *path) {
+    (void)path;
+    return s_fs_operation_result;
+}
+
+fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback,
+                        void *user_data) {
+    (void)path;
+    (void)callback;
+    (void)user_data;
+    return s_fs_operation_result;
+}
+
+fs_result_t fs_sync(void) {
+    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_OK;
+}
+
+void fs_notify_host(void) {}
+
+fs_result_t fs_access_status(void) {
+    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_OK;
+}
+
+bool fs_storage_ready(void) {
+    return fs_access_status() == FS_OK;
 }
 
 void js_module_free_file(char *content) {
@@ -228,6 +275,29 @@ static const char s_test_source[] =
     "  assertThrowsType(function () { board.capability('gpio\\x00shadow'); }, RangeError, 'null-byte capability name did not throw RangeError');\n"
     "})();\n";
 
+static const char s_busy_test_source[] =
+    "(function () {\n"
+    "  function assert(condition, message) { if (!condition) throw new Error(message); }\n"
+    "  function expectBusy(call, label) {\n"
+    "    var error; try { call(); } catch (caught) { error = caught; }\n"
+    "    assert(error && error.name === 'ResourceBusyError', label + ' name');\n"
+    "    assert(error.code === 'EBUSY', label + ' code');\n"
+    "    assert(error.resource === 'filesystem', label + ' resource');\n"
+    "    assert(error.owner === 'usb-host', label + ' owner');\n"
+    "  }\n"
+    "  var filesystem = require('fs');\n"
+    "  expectBusy(function () { filesystem.readFileSync('/busy.js'); }, 'readFileSync');\n"
+    "  expectBusy(function () { filesystem.writeFileSync('/busy.js', 'x'); }, 'writeFileSync');\n"
+    "  expectBusy(function () { filesystem.appendFileSync('/busy.js', 'x'); }, 'appendFileSync');\n"
+    "  expectBusy(function () { filesystem.existsSync('/busy.js'); }, 'existsSync');\n"
+    "  expectBusy(function () { filesystem.unlinkSync('/busy.js'); }, 'unlinkSync');\n"
+    "  expectBusy(function () { filesystem.readdirSync('/'); }, 'readdirSync');\n"
+    "  expectBusy(function () { filesystem.statSync('/'); }, 'statSync');\n"
+    "  expectBusy(function () { filesystem.renameSync('/busy.js', '/still-busy.js'); }, 'renameSync');\n"
+    "  expectBusy(function () { filesystem.mkdirSync('/busy'); }, 'mkdirSync');\n"
+    "  expectBusy(function () { require('./busy-module'); }, 'file-backed require');\n"
+    "})();\n";
+
 int main(void) {
     jerry_init(JERRY_INIT_EMPTY);
 
@@ -272,6 +342,8 @@ int main(void) {
            registry->board_id, baseline, singular, complete);
 
     assert(eval_source(s_test_source));
+    s_fs_operation_result = FS_ERROR_BUSY;
+    assert(eval_source(s_busy_test_source));
     js_require_clear_cache();
     jerry_cleanup();
 

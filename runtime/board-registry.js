@@ -9,7 +9,6 @@ const featureNames = Object.freeze([
   "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi",
   "adc", "neopixel", "process", "require", "fs", "image", "keyboard", "mouse",
   "graphics", "screen", "dvi", "onboardLed", "onboardNeopixel", "safeMode",
-  "storageReady",
 ]);
 
 const moduleOrder = Object.freeze([
@@ -142,39 +141,39 @@ function modulesFor(features) {
 const rpFeatureMaps = Object.freeze({
   pico: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed",
   ),
   pico2: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed",
   ),
   pico2_w: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed",
   ),
   waveshare_rp2040_zero: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardNeopixel", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardNeopixel",
   ),
   waveshare_rp2040_pizero: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "dvi", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "dvi",
   ),
   "waveshare_rp2040_touch_lcd_1.28": featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen",
   ),
   "waveshare_rp2350_lcd_1.47_a": featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardNeopixel", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardNeopixel",
   ),
   "waveshare_rp2350_touch_lcd_1.69": featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen",
   ),
   adafruit_feather_rp2040: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed", "onboardNeopixel", "storageReady",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed", "onboardNeopixel",
   ),
 });
 
@@ -332,7 +331,7 @@ const boardDescriptors = {
 const xiaoPins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 21];
 const xiaoFeatures = featureMap(
   "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-  "process", "require", "fs", "onboardLed", "safeMode", "storageReady",
+  "process", "require", "fs", "onboardLed", "safeMode",
 );
 boardDescriptors.seeed_xiao_esp32s3 = {
   board: {

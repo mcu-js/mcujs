@@ -76,7 +76,6 @@ static jerry_value_t create_error(const char *code, const char *message) {
 }
 
 static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
-#ifdef MCUJS_PLATFORM_ESP32
     if (result == FS_ERROR_BUSY) {
         const mcujs_error_details_t details = {
             .resource = "filesystem",
@@ -87,7 +86,6 @@ static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
             "filesystem is owned by the USB host; eject MCUJS first",
             &details);
     }
-#endif
     if (result == FS_ERROR_NO_SPACE) {
         return create_error("ENOSPC", "no space left on device");
     }
@@ -338,11 +336,9 @@ static jerry_value_t fs_exists_sync(const jerry_call_info_t *call_info_p,
     }
     
     fs_result_t result = fs_exists(path);
-#ifdef MCUJS_PLATFORM_ESP32
     if (result == FS_ERROR_BUSY) {
         return CREATE_FS_ERROR(result, "failed to inspect path");
     }
-#endif
     return jerry_boolean(result == FS_OK);
 }
 
@@ -494,12 +490,10 @@ static jerry_value_t fs_stat_sync(const jerry_call_info_t *call_info_p,
     
     /* Handle root directory */
     if (strcmp(path, "/") == 0) {
-#ifdef MCUJS_PLATFORM_ESP32
         fs_result_t root_result = fs_exists("/");
         if (root_result != FS_OK) {
             return CREATE_FS_ERROR(root_result, "failed to stat root directory");
         }
-#endif
         jerry_value_t stat_obj = jerry_object();
         
         jerry_value_t size_prop = jerry_string_sz("size");

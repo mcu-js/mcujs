@@ -26,6 +26,15 @@ modules, and capability snapshot without branching on a board name.
 
 **Hardware:** None
 
+### storage-ownership/
+Feature-detects filesystem support and `board.storageReady()`, then performs a
+read-only check only while the device owns the mounted volume.
+
+**Concepts:** static `fs` capability, dynamic storage readiness, USB MSC
+ownership, `EBUSY`
+
+**Hardware:** None
+
 ### blink/
 Portable LED blink - uses onboard inventory and toggles the LED every 500ms for 30 seconds.
 

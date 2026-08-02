@@ -14,6 +14,7 @@ set(MCUJS_SOURCES
     jerry_port.c
     board_services.c
     ${MCUJS_ROOT}/src/repl.c
+    ${MCUJS_ROOT}/src/usb/msc_ownership.c
     usb_cdc.c
     usb_msc.c
     usb_recovery.c

@@ -61,6 +61,26 @@ typedef enum {
 
 static atomic_int s_storage_state = STORAGE_UNINITIALIZED;
 
+fs_result_t fs_access_status(void) {
+    switch ((storage_state_t)atomic_load(&s_storage_state)) {
+        case STORAGE_DEVICE_OWNED:
+            return s_initialized ? FS_OK : FS_ERROR_IO;
+        case STORAGE_CLAIMING_HOST:
+        case STORAGE_HOST_OWNED:
+        case STORAGE_RELEASING_HOST:
+            return FS_ERROR_BUSY;
+        case STORAGE_FAULT:
+            return FS_ERROR_IO;
+        case STORAGE_UNINITIALIZED:
+        default:
+            return FS_ERROR;
+    }
+}
+
+bool fs_storage_ready(void) {
+    return fs_access_status() == FS_OK;
+}
+
 static bool is_device_task(void) {
     return s_device_task == NULL || xTaskGetCurrentTaskHandle() == s_device_task;
 }
@@ -427,6 +447,18 @@ fs_result_t mcujs_filesystem_end_host_access(void) {
     atomic_store(&s_storage_state,
                  result == FS_OK ? STORAGE_DEVICE_OWNED : STORAGE_FAULT);
     return result;
+}
+
+fs_result_t fs_begin_host_access(void) {
+    return mcujs_filesystem_begin_host_access();
+}
+
+fs_result_t fs_end_host_access(void) {
+    return mcujs_filesystem_end_host_access();
+}
+
+fs_result_t fs_msc_sync(void) {
+    return mcujs_filesystem_host_owned() ? FS_OK : FS_ERROR_BUSY;
 }
 
 bool mcujs_filesystem_host_owned(void) {

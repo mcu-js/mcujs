@@ -81,6 +81,7 @@ compile_binding_test() {
         "${ROOT}/host/bindings/neopixel_options.c" \
         "${ROOT}/host/bindings/pwm_policy.c" \
         "${ROOT}/host/bindings/board_registry.c" \
+        "${ROOT}/host/bindings/fs.c" \
         "${ROOT}/host/bindings/require.c" \
         "${ROOT}/${backend}/bindings/pin_policy.c" \
         "${ROOT}/${backend}/bindings/gpio.c" \

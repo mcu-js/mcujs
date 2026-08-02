@@ -15,6 +15,7 @@
 #include "bindings.h"
 #include "fs.h"
 #include "usb_cdc.h"
+#include "usb_msc.h"
 #include "repl.h"
 #include "boot.h"
 
@@ -111,6 +112,7 @@ int main(void) {
             tud_task();
         }
     }
+    usb_msc_init();
     
     /* Initialize JavaScript engine */
     if (js_engine_init() != JS_OK) {
@@ -127,6 +129,11 @@ int main(void) {
     
     /* Attempt to boot from index.js */
     boot_run_index_js();
+
+    /* Export storage only after startup files have been read. */
+    if (!usb_msc_expose()) {
+        usb_msc_event(MCUJS_MSC_EVENT_LOAD);
+    }
 
     /* Print startup banner on first CDC connect */
     print_banner_once();
@@ -179,6 +186,7 @@ static void main_loop(void) {
     while (1) {
         /* Process USB tasks */
         tud_task();
+        usb_msc_task();
         
         /* Process REPL input/output */
         repl_task();
@@ -205,21 +213,23 @@ static void main_loop(void) {
 
 /* Invoked when device is mounted */
 void tud_mount_cb(void) {
-    /* Device connected to host */
+    usb_msc_event(MCUJS_MSC_EVENT_LOAD);
 }
 
 /* Invoked when device is unmounted */
 void tud_umount_cb(void) {
-    /* Device disconnected from host */
+    usb_msc_event(MCUJS_MSC_EVENT_DETACH);
 }
 
 /* Invoked when USB bus is suspended */
 void tud_suspend_cb(bool remote_wakeup_en) {
     (void)remote_wakeup_en;
+    usb_msc_event(MCUJS_MSC_EVENT_SUSPEND);
 }
 
 /* Invoked when USB bus is resumed */
 void tud_resume_cb(void) {
+    usb_msc_event(MCUJS_MSC_EVENT_RESUME);
 }
 
 /*--------------------------------------------------------------------

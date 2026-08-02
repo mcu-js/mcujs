@@ -23,9 +23,7 @@ typedef enum {
     FS_ERROR_NO_SPACE,
     FS_ERROR_INVALID,
     FS_ERROR_IO,
-#ifdef MCUJS_PLATFORM_ESP32
     FS_ERROR_BUSY,
-#endif
 } fs_result_t;
 
 /* File open modes */
@@ -90,8 +88,15 @@ uint32_t fs_get_total_sectors(void);
  */
 uint32_t fs_get_free_space(void);
 
-/* True while USB MSC exclusively owns the filesystem. */
+/* Dynamic device-side availability and ownership state. */
+fs_result_t fs_access_status(void);
+bool fs_storage_ready(void);
 bool fs_host_owned(void);
+
+/* Transfer exclusive ownership between application FatFs and USB MSC. */
+fs_result_t fs_begin_host_access(void);
+fs_result_t fs_end_host_access(void);
+fs_result_t fs_msc_sync(void);
 
 /*
  * Low-level sector access for USB MSC

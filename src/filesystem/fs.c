@@ -22,10 +22,52 @@
 static FATFS s_fatfs;
 static bool s_initialized = false;
 
+typedef enum {
+    STORAGE_UNINITIALIZED = 0,
+    STORAGE_DEVICE_OWNED,
+    STORAGE_CLAIMING_HOST,
+    STORAGE_HOST_OWNED,
+    STORAGE_RELEASING_HOST,
+    STORAGE_FAULT,
+} storage_state_t;
+
+static storage_state_t s_storage_state = STORAGE_UNINITIALIZED;
+
 /* File handle pool (FatFs FIL objects are ~550 bytes each with LFN) */
 #define MAX_OPEN_FILES 4
 static FIL s_fil_pool[MAX_OPEN_FILES];
 static bool s_fil_used[MAX_OPEN_FILES];
+
+static bool has_open_files(void) {
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (s_fil_used[i]) return true;
+    }
+    return false;
+}
+
+fs_result_t fs_access_status(void) {
+    switch (s_storage_state) {
+        case STORAGE_DEVICE_OWNED:
+            return s_initialized ? FS_OK : FS_ERROR_IO;
+        case STORAGE_CLAIMING_HOST:
+        case STORAGE_HOST_OWNED:
+        case STORAGE_RELEASING_HOST:
+            return FS_ERROR_BUSY;
+        case STORAGE_FAULT:
+            return FS_ERROR_IO;
+        case STORAGE_UNINITIALIZED:
+        default:
+            return FS_ERROR;
+    }
+}
+
+static fs_result_t ensure_initialized(void) {
+    fs_result_t status = fs_access_status();
+    if (status == FS_OK || status == FS_ERROR_BUSY || status == FS_ERROR_IO) {
+        return status;
+    }
+    return fs_init();
+}
 
 /*
  * Convert fs_mode_t to FatFs mode flags
@@ -140,7 +182,12 @@ static fs_result_t do_format(void) {
  * Initialize filesystem
  */
 fs_result_t fs_init(void) {
+    fs_result_t status = fs_access_status();
+    if (status == FS_ERROR_BUSY || status == FS_ERROR_IO) {
+        return status;
+    }
     if (s_initialized) {
+        s_storage_state = STORAGE_DEVICE_OWNED;
         return FS_OK;
     }
     
@@ -168,6 +215,7 @@ fs_result_t fs_init(void) {
         fs_result_t fmt_result = do_format();
         if (fmt_result != FS_OK) {
             usb_cdc_puts("Format failed!\r\n");
+            s_storage_state = STORAGE_FAULT;
             return fmt_result;
         }
         
@@ -175,6 +223,7 @@ fs_result_t fs_init(void) {
         fr = f_mount(&s_fatfs, "", 1);
         if (fr != FR_OK) {
             usb_cdc_puts("Mount after format failed!\r\n");
+            s_storage_state = STORAGE_FAULT;
             return fresult_to_fs(fr);
         }
         
@@ -185,10 +234,12 @@ fs_result_t fs_init(void) {
     }
     
     if (fr != FR_OK) {
+        s_storage_state = STORAGE_FAULT;
         return fresult_to_fs(fr);
     }
     
     s_initialized = true;
+    s_storage_state = STORAGE_DEVICE_OWNED;
     return FS_OK;
 }
 
@@ -197,27 +248,31 @@ fs_result_t fs_init(void) {
  * Formats the filesystem, destroying all data
  */
 fs_result_t fs_format(void) {
-    /* Close any open files first */
-    for (int i = 0; i < MAX_OPEN_FILES; i++) {
-        if (s_fil_used[i]) {
-            f_close(&s_fil_pool[i]);
-            s_fil_used[i] = false;
-        }
+    if (s_storage_state == STORAGE_CLAIMING_HOST ||
+        s_storage_state == STORAGE_HOST_OWNED ||
+        s_storage_state == STORAGE_RELEASING_HOST || has_open_files()) {
+        return FS_ERROR_BUSY;
     }
-    
-    /* Unmount first */
-    f_mount(NULL, "", 0);
-    s_initialized = false;
+
+    if (s_initialized) {
+        if (f_mount(NULL, "", 0) != FR_OK) {
+            s_storage_state = STORAGE_FAULT;
+            return FS_ERROR_IO;
+        }
+        s_initialized = false;
+    }
     
     /* Perform format */
     fs_result_t result = do_format();
     if (result != FS_OK) {
+        s_storage_state = STORAGE_FAULT;
         return result;
     }
     
     /* Remount */
     FRESULT fr = f_mount(&s_fatfs, "", 1);
     if (fr != FR_OK) {
+        s_storage_state = STORAGE_FAULT;
         return fresult_to_fs(fr);
     }
     
@@ -227,6 +282,7 @@ fs_result_t fs_format(void) {
     /* Reinitialize file pool */
     memset(s_fil_used, 0, sizeof(s_fil_used));
     s_initialized = true;
+    s_storage_state = STORAGE_DEVICE_OWNED;
     
     /* Notify USB host that media changed */
     usb_msc_media_changed();
@@ -238,14 +294,17 @@ fs_result_t fs_format(void) {
  * Sync filesystem to flash
  */
 fs_result_t fs_sync(void) {
-    if (!s_initialized) {
-        return FS_ERROR;
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     
     /* Sync all open files */
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (s_fil_used[i]) {
-            f_sync(&s_fil_pool[i]);
+            if (f_sync(&s_fil_pool[i]) != FR_OK) {
+                return FS_ERROR_IO;
+            }
         }
     }
     
@@ -260,28 +319,9 @@ fs_result_t fs_sync(void) {
  * Remounts FatFs to pick up changes made via USB MSC
  */
 fs_result_t fs_invalidate(void) {
-    if (!s_initialized) {
-        return FS_OK;  /* Nothing to invalidate */
-    }
-    
-    /* Close any open files first */
-    for (int i = 0; i < MAX_OPEN_FILES; i++) {
-        if (s_fil_used[i]) {
-            f_close(&s_fil_pool[i]);
-            s_fil_used[i] = false;
-        }
-    }
-    
-    /* Unmount and remount to clear FatFs internal caches */
-    f_mount(NULL, "", 0);  /* Unmount */
-    
-    FRESULT fr = f_mount(&s_fatfs, "", 1);  /* Remount */
-    if (fr != FR_OK) {
-        s_initialized = false;
-        return fresult_to_fs(fr);
-    }
-    
-    return FS_OK;
+    /* Host writes become visible through the fresh mount performed by
+     * fs_end_host_access(). Never remount lazily while host-owned. */
+    return ensure_initialized();
 }
 
 /*
@@ -302,7 +342,7 @@ uint32_t fs_get_total_sectors(void) {
  * Get free space in bytes
  */
 uint32_t fs_get_free_space(void) {
-    if (!s_initialized) {
+    if (ensure_initialized() != FS_OK) {
         return 0;
     }
     
@@ -319,7 +359,65 @@ uint32_t fs_get_free_space(void) {
 }
 
 bool fs_host_owned(void) {
-    return false;
+    return s_storage_state == STORAGE_HOST_OWNED;
+}
+
+bool fs_storage_ready(void) {
+    return fs_access_status() == FS_OK;
+}
+
+fs_result_t fs_begin_host_access(void) {
+    fs_result_t ready = fs_access_status();
+    if (ready != FS_OK) {
+        return ready;
+    }
+    if (!s_initialized || has_open_files()) {
+        return FS_ERROR_BUSY;
+    }
+
+    fs_result_t sync_result = fs_sync();
+    if (sync_result != FS_OK) {
+        s_storage_state = STORAGE_FAULT;
+        return sync_result;
+    }
+    s_storage_state = STORAGE_CLAIMING_HOST;
+    if (f_mount(NULL, "", 0) != FR_OK) {
+        s_storage_state = STORAGE_FAULT;
+        return FS_ERROR_IO;
+    }
+    s_initialized = false;
+    s_storage_state = STORAGE_HOST_OWNED;
+    return FS_OK;
+}
+
+fs_result_t fs_end_host_access(void) {
+    if (s_storage_state != STORAGE_HOST_OWNED) {
+        return s_storage_state == STORAGE_FAULT ? FS_ERROR_IO : FS_ERROR_BUSY;
+    }
+
+    s_storage_state = STORAGE_RELEASING_HOST;
+    FRESULT mount_result = f_mount(&s_fatfs, "", 1);
+    if (mount_result != FR_OK || !validate_filesystem()) {
+        if (mount_result == FR_OK) {
+            (void)f_mount(NULL, "", 0);
+        }
+        s_initialized = false;
+        s_storage_state = STORAGE_FAULT;
+        return FS_ERROR_IO;
+    }
+
+    memset(s_fil_used, 0, sizeof(s_fil_used));
+    s_initialized = true;
+    s_storage_state = STORAGE_DEVICE_OWNED;
+    return FS_OK;
+}
+
+fs_result_t fs_msc_sync(void) {
+    if (!fs_host_owned()) {
+        return FS_ERROR_BUSY;
+    }
+    diskio_sync();
+    return FS_OK;
 }
 
 /*
@@ -328,6 +426,12 @@ bool fs_host_owned(void) {
  */
 fs_result_t fs_read_sector(uint32_t sector, uint32_t offset,
                            void *buffer, uint32_t size) {
+    if (buffer == NULL) {
+        return FS_ERROR_INVALID;
+    }
+    if (!fs_host_owned()) {
+        return FS_ERROR_BUSY;
+    }
     if (diskio_read_sector(sector, offset, buffer, size) != 0) {
         return FS_ERROR_IO;
     }
@@ -340,6 +444,12 @@ fs_result_t fs_read_sector(uint32_t sector, uint32_t offset,
  */
 fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
                             const void *buffer, uint32_t size) {
+    if (buffer == NULL) {
+        return FS_ERROR_INVALID;
+    }
+    if (!fs_host_owned()) {
+        return FS_ERROR_BUSY;
+    }
     if (diskio_write_sector(sector, offset, buffer, size) != 0) {
         return FS_ERROR_IO;
     }
@@ -353,12 +463,12 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     if (file == NULL || path == NULL) {
         return FS_ERROR_INVALID;
     }
-    
-    if (!s_initialized) {
-        fs_result_t res = fs_init();
-        if (res != FS_OK) {
-            return res;
-        }
+
+    file->internal = NULL;
+    file->is_open = false;
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     
     /* Find free file slot */
@@ -384,7 +494,10 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     
     /* Handle append mode */
     if (mode & FS_MODE_APPEND) {
-        f_lseek(&s_fil_pool[slot], f_size(&s_fil_pool[slot]));
+        if (f_lseek(&s_fil_pool[slot], f_size(&s_fil_pool[slot])) != FR_OK) {
+            (void)f_close(&s_fil_pool[slot]);
+            return FS_ERROR_IO;
+        }
     }
     
     s_fil_used[slot] = true;
@@ -429,7 +542,11 @@ fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_re
     if (file == NULL || !file->is_open || buffer == NULL) {
         return FS_ERROR_INVALID;
     }
-    
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
+
     FIL *fp = (FIL *)file->internal;
     UINT br;
     
@@ -449,7 +566,11 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size, size_t *b
     if (file == NULL || !file->is_open || buffer == NULL) {
         return FS_ERROR_INVALID;
     }
-    
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
+
     FIL *fp = (FIL *)file->internal;
     UINT bw;
     
@@ -469,7 +590,11 @@ fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
     if (file == NULL || !file->is_open) {
         return FS_ERROR_INVALID;
     }
-    
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
+
     FIL *fp = (FIL *)file->internal;
     FRESULT fr = f_lseek(fp, offset);
     
@@ -483,7 +608,11 @@ fs_result_t fs_size(fs_file_t *file, size_t *size) {
     if (file == NULL || !file->is_open || size == NULL) {
         return FS_ERROR_INVALID;
     }
-    
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
+    }
+
     FIL *fp = (FIL *)file->internal;
     *size = f_size(fp);
     
@@ -497,22 +626,14 @@ fs_result_t fs_exists(const char *path) {
     if (path == NULL) {
         return FS_ERROR_INVALID;
     }
-    
-    if (!s_initialized) {
-        fs_result_t res = fs_init();
-        if (res != FS_OK) {
-            return res;
-        }
+
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
-    
+
     FILINFO finfo;
-    FRESULT fr = f_stat(path, &finfo);
-    
-    if (fr == FR_OK) {
-        return FS_OK;
-    }
-    
-    return FS_ERROR_NOT_FOUND;
+    return fresult_to_fs(f_stat(path, &finfo));
 }
 
 /*
@@ -522,13 +643,12 @@ fs_result_t fs_remove(const char *path) {
     if (path == NULL) {
         return FS_ERROR_INVALID;
     }
-    
-    if (!s_initialized) {
-        return FS_ERROR;
+
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
-    
-    FRESULT fr = f_unlink(path);
-    return fresult_to_fs(fr);
+    return fresult_to_fs(f_unlink(path));
 }
 
 /*
@@ -538,13 +658,12 @@ fs_result_t fs_rename(const char *old_path, const char *new_path) {
     if (old_path == NULL || new_path == NULL) {
         return FS_ERROR_INVALID;
     }
-    
-    if (!s_initialized) {
-        return FS_ERROR;
+
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
-    
-    FRESULT fr = f_rename(old_path, new_path);
-    return fresult_to_fs(fr);
+    return fresult_to_fs(f_rename(old_path, new_path));
 }
 
 /*
@@ -554,16 +673,12 @@ fs_result_t fs_mkdir(const char *path) {
     if (path == NULL) {
         return FS_ERROR_INVALID;
     }
-    
-    if (!s_initialized) {
-        fs_result_t res = fs_init();
-        if (res != FS_OK) {
-            return res;
-        }
+
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
-    
-    FRESULT fr = f_mkdir(path);
-    return fresult_to_fs(fr);
+    return fresult_to_fs(f_mkdir(path));
 }
 
 /*
@@ -573,12 +688,10 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
     if (callback == NULL) {
         return FS_ERROR_INVALID;
     }
-    
-    if (!s_initialized) {
-        fs_result_t res = fs_init();
-        if (res != FS_OK) {
-            return res;
-        }
+
+    fs_result_t ready = ensure_initialized();
+    if (ready != FS_OK) {
+        return ready;
     }
     
     DIR dir;

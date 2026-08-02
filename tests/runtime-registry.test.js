@@ -78,6 +78,11 @@ const expectedOnboardDevices = {
 };
 
 test("all shipping boards have explicit, closed feature maps", () => {
+  assert.equal(
+    featureNames.includes("storageReady"),
+    false,
+    "dynamic storageReady() availability must derive from the static fs capability",
+  );
   assert.deepEqual(shippingBoardIds, expectedBoards);
   assert.deepEqual(Object.keys(boardDescriptors), expectedBoards);
 
@@ -186,13 +191,43 @@ test("capability-gated board exports exactly match their advertised gates", () =
   for (const boardId of shippingBoardIds) {
     const descriptor = boardDescriptors[boardId];
     for (const [exportName, gateAdvertised] of Object.entries(capabilityGatedBoardExports)) {
+      const advertised = exportName === "storageReady"
+        ? Object.hasOwn(descriptor.capabilities, "fs")
+        : descriptor.features[exportName];
       assert.equal(
-        descriptor.features[exportName],
+        advertised,
         gateAdvertised(descriptor),
         `${boardId}.board.${exportName}`,
       );
     }
   }
+});
+
+test("filesystem, MSC transfer, and storageReady support share one static registry contract", () => {
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    const filesystem = descriptor.capabilities.fs;
+    const usbClasses = descriptor.capabilities.usb?.classes ?? [];
+
+    assert.equal(Boolean(filesystem), descriptor.modules.includes("fs"), `${boardId}.fs module`);
+    assert.equal(
+      filesystem?.hostTransfer === true,
+      usbClasses.includes("msc"),
+      `${boardId}.MSC transfer`,
+    );
+    assert.equal(
+      Object.hasOwn(descriptor.features, "storageReady"),
+      false,
+      `${boardId}.storageReady must not be a duplicated feature flag`,
+    );
+    if (filesystem) {
+      assert.equal(Object.hasOwn(filesystem, "ready"), false, `${boardId}.fs.ready is dynamic`);
+      assert.equal(Object.hasOwn(filesystem, "owner"), false, `${boardId}.fs.owner is dynamic`);
+    }
+  }
+
+  const generator = readFileSync(join(root, "scripts/generate-runtime-registry.js"), "utf8");
+  assert.equal(generator.includes("features.storageReady"), false);
 });
 
 test("full and constrained feature maps remain intentionally different", () => {

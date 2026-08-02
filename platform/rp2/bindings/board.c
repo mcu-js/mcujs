@@ -147,7 +147,7 @@ static jerry_value_t board_storage_ready_handler(const jerry_call_info_t *call_i
     (void)call_info_p;
     (void)args;
     (void)argc;
-    return jerry_boolean(!fs_host_owned());
+    return jerry_boolean(fs_storage_ready());
 }
 
 #if MCUJS_REGISTRY_ONBOARD_LED

@@ -4,6 +4,7 @@
 #include "runtime_features.h"
 #include "board_config.h"
 #include "boot.h"
+#include "fs.h"
 #include "jerryscript.h"
 #include "validation.h"
 
@@ -104,7 +105,7 @@ static jerry_value_t board_safe_mode(const jerry_call_info_t *info,
 static jerry_value_t board_storage_ready(const jerry_call_info_t *info,
                                          const jerry_value_t args[], jerry_length_t argc) {
     (void)info; (void)args; (void)argc;
-    return jerry_boolean(mcujs_boot_storage_ready());
+    return jerry_boolean(fs_storage_ready());
 }
 
 static jerry_value_t board_led(const jerry_call_info_t *info,

@@ -2,6 +2,9 @@
 # Contains USB, filesystem, REPL, and boot loader
 
 add_library(mcujs_core STATIC
+    # Shared USB ownership policy
+    usb/msc_ownership.c
+
     # Platform USB subsystem
     ${MCUJS_PLATFORM_USB_SOURCES}
 

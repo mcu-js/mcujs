@@ -26,6 +26,7 @@
 #include "../runtime_registry.h"
 #include "jerryscript.h"
 #include "fs.h"
+#include "validation.h"
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -85,6 +86,17 @@ static void set_property_value(jerry_value_t object, jerry_value_t property,
                                jerry_value_t value) {
     jerry_value_t result = jerry_object_set(object, property, value);
     jerry_value_free(result);
+}
+
+static jerry_value_t throw_filesystem_busy(void) {
+    const mcujs_error_details_t details = {
+        .resource = "filesystem",
+        .owner = "usb-host",
+    };
+    return mcujs_throw_operational_error(
+        MCUJS_ERROR_BUSY,
+        "filesystem is owned by the USB host; eject MCUJS first",
+        &details);
 }
 
 
@@ -735,6 +747,10 @@ static jerry_value_t require_handler(const jerry_call_info_t *call_info,
             return builtin;
         }
         jerry_value_free(builtin);
+    }
+
+    if (fs_access_status() == FS_ERROR_BUSY) {
+        return throw_filesystem_busy();
     }
     
     /* Resolve the path */

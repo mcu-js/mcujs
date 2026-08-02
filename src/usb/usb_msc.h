@@ -10,11 +10,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "msc_ownership.h"
+
 /*
  * Initialize USB MSC
  * Must be called after filesystem is initialized
  */
 void usb_msc_init(void);
+
+/* Main-loop-only ownership transitions. */
+bool usb_msc_expose(void);
+void usb_msc_task(void);
+void usb_msc_event(mcujs_msc_event_t event);
 
 /*
  * Check if the drive has been ejected

@@ -93,9 +93,21 @@ status.report();
 
 ## Filesystem behavior
 
-- Files written by JavaScript persist immediately
-- Host OS directory caches can delay visibility of device-written files
-- If a file seems missing on your computer, unplug and replug the device
+- `require('board').capability('fs')` is the static contract: it describes
+  whether this firmware has a filesystem and supports host transfer.
+- `board.storageReady()` is dynamic. It is `true` only while the device owns a
+  mounted, usable filesystem; check that the method exists before calling it.
+- USB mass storage and device-side JavaScript never access the volume at the
+  same time. While the USB host owns it, `fs` operations and file-backed
+  `require()` throw `ResourceBusyError` with `code === 'EBUSY'`,
+  `resource === 'filesystem'`, and `owner === 'usb-host'`. Built-in modules such
+  as `require('board')` remain available.
+- Properly eject the MCU.js volume on the host before using device-side files.
+  Once ownership returns, `board.storageReady()` becomes `true` and host writes
+  are visible through the fresh mount.
+- Host OS directory caches can delay visibility of device-written files. If a
+  file still appears stale after the next handoff, disconnect and reconnect the
+  board.
 
 ## Key terms
 

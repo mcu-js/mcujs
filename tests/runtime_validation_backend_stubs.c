@@ -498,6 +498,9 @@ void pico_get_unique_board_id(pico_unique_board_id_t *id) {
 void usb_cdc_reset_usb(uint32_t delay_ms) { (void)delay_ms; }
 void board_enter_uf2(void) {}
 bool fs_host_owned(void) { return false; }
+#if !defined(MCUJS_USE_PRODUCTION_BINDING_HELPERS)
+bool fs_storage_ready(void) { return true; }
+#endif
 void cyw43_arch_gpio_put(int pin, int value) { (void)pin; (void)value; }
 
 #elif defined(MCUJS_PLATFORM_ESP32)

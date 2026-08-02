@@ -1,12 +1,14 @@
 /*
  * mcujs - TinyUSB Configuration
  * 
- * Configures USB device (CDC for now, MSC later)
+ * Configures the USB classes enabled by the generated board registry.
  * Based on Pico SDK and CircuitPython patterns
  */
 
 #ifndef TUSB_CONFIG_H
 #define TUSB_CONFIG_H
+
+#include "runtime_features.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,16 +55,16 @@ extern "C" {
  *--------------------------------------------------------------------*/
 
 /* CDC - Serial communication */
-#define CFG_TUD_CDC 1
+#define CFG_TUD_CDC MCUJS_USB_CDC
 #define CFG_TUD_CDC_RX_BUFSIZE 256
 #define CFG_TUD_CDC_TX_BUFSIZE 256
 
 /* MSC - Mass Storage */
-#define CFG_TUD_MSC 1
+#define CFG_TUD_MSC MCUJS_USB_MSC
 #define CFG_TUD_MSC_EP_BUFSIZE 512
 
 /* HID - Human Interface Device (Keyboard/Mouse) */
-#define CFG_TUD_HID 1
+#define CFG_TUD_HID (MCUJS_USB_KEYBOARD_HID || MCUJS_USB_MOUSE_HID)
 #define CFG_TUD_HID_EP_BUFSIZE 16
 
 /* Unused classes */

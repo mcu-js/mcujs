@@ -73,6 +73,11 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_REGISTRY_ADC_TEMPERATURE ${descriptor.capabilities.adc?.temperature?.supported === true ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_SAFE_MODE ${descriptor.features.safeMode ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_STORAGE_READY ${descriptor.capabilities.fs ? 1 : 0}`);
+  const usbClasses = descriptor.capabilities.usb?.classes ?? [];
+  lines.push(`#define MCUJS_USB_CDC ${usbClasses.includes("cdc") ? 1 : 0}`);
+  lines.push(`#define MCUJS_USB_MSC ${usbClasses.includes("msc") ? 1 : 0}`);
+  lines.push(`#define MCUJS_USB_KEYBOARD_HID ${usbClasses.includes("keyboardHid") ? 1 : 0}`);
+  lines.push(`#define MCUJS_USB_MOUSE_HID ${usbClasses.includes("mouseHid") ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_GPIO_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.pins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK ${pinMask(descriptor.capabilities.gpio?.outputPins ?? [])}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_PIN_MASK ${pinMask(descriptor.capabilities.pwm?.pins ?? [])}`);
@@ -204,8 +209,9 @@ function generatedBoardDocsSection() {
   const featureRows = shippingBoardIds.map((boardId) => {
     const descriptor = boardDescriptors[boardId];
     const { features } = descriptor;
+    const usbClasses = descriptor.capabilities.usb?.classes ?? [];
     const image = features.image ? (features.dvi ? "✓ + DVI" : "✓") : "—";
-    return `| \`${boardId}\` | ${checkmark(features.gpio)} | ${checkmark(features.pwm)} | ${checkmark(features.i2c)} | ${checkmark(features.spi)} | ${checkmark(features.adc)} | ${checkmark(features.neopixel)} | ${image} | ${checkmark(features.keyboard && features.mouse)} | ${onboardSummary(descriptor)} |`;
+    return `| \`${boardId}\` | ${checkmark(features.gpio)} | ${checkmark(features.pwm)} | ${checkmark(features.i2c)} | ${checkmark(features.spi)} | ${checkmark(features.adc)} | ${checkmark(features.neopixel)} | ${image} | ${checkmark(usbClasses.includes("cdc"))} | ${checkmark(usbClasses.includes("msc"))} | ${checkmark(usbClasses.includes("keyboardHid"))} | ${checkmark(usbClasses.includes("mouseHid"))} | ${onboardSummary(descriptor)} |`;
   });
   const discoveryRows = shippingBoardIds.map((boardId) => {
     const descriptor = boardDescriptors[boardId];
@@ -225,12 +231,13 @@ ${supportedRows.join("\n")}
 
 The runtime descriptor in \`runtime/board-registry.js\` is authoritative for
 firmware-enabled modules and release capability manifests. A check means the
-module is registered in that image; it does not claim an external device is
-attached. \`NeoPixel\` describes the external driver, while the final column lists
-only physically onboard devices.
+corresponding firmware capability is enabled in that image; for module columns,
+the module is registered. It does not claim an external device is attached.
+\`NeoPixel\` describes the external driver, while the final column lists only
+physically onboard devices.
 
-| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image/graphics | USB keyboard/mouse | Onboard devices |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image/graphics | CDC | MSC | Keyboard HID | Mouse HID | Onboard devices |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ${featureRows.join("\n")}
 
 ## Runtime board discovery

@@ -29,13 +29,32 @@ int main(void) {
 
 #if MCUJS_FEATURE_IMAGE
     assert(mcujs_runtime_has_module("image"));
-    assert(mcujs_runtime_has_module("keyboard"));
-    assert(mcujs_runtime_has_module("mouse"));
 #else
     assert(!mcujs_runtime_has_module("image"));
+#endif
+
+#if MCUJS_FEATURE_KEYBOARD
+    assert(mcujs_runtime_has_module("keyboard"));
+#else
     assert(!mcujs_runtime_has_module("keyboard"));
+#endif
+
+#if MCUJS_FEATURE_MOUSE
+    assert(mcujs_runtime_has_module("mouse"));
+#else
     assert(!mcujs_runtime_has_module("mouse"));
 #endif
+
+    const mcujs_runtime_capability_t *usb = mcujs_runtime_find_capability("usb");
+    assert(usb != NULL);
+    assert((strstr(usb->json, "\"cdc\"") != NULL) == (MCUJS_USB_CDC != 0));
+    assert((strstr(usb->json, "\"msc\"") != NULL) == (MCUJS_USB_MSC != 0));
+    assert((strstr(usb->json, "\"keyboardHid\"") != NULL) ==
+           (MCUJS_USB_KEYBOARD_HID != 0));
+    assert((strstr(usb->json, "\"mouseHid\"") != NULL) ==
+           (MCUJS_USB_MOUSE_HID != 0));
+    assert((MCUJS_FEATURE_KEYBOARD != 0) == (MCUJS_USB_KEYBOARD_HID != 0));
+    assert((MCUJS_FEATURE_MOUSE != 0) == (MCUJS_USB_MOUSE_HID != 0));
 
 #if MCUJS_REGISTRY_ONBOARD_NEOPIXEL
     assert(registry->onboard_neopixel);

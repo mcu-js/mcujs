@@ -14,9 +14,15 @@ static jerry_value_t stub_module(void) {
 
 jerry_value_t js_create_spi_module(void) { return stub_module(); }
 jerry_value_t js_create_adc_module(void) { return stub_module(); }
+#if MCUJS_FEATURE_IMAGE
 jerry_value_t js_create_image_module(void) { return stub_module(); }
+#endif
+#if MCUJS_FEATURE_KEYBOARD
 jerry_value_t js_create_keyboard_module(void) { return stub_module(); }
+#endif
+#if MCUJS_FEATURE_MOUSE
 jerry_value_t js_create_mouse_module(void) { return stub_module(); }
+#endif
 
 static fs_result_t s_fs_operation_result = FS_ERROR_NOT_FOUND;
 
@@ -201,6 +207,8 @@ static const char s_test_source[] =
     "  assert(modules.has('board') === true, 'board missing from has()');\n"
     "  assert(modules.has('__missing_module__') === false, 'unknown module present');\n"
     "  assert(modules.has('image') === (__mcujsHasImage === true), 'feature lane mismatch');\n"
+    "  assert(modules.has('keyboard') === (__mcujsHasKeyboard === true), 'keyboard feature lane mismatch');\n"
+    "  assert(modules.has('mouse') === (__mcujsHasMouse === true), 'mouse feature lane mismatch');\n"
     "  assertThrowsType(function () { modules.has(); }, TypeError, 'missing has() argument did not throw TypeError');\n"
     "  assertThrowsType(function () { modules.has(1); }, TypeError, 'numeric has() argument did not throw TypeError');\n"
     "  assertThrowsType(function () { modules.has(null); }, TypeError, 'null has() argument did not throw TypeError');\n"
@@ -313,6 +321,12 @@ int main(void) {
     jerry_value_t has_image = jerry_boolean(MCUJS_FEATURE_IMAGE != 0);
     js_set_property(global, "__mcujsHasImage", has_image);
     jerry_value_free(has_image);
+    jerry_value_t has_keyboard = jerry_boolean(MCUJS_FEATURE_KEYBOARD != 0);
+    js_set_property(global, "__mcujsHasKeyboard", has_keyboard);
+    jerry_value_free(has_keyboard);
+    jerry_value_t has_mouse = jerry_boolean(MCUJS_FEATURE_MOUSE != 0);
+    js_set_property(global, "__mcujsHasMouse", has_mouse);
+    jerry_value_free(has_mouse);
     jerry_value_t expected_board = jerry_json_parse(
         (const jerry_char_t *)registry->board_json, strlen(registry->board_json));
     assert(!jerry_value_is_exception(expected_board));

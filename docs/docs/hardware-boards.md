@@ -30,22 +30,23 @@ package set in `MCUJS_RELEASE_BOARDS`; keep this table in sync with both lanes.
 
 The runtime descriptor in `runtime/board-registry.js` is authoritative for
 firmware-enabled modules and release capability manifests. A check means the
-module is registered in that image; it does not claim an external device is
-attached. `NeoPixel` describes the external driver, while the final column lists
-only physically onboard devices.
+corresponding firmware capability is enabled in that image; for module columns,
+the module is registered. It does not claim an external device is attached.
+`NeoPixel` describes the external driver, while the final column lists only
+physically onboard devices.
 
-| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image/graphics | USB keyboard/mouse | Onboard devices |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `pico` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (GPIO 25, active-high) |
-| `pico2` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (GPIO 25, active-high) |
-| `pico2_w` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (managed) |
-| `waveshare_rp2040_zero` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | NeoPixel (GPIO 16, 1 × RGB) |
-| `waveshare_rp2040_pizero` | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ + DVI | ✓ | — |
-| `waveshare_rp2040_touch_lcd_1.28` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
-| `waveshare_rp2350_lcd_1.47_a` | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | NeoPixel (GPIO 22, 1 × GRB) |
-| `waveshare_rp2350_touch_lcd_1.69` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
-| `adafruit_feather_rp2040` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (GPIO 13, active-high) + NeoPixel (GPIO 16, 1 × GRB) |
-| `seeed_xiao_esp32s3` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | LED (GPIO 21, active-low) |
+| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image/graphics | CDC | MSC | Keyboard HID | Mouse HID | Onboard devices |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `pico` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (GPIO 25, active-high) |
+| `pico2` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (GPIO 25, active-high) |
+| `pico2_w` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (managed) |
+| `waveshare_rp2040_zero` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | NeoPixel (GPIO 16, 1 × RGB) |
+| `waveshare_rp2040_pizero` | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ + DVI | ✓ | ✓ | ✓ | ✓ | — |
+| `waveshare_rp2040_touch_lcd_1.28` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| `waveshare_rp2350_lcd_1.47_a` | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | NeoPixel (GPIO 22, 1 × GRB) |
+| `waveshare_rp2350_touch_lcd_1.69` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| `adafruit_feather_rp2040` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | LED (GPIO 13, active-high) + NeoPixel (GPIO 16, 1 × GRB) |
+| `seeed_xiao_esp32s3` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | — | — | LED (GPIO 21, active-low) |
 
 ## Runtime board discovery
 

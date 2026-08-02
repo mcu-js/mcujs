@@ -22,12 +22,16 @@
 #define REPORT_ID_CONSUMER 3
 
 static uint8_t const desc_hid_report[] = {
+#if MCUJS_USB_KEYBOARD_HID
     /* Keyboard */
     TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD)),
+    /* Consumer Control (media keys exposed by the keyboard module) */
+    TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(REPORT_ID_CONSUMER)),
+#endif
+#if MCUJS_USB_MOUSE_HID
     /* Mouse */
     TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE)),
-    /* Consumer Control (media keys) */
-    TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(REPORT_ID_CONSUMER)),
+#endif
 };
 
 /* Invoked when received GET HID REPORT DESCRIPTOR */
@@ -80,8 +84,10 @@ uint8_t const *tud_descriptor_device_cb(void) {
 
 /* Interface numbers */
 enum {
+#if CFG_TUD_CDC
     ITF_NUM_CDC = 0,
     ITF_NUM_CDC_DATA,
+#endif
 #if CFG_TUD_MSC
     ITF_NUM_MSC,
 #endif
@@ -100,7 +106,8 @@ enum {
 #define EPNUM_HID_IN      0x84  /* EP 4 IN - HID data */
 
 /* Calculate total config descriptor length */
-#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + \
+#define CONFIG_TOTAL_LEN  (TUD_CONFIG_DESC_LEN + \
+                           (CFG_TUD_CDC ? TUD_CDC_DESC_LEN : 0) + \
                            (CFG_TUD_MSC ? TUD_MSC_DESC_LEN : 0) + \
                            (CFG_TUD_HID ? TUD_HID_DESC_LEN : 0))
 
@@ -108,8 +115,10 @@ static uint8_t const desc_configuration[] = {
     /* Config descriptor: config number, interface count, string index, total length, attribute, power in mA */
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, CONFIG_TOTAL_LEN, 0x80, 100),
     
+#if CFG_TUD_CDC
     /* CDC descriptor: interface number, string index, notification EP & size, data EP out, data EP in, data EP size */
     TUD_CDC_DESCRIPTOR(ITF_NUM_CDC, 4, EPNUM_CDC_NOTIF, 16, EPNUM_CDC_OUT, EPNUM_CDC_IN, 64),
+#endif
     
 #if CFG_TUD_MSC
     /* MSC descriptor: interface number, string index, EP out, EP in, EP size */

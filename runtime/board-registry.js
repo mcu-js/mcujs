@@ -35,6 +35,9 @@ const featureModule = Object.freeze({
   keyboard: "keyboard", mouse: "mouse",
 });
 
+const rpUsbClasses = Object.freeze(["cdc", "msc", "keyboardHid", "mouseHid"]);
+const espUsbClasses = Object.freeze(["cdc", "msc"]);
+
 function featureMap(...enabledNames) {
   const features = Object.fromEntries(featureNames.map((name) => [name, false]));
   for (const name of enabledNames) {
@@ -130,6 +133,10 @@ function neopixelCapability(pins, maxLength = 256) {
   return { pins: [...pins], maxLength, orders: ["RGB", "GRB"] };
 }
 
+function usbCapability(classes) {
+  return { classes: [...classes] };
+}
+
 function modulesFor(features) {
   return moduleOrder.filter((name) => {
     if (name === "board") return features.board;
@@ -200,7 +207,7 @@ function rpDescriptor({
     gpio: gpioCapability(gpioPins, gpioOutputPins),
     pwm: pwmCapability(pwmPins, chip),
     fs: { implementation: "fat", writable: true, hostTransfer: true },
-    usb: { classes: ["cdc", "msc", "keyboardHid", "mouseHid"] },
+    usb: usbCapability(rpUsbClasses),
   };
   if (features.adc) capabilities.adc = adcCapability(adcPins, adcAliases, adcOptions);
   if (features.i2c) capabilities.i2c = i2cCapability(i2cRoutes, i2cDefaultBus);
@@ -364,7 +371,7 @@ boardDescriptors.seeed_xiao_esp32s3 = {
     }),
     neopixel: neopixelCapability(pinsBetween(1, 9)),
     fs: { implementation: "fat", writable: true, hostTransfer: true },
-    usb: { classes: ["cdc", "msc"] },
+    usb: usbCapability(espUsbClasses),
   },
 };
 

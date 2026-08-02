@@ -23,10 +23,9 @@
 
 #include "pico/stdlib.h"  /* For sleep_ms */
 
-/* Check if HID is enabled via tusb_config.h */
-#include "tusb_config.h"
+#include "runtime_features.h"
 
-#if CFG_TUD_HID
+#if MCUJS_USB_MOUSE_HID
 
 #include "usb_hid.h"
 
@@ -317,11 +316,4 @@ jerry_value_t js_create_mouse_module(void) {
     return module;
 }
 
-#else /* CFG_TUD_HID */
-
-/* Stub when HID is disabled */
-jerry_value_t js_create_mouse_module(void) {
-    return jerry_throw_sz(JERRY_ERROR_COMMON, "HID not enabled");
-}
-
-#endif /* CFG_TUD_HID */
+#endif /* MCUJS_USB_MOUSE_HID */

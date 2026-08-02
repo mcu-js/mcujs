@@ -384,6 +384,41 @@ Array-of-objects always stay RGB; array-of-arrays follows the order.
 
 ## Capability-gated compatibility extensions
 
+### Image decoder (current RP compatibility surface)
+
+The `image` module exists only when the running firmware compiled and linked the
+decoder. Detect it without branching on board identity:
+
+```javascript
+(function () {
+  var boardApi = require('board');
+  var modules = require('mcujs:module');
+  if (!modules.has('image')) {
+    console.log('Image decoding is not compiled into this firmware');
+    return;
+  }
+
+  var capability = boardApi.capability('image');
+  var image = require('image');
+  console.log(capability.maxInputBytes, capability.formats);
+  console.log(capability.methods, Object.keys(image));
+}());
+```
+
+Current RP2040 images advertise a 16 KiB input ceiling; RP2350 images advertise
+192 KiB. The descriptor lists the exact `info`, `decodeJPEG`, `decodeBMP`,
+`drawJPEG`, and `drawBMP` methods, baseline JPEG decoding, and BMP variants.
+Uncompressed RGB565, BGR888, and BGRA8888 BMP is supported; alpha is ignored,
+and 16-bit BMP also accepts RGB565 bitfields. BMP dimensions are limited to
+4096 × 4096 before clipping into an RGB565 destination buffer. `swapped` and
+`native` destination byte orders are exposed.
+
+This descriptor reports the current module; it does not make the image API
+portable and does not imply graphics-buffer allocation, a framebuffer, screen,
+display, DVI output, or onboard hardware. Firmware without the decoder omits
+both `require('image')` and `board.capability('image')`. Portable argument,
+error, buffer-handle, and display semantics remain deferred to later 0.x work.
+
 The portable 0.2 SPI surface is `init()` and `transfer()`, with fixed 8-bit words and MSB-first order. Existing RP display builds may also expose `spi.writeBufferDMA(bus, bufferHandle, byteLength)` when the SPI capability reports `dma: true` and includes `writeBufferDMA` in `compatibilityExtensions`. Its opaque graphics handle is not portable; feature-detect the method and do not infer it from the board name. The requested length may equal—but not exceed—the selected handle's byte length. Invalid handles and oversized lengths throw `RangeError`; use before `spi.init()` throws `EBUSY`; DMA-channel exhaustion throws `ERR_RESOURCE_EXHAUSTED`.
 
 Firmware with persistent boot-script recovery may expose `board.safeMode()` and `board.safeMode(enabled)` when `board.capability('boot').safeMode` is true. This getter/setter is a nonportable compatibility extension. The capability is static; the returned boolean is dynamic state. Clearing during the active boot qualification window throws `EBUSY`; a persistent-state write failure throws `EIO`.

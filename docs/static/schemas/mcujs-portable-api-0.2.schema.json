@@ -185,6 +185,9 @@
         "neopixel": {
           "$ref": "#/$defs/neopixelCapability"
         },
+        "image": {
+          "$ref": "#/$defs/imageCapability"
+        },
         "fs": {
           "$ref": "#/$defs/fsCapability"
         },
@@ -679,6 +682,138 @@
               "RGB",
               "GRB"
             ]
+          }
+        }
+      }
+    },
+    "imageCapability": {
+      "type": "object",
+      "description": "Exact current-firmware image decoder exposure. This compatibility descriptor does not standardize a portable image, graphics-buffer, screen, or display API.",
+      "additionalProperties": false,
+      "required": [
+        "methods",
+        "formats",
+        "maxInputBytes",
+        "destination"
+      ],
+      "properties": {
+        "methods": {
+          "const": [
+            "info",
+            "decodeJPEG",
+            "decodeBMP",
+            "drawJPEG",
+            "drawBMP"
+          ]
+        },
+        "formats": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "jpeg",
+            "bmp"
+          ],
+          "properties": {
+            "jpeg": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "profiles"
+              ],
+              "properties": {
+                "profiles": {
+                  "const": [
+                    "baseline"
+                  ]
+                }
+              }
+            },
+            "bmp": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "variants",
+                "maxWidth",
+                "maxHeight"
+              ],
+              "properties": {
+                "variants": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "bitsPerPixel",
+                      "pixelFormat",
+                      "compression"
+                    ],
+                    "properties": {
+                      "bitsPerPixel": {
+                        "enum": [
+                          16,
+                          24,
+                          32
+                        ]
+                      },
+                      "pixelFormat": {
+                        "enum": [
+                          "rgb565",
+                          "bgr888",
+                          "bgra8888"
+                        ]
+                      },
+                      "alpha": {
+                        "const": "ignored"
+                      },
+                      "compression": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": {
+                          "enum": [
+                            "none",
+                            "rgb565-bitfields"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                "maxWidth": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "maxHeight": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        },
+        "maxInputBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "destination": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pixelFormat",
+            "byteOrders"
+          ],
+          "properties": {
+            "pixelFormat": {
+              "const": "rgb565"
+            },
+            "byteOrders": {
+              "const": [
+                "swapped",
+                "native"
+              ]
+            }
           }
         }
       }
@@ -1287,6 +1422,13 @@
         "schema": "#/$defs/neopixelCapability",
         "scope": "externalDriver",
         "dynamic": false
+      },
+      "image": {
+        "schema": "#/$defs/imageCapability",
+        "scope": "firmwareCompatibilityModule",
+        "dynamic": false,
+        "portableApi": false,
+        "normalization": "deferredLater0x"
       },
       "fs": {
         "schema": "#/$defs/fsCapability",

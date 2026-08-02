@@ -133,6 +133,26 @@ function neopixelCapability(pins, maxLength = 256) {
   return { pins: [...pins], maxLength, orders: ["RGB", "GRB"] };
 }
 
+function imageCapability(chip) {
+  return {
+    methods: ["info", "decodeJPEG", "decodeBMP", "drawJPEG", "drawBMP"],
+    formats: {
+      jpeg: { profiles: ["baseline"] },
+      bmp: {
+        variants: [
+          { bitsPerPixel: 16, pixelFormat: "rgb565", compression: ["none", "rgb565-bitfields"] },
+          { bitsPerPixel: 24, pixelFormat: "bgr888", compression: ["none"] },
+          { bitsPerPixel: 32, pixelFormat: "bgra8888", alpha: "ignored", compression: ["none"] },
+        ],
+        maxWidth: 4096,
+        maxHeight: 4096,
+      },
+    },
+    maxInputBytes: chip === "RP2350" ? 192 * 1024 : 16 * 1024,
+    destination: { pixelFormat: "rgb565", byteOrders: ["swapped", "native"] },
+  };
+}
+
 function usbCapability(classes) {
   return { classes: [...classes] };
 }
@@ -213,6 +233,7 @@ function rpDescriptor({
   if (features.i2c) capabilities.i2c = i2cCapability(i2cRoutes, i2cDefaultBus);
   if (features.spi) capabilities.spi = spiCapability(spiRoutes, spiDefaultBus, { dma: true });
   if (features.neopixel) capabilities.neopixel = neopixelCapability(neopixelPins);
+  if (features.image) capabilities.image = imageCapability(chip);
   return {
     board: { name, chip, firmwareVersion, exposedPins: [...exposedPins], pins: { ...aliases }, devices: structuredClone(devices) },
     features,

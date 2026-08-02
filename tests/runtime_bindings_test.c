@@ -12,10 +12,22 @@ static jerry_value_t stub_module(void) {
     return jerry_object();
 }
 
+static jerry_value_t stub_handler(const jerry_call_info_t *call_info,
+                                  const jerry_value_t args[],
+                                  jerry_length_t argc);
+
 jerry_value_t js_create_spi_module(void) { return stub_module(); }
 jerry_value_t js_create_adc_module(void) { return stub_module(); }
 #if MCUJS_FEATURE_IMAGE
-jerry_value_t js_create_image_module(void) { return stub_module(); }
+jerry_value_t js_create_image_module(void) {
+    jerry_value_t module = stub_module();
+    js_set_function(module, "info", stub_handler);
+    js_set_function(module, "decodeJPEG", stub_handler);
+    js_set_function(module, "decodeBMP", stub_handler);
+    js_set_function(module, "drawJPEG", stub_handler);
+    js_set_function(module, "drawBMP", stub_handler);
+    return module;
+}
 #endif
 #if MCUJS_FEATURE_KEYBOARD
 jerry_value_t js_create_keyboard_module(void) { return stub_module(); }
@@ -229,7 +241,8 @@ static const char s_test_source[] =
     "    gpio: ['OUTPUT', 'INPUT', 'INPUT_PULLUP', 'INPUT_PULLDOWN', 'init', 'set', 'get', 'toggle'],\n"
     "    pwm: ['init', 'setDuty', 'stop'],\n"
     "    i2c: ['init', 'write', 'read'],\n"
-    "    neopixel: ['init', 'setPixel', 'show', 'clear']\n"
+    "    neopixel: ['init', 'setPixel', 'show', 'clear'],\n"
+    "    image: ['info', 'decodeJPEG', 'decodeBMP', 'drawJPEG', 'drawBMP']\n"
     "  };\n"
     "  Object.keys(productionExports).forEach(function (name) {\n"
     "    if (!modules.has(name)) return;\n"
@@ -269,7 +282,7 @@ static const char s_test_source[] =
     "  assertFrozenTree(capabilities, 'board.capabilities()');\n"
     "  attackFrozenTree(capabilities, 'board.capabilities()');\n"
     "  assert(JSON.stringify(capabilities.gpio) === JSON.stringify(gpioCapability), 'singular and snapshot capabilities diverged');\n"
-    "  var moduleCapabilities = {fs: 'fs', gpio: 'gpio', pwm: 'pwm', i2c: 'i2c', spi: 'spi', adc: 'adc', neopixel: 'neopixel'};\n"
+    "  var moduleCapabilities = {fs: 'fs', gpio: 'gpio', pwm: 'pwm', i2c: 'i2c', spi: 'spi', adc: 'adc', neopixel: 'neopixel', image: 'image'};\n"
     "  Object.keys(moduleCapabilities).forEach(function (name) {\n"
     "    var capabilityName = moduleCapabilities[name];\n"
     "    assert(modules.has(name) === (board.capability(capabilityName) !== undefined), name + ' module/capability mismatch');\n"

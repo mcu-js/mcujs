@@ -98,7 +98,7 @@ test("unavailable HID bindings are omitted rather than linked as throwing stubs"
 
 test("generated Docusaurus matrix distinguishes each configured USB class", () => {
   const docs = generatedBoardDocsSection();
-  assert.ok(docs.includes("| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image/graphics | CDC | MSC | Keyboard HID | Mouse HID | Onboard devices |"));
+  assert.ok(docs.includes("| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image (max input) | Graphics | Screen/display | DVI | CDC | MSC | Keyboard HID | Mouse HID | Onboard devices |"));
   assert.match(docs, /A check means the\s+corresponding firmware capability is enabled in that image;/);
   assert.doesNotMatch(docs, /A check means the\s+module is registered/);
 });

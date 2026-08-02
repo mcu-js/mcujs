@@ -158,6 +158,23 @@ function validManifest() {
         maxLength: 16,
         orders: ["RGB", "GRB"],
       },
+      image: {
+        methods: ["info", "decodeJPEG", "decodeBMP", "drawJPEG", "drawBMP"],
+        formats: {
+          jpeg: { profiles: ["baseline"] },
+          bmp: {
+            variants: [
+              { bitsPerPixel: 16, pixelFormat: "rgb565", compression: ["none", "rgb565-bitfields"] },
+              { bitsPerPixel: 24, pixelFormat: "bgr888", compression: ["none"] },
+              { bitsPerPixel: 32, pixelFormat: "bgra8888", alpha: "ignored", compression: ["none"] },
+            ],
+            maxWidth: 4096,
+            maxHeight: 4096,
+          },
+        },
+        maxInputBytes: 16384,
+        destination: { pixelFormat: "rgb565", byteOrders: ["swapped", "native"] },
+      },
       fs: { implementation: "fat", writable: true, hostTransfer: true },
       usb: { classes: ["cdc", "msc"] },
     },
@@ -1306,7 +1323,7 @@ test("capability descriptors are static and onboard inventory stays separate", (
   const schema = loadSchema();
   const contract = schema["x-mcujs-contract"];
   const capabilityMap = schema.$defs.capabilityMap;
-  const expectedCapabilities = ["adc", "boot", "fs", "gpio", "i2c", "neopixel", "pwm", "spi", "usb"];
+  const expectedCapabilities = ["adc", "boot", "fs", "gpio", "i2c", "image", "neopixel", "pwm", "spi", "usb"];
   const dynamicNames = /^(available|busy|connected|current|mounted|occupied|owner|ready|state|status)$/i;
 
   assert.equal(capabilityMap.additionalProperties, false);

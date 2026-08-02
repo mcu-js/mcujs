@@ -91,6 +91,7 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_MAX_LENGTH ${neopixel?.maxLength ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_ORDER_RGB ${neopixel?.orders.includes("RGB") ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_ORDER_GRB ${neopixel?.orders.includes("GRB") ? 1 : 0}`);
+  lines.push(`#define MCUJS_RUNTIME_IMAGE_MAX_INPUT_BYTES ${descriptor.capabilities.image?.maxInputBytes ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MIN_HZ ${descriptor.capabilities.pwm?.frequency.minHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MAX_HZ ${descriptor.capabilities.pwm?.frequency.maxHz ?? 0}`);
   const i2c = descriptor.capabilities.i2c;
@@ -210,8 +211,9 @@ function generatedBoardDocsSection() {
     const descriptor = boardDescriptors[boardId];
     const { features } = descriptor;
     const usbClasses = descriptor.capabilities.usb?.classes ?? [];
-    const image = features.image ? (features.dvi ? "✓ + DVI" : "✓") : "—";
-    return `| \`${boardId}\` | ${checkmark(features.gpio)} | ${checkmark(features.pwm)} | ${checkmark(features.i2c)} | ${checkmark(features.spi)} | ${checkmark(features.adc)} | ${checkmark(features.neopixel)} | ${image} | ${checkmark(usbClasses.includes("cdc"))} | ${checkmark(usbClasses.includes("msc"))} | ${checkmark(usbClasses.includes("keyboardHid"))} | ${checkmark(usbClasses.includes("mouseHid"))} | ${onboardSummary(descriptor)} |`;
+    const image = descriptor.capabilities.image;
+    const imageSummary = image ? `✓ (${image.maxInputBytes / 1024} KiB)` : "—";
+    return `| \`${boardId}\` | ${checkmark(features.gpio)} | ${checkmark(features.pwm)} | ${checkmark(features.i2c)} | ${checkmark(features.spi)} | ${checkmark(features.adc)} | ${checkmark(features.neopixel)} | ${imageSummary} | ${checkmark(features.graphics)} | ${checkmark(features.screen)} | ${checkmark(features.dvi)} | ${checkmark(usbClasses.includes("cdc"))} | ${checkmark(usbClasses.includes("msc"))} | ${checkmark(usbClasses.includes("keyboardHid"))} | ${checkmark(usbClasses.includes("mouseHid"))} | ${onboardSummary(descriptor)} |`;
   });
   const discoveryRows = shippingBoardIds.map((boardId) => {
     const descriptor = boardDescriptors[boardId];
@@ -234,10 +236,11 @@ firmware-enabled modules and release capability manifests. A check means the
 corresponding firmware capability is enabled in that image; for module columns,
 the module is registered. It does not claim an external device is attached.
 \`NeoPixel\` describes the external driver, while the final column lists only
-physically onboard devices.
+physically onboard devices. Image decoding, graphics buffers, screen/display
+output, and DVI are independent capabilities; none implies another.
 
-| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image/graphics | CDC | MSC | Keyboard HID | Mouse HID | Onboard devices |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image (max input) | Graphics | Screen/display | DVI | CDC | MSC | Keyboard HID | Mouse HID | Onboard devices |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ${featureRows.join("\n")}
 
 ## Runtime board discovery

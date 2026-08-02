@@ -22,6 +22,13 @@ These display helpers are globals or built-in modules, depending on the board:
 - `image` (module): `byteOrder` option for `decodeJPEG`, `decodeBMP`, `drawJPEG`, `drawBMP`
 - `DVI` (global on DVI boards): `DVI.getDrawBuffer()`, `DVI.swapAndShow()`
 
+Feature-detect `image` with `require('mcujs:module').has('image')` and inspect
+`board.capability('image')` for the exact current firmware methods, decoders, and
+input ceiling. Image decoding is independent from graphics-buffer allocation,
+screen/display output, DVI, and onboard-device inventory. The current RP module
+is an explicitly nonportable compatibility surface; portable image API
+normalization remains deferred to a later 0.x release.
+
 ## MCU.js 0.2 portable contract
 
 - API names, types, units, capabilities, and errors: [Portable API contract](./api-design/portable-api-contract.md)

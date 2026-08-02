@@ -447,7 +447,7 @@ Compare code size, Jerry heap use, deterministic cleanup, finalizer safety, and 
 
 - Portable buffer types and DMA-aware transfers.
 - USB HID capability and API normalization.
-- Image/graphics/display capability layering.
+- Portable image/graphics/display API normalization beyond current-image capability truthfulness.
 - Event-driven input APIs where hardware supports them.
 - Compatibility removals with explicit migration notes.
 

@@ -5,6 +5,7 @@
     var modules = require('mcujs:module');
     var capabilities = boardApi.capabilities();
     var usb = boardApi.capability('usb');
+    var image = boardApi.capability('image');
 
     console.log('Board:', boardApi.name);
     console.log('Chip:', boardApi.chip);
@@ -14,6 +15,8 @@
     console.log('USB classes:', JSON.stringify(usb.classes));
     console.log('Keyboard module:', modules.has('keyboard') ? 'available' : 'unavailable');
     console.log('Mouse module:', modules.has('mouse') ? 'available' : 'unavailable');
+    console.log('Image module:', modules.has('image') ? 'available' : 'unavailable');
+    console.log('Image capability:', image ? JSON.stringify(image) : 'unavailable');
     console.log('Semantic pins:', JSON.stringify(boardApi.pins));
     console.log('Onboard devices:', JSON.stringify(boardApi.devices));
     console.log('Capabilities:', JSON.stringify(capabilities));

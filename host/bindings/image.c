@@ -14,6 +14,7 @@
 #include "graphics.h"
 #include "jerryscript.h"
 #include "picojpeg.h"
+#include "runtime_features.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -477,13 +478,14 @@ bool image_get_info(const uint8_t *data, size_t data_len, image_info_t *info) {
 
 #include "fs.h"
 
-/* Static buffer for image data - read directly from filesystem */
-/* RP2350 has 520KB RAM, RP2040 has 264KB. Adjust buffer size accordingly */
-#if defined(PICO_RP2350)
-#define IMAGE_BUFFER_SIZE (192 * 1024)  /* 192KB for RP2350 */
-#else
-#define IMAGE_BUFFER_SIZE (16 * 1024)   /* 16KB for RP2040 (limited RAM) */
+/* The shared registry owns the current-image input ceiling. */
+#if !MCUJS_FEATURE_IMAGE
+#error "image.c must not be compiled when the image module is unavailable"
 #endif
+#if MCUJS_RUNTIME_IMAGE_MAX_INPUT_BYTES <= 0
+#error "image module requires a positive registry input ceiling"
+#endif
+#define IMAGE_BUFFER_SIZE MCUJS_RUNTIME_IMAGE_MAX_INPUT_BYTES
 static uint8_t s_image_buffer[IMAGE_BUFFER_SIZE];
 static size_t s_image_buffer_len = 0;
 

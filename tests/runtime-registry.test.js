@@ -41,6 +41,7 @@ const moduleCapability = {
   spi: "spi",
   adc: "adc",
   neopixel: "neopixel",
+  image: "image",
 };
 
 const capabilityGatedBoardExports = {
@@ -170,7 +171,6 @@ test("module availability, capabilities, and onboard inventory cannot contradict
       );
     }
     assert.equal(modules.has("process"), descriptor.features.process);
-    assert.equal(modules.has("image"), descriptor.features.image);
     assert.equal(modules.has("keyboard"), descriptor.features.keyboard);
     assert.equal(modules.has("mouse"), descriptor.features.mouse);
 
@@ -233,6 +233,7 @@ test("filesystem, MSC transfer, and storageReady support share one static regist
 test("full and constrained feature maps remain intentionally different", () => {
   const full = boardDescriptors.pico;
   assert.equal(full.features.image, true);
+  assert.equal(full.capabilities.image.maxInputBytes, 16 * 1024);
   assert.equal(full.features.keyboard, true);
   assert.equal(full.features.mouse, true);
   assert.deepEqual(full.capabilities.usb.classes, [
@@ -244,6 +245,7 @@ test("full and constrained feature maps remain intentionally different", () => {
 
   const constrained = boardDescriptors.seeed_xiao_esp32s3;
   assert.equal(constrained.features.image, false);
+  assert.equal("image" in constrained.capabilities, false);
   assert.equal(constrained.features.keyboard, false);
   assert.equal(constrained.features.mouse, false);
   assert.equal(constrained.features.graphics, false);

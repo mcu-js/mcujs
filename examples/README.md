@@ -22,7 +22,7 @@ Prints the canonical board identity, semantic pin map, onboard devices, built-in
 modules, and capability snapshot without branching on a board name.
 
 **Concepts:** `require('board')`, `require('mcujs:module')`, `board.pins`,
-`board.devices`, `board.capabilities()`
+`board.devices`, `board.capabilities()`, optional image-module discovery
 
 **Hardware:** None
 

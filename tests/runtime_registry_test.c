@@ -29,8 +29,15 @@ int main(void) {
 
 #if MCUJS_FEATURE_IMAGE
     assert(mcujs_runtime_has_module("image"));
+    const mcujs_runtime_capability_t *image = mcujs_runtime_find_capability("image");
+    assert(image != NULL);
+    assert(MCUJS_RUNTIME_IMAGE_MAX_INPUT_BYTES > 0);
+    assert(strstr(image->json, "\"maxInputBytes\":") != NULL);
+    assert(strstr(image->json, "\"pixelFormat\":\"rgb565\"") != NULL);
 #else
     assert(!mcujs_runtime_has_module("image"));
+    assert(mcujs_runtime_find_capability("image") == NULL);
+    assert(MCUJS_RUNTIME_IMAGE_MAX_INPUT_BYTES == 0);
 #endif
 
 #if MCUJS_FEATURE_KEYBOARD

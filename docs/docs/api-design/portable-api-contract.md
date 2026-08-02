@@ -69,6 +69,7 @@ A static capability describes immutable facts about this board and firmware imag
 - buses, modes, word sizes, and bit orders;
 - transfer, output, strip-length, timer, and frequency limits;
 - ADC resolution, calibrated-voltage support, and temperature support;
+- current-image decoder methods, formats, destination format, and input ceiling;
 - enabled filesystem and USB classes.
 
 The release manifest's `board.exposedPins` array is the authoritative set of safe, runtime-exposed MCU GPIO identifiers. It includes intentional onboard GPIO endpoints and excludes reserved implementation pins. Every MCU pin published through `board.pins`, `board.devices`, or a GPIO, PWM, ADC, I2C, SPI, or NeoPixel descriptor must resolve into that set. `board.pins` remains the smaller runtime map of semantic aliases; it is not treated as a complete pin inventory.
@@ -99,12 +100,22 @@ The JSON schema closes every 0.2 descriptor with `additionalProperties: false`; 
 | `i2c` | `buses`, `routes`, `defaultBus`, `defaultRoute`, `frequency`, `maxTransferBytes` |
 | `spi` | `buses`, `routes`, `defaultBus`, `defaultRoute`, `frequency`, `maxTransferBytes`, `modes`, fixed `bitsPerWord: [8]`, fixed `bitOrders: ['msb']`, `fullDuplex`, `dma`; optional `compatibilityExtensions` |
 | `neopixel` | `pins`, `maxLength`, `orders` |
+| `image` | `methods`, `formats`, `maxInputBytes`, `destination` (current-image compatibility descriptor; not a normalized portable API) |
 | `fs` | `implementation`, `writable`, `hostTransfer` |
 | `usb` | `classes` |
 
 Irrelevant optional subfields are omitted rather than populated with `-1`, `null`, or another magic value. For example, unsupported calibrated voltage is `{supported: false}` instead of invented voltage limits.
 
 JSON Schema enforces closed shapes, required fields, types, uniqueness, and non-empty collections where those rules are expressible. An advertised ADC capability therefore always has at least one raw pin and channel operation; firmware with no usable raw route omits the capability and module. Cross-field relations require the mandatory semantic validator at `scripts/validate-portable-api-manifest.js`; release tooling and manifest producers must use it rather than AJV alone. Run it with `npm run validate:manifest -- path/to/manifest.json`. It rejects contradictions such as pins or aliases outside `board.exposedPins`, GPIO output pins without output mode, zero-width or reversed ADC voltage ranges, duplicate bus-role pins, invalid default buses or default routes, operation defaults absent from a capability, SPI formats other than the executable 8-bit MSB-first contract, `writeBufferDMA` without DMA, and onboard NeoPixel metadata outside the driver capability. The machine-readable constraint IDs live under `x-mcujs-contract.manifestValidation`.
+
+The `image` descriptor is deliberately narrower than a portable image API. It
+reports only what the current firmware compiles and registers: the exact module
+methods, baseline JPEG and supported BMP decoder variants, RGB565 destination
+byte orders, and the shared input-buffer ceiling. It does not imply a graphics
+buffer, framebuffer, screen, display, DVI output, or onboard device. Firmware
+without the compiled decoder omits both the module and descriptor. Argument,
+error, buffer-handle, and display API normalization remain deferred to later
+0.x work.
 
 Operation arguments and results carry executable limit annotations in `x-mcujs-contract.modules` and `types`: `defaultFromCapability`, `defaultRouteFromCapability`, `allowedFromCapability`, `conditionalAllowedFromCapability`, `minimumFromCapability`, `maximumFromCapability`, `maximumFromCapabilityBitWidth`, `maximumFromArgumentResource`, and `routeFromCapability`. Each bus descriptor contains one complete `defaultRoute` that is also present in `routes` and uses `defaultBus`; omitted route fields resolve through that object, so multiple routes on the default bus are not ambiguous. Raw ADC results are bounded by `0..(2^resolutionBits - 1)`, while voltage results use `voltage.minVolts..voltage.maxVolts`. Optional ADC exports use the `capabilityField` discriminator, so voltage and temperature methods are absent unless their exact static support field is true. Onboard shortcut list lengths use `maximumFromOnboardDevice`; NeoPixel indexes use `exclusiveMaximumFromConfiguration` because their upper bound is the strip length selected by a validated `init()` call. The RP DMA compatibility helper uses `maximumFromArgumentResource` to bind `byteLength` to the selected graphics handle's live `byteLength`. Conformance tooling uses these references to derive max/max+1, route, mode, enum, and numeric-result boundary tests instead of parsing prose.
 

@@ -29,7 +29,6 @@
 /* External helpers from bindings.c */
 extern void js_set_function(jerry_value_t object, const char *name, 
                             jerry_external_handler_t handler);
-extern void js_set_string(jerry_value_t object, const char *name, const char *value);
 extern void js_set_number(jerry_value_t object, const char *name, double value);
 extern void js_register_global(const char *name, jerry_value_t object);
 
@@ -438,8 +437,6 @@ jerry_value_t mcujs_rp2_create_board_module(void) {
     jerry_value_t board = jerry_object();
 
     /* Static properties */
-    js_set_string(board, "name", MCUJS_BOARD_NAME);
-    js_set_string(board, "chip", MCUJS_BOARD_CHIP);
     js_set_number(board, "flashSize", (double)MCUJS_FLASH_SIZE);
     js_set_number(board, "ramSize", (double)MCUJS_RAM_SIZE);
     js_set_number(board, "cpuFreq", (double)clock_get_hz(clk_sys));
@@ -466,13 +463,6 @@ jerry_value_t mcujs_rp2_create_board_module(void) {
 #if MCUJS_REGISTRY_ONBOARD_NEOPIXEL
     js_set_function(board, "neopixel", board_neopixel_handler);
 #endif
-
-    /* Version from build */
-    #ifdef MCUJS_VERSION
-    js_set_string(board, "version", MCUJS_VERSION);
-    #else
-    js_set_string(board, "version", "0.0.0");
-    #endif
 
     if (!js_board_apply_registry(board, NULL, board_storage_ready_handler)) {
         jerry_value_free(board);

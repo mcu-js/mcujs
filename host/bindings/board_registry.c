@@ -147,12 +147,18 @@ bool js_board_apply_registry(jerry_value_t board,
         return false;
     }
 
+    jerry_value_t name = object_get(identity, "name");
+    jerry_value_t chip = object_get(identity, "chip");
+    jerry_value_t version = object_get(identity, "firmwareVersion");
     jerry_value_t api_version = jerry_string_sz(registry->api_version);
     jerry_value_t exposed_pins = object_get(identity, "exposedPins");
     jerry_value_t pins = object_get(identity, "pins");
     jerry_value_t devices = object_get(identity, "devices");
 
-    bool published = freeze_and_publish(board, "apiVersion", api_version) &&
+    bool published = freeze_and_publish(board, "name", name) &&
+                     freeze_and_publish(board, "chip", chip) &&
+                     freeze_and_publish(board, "version", version) &&
+                     freeze_and_publish(board, "apiVersion", api_version) &&
                      freeze_and_publish(board, "exposedPins", exposed_pins) &&
                      freeze_and_publish(board, "pins", pins) &&
                      freeze_and_publish(board, "devices", devices);
@@ -161,6 +167,9 @@ bool js_board_apply_registry(jerry_value_t board,
         jerry_value_free(pins);
         jerry_value_free(exposed_pins);
         jerry_value_free(api_version);
+        jerry_value_free(version);
+        jerry_value_free(chip);
+        jerry_value_free(name);
         jerry_value_free(identity);
         return false;
     }
@@ -171,6 +180,9 @@ bool js_board_apply_registry(jerry_value_t board,
     jerry_value_free(pins);
     jerry_value_free(exposed_pins);
     jerry_value_free(api_version);
+    jerry_value_free(version);
+    jerry_value_free(chip);
+    jerry_value_free(name);
     jerry_value_free(identity);
     return true;
 }

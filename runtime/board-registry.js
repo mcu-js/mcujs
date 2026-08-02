@@ -17,6 +17,19 @@ const moduleOrder = Object.freeze([
   "image", "keyboard", "mouse", "mcujs:module", "node:module",
 ]);
 
+const boardPresentation = Object.freeze({
+  pico: { label: "Raspberry Pi Pico", flash: "2MB", notes: "Onboard LED" },
+  pico2: { label: "Raspberry Pi Pico 2", flash: "4MB", notes: "Onboard LED" },
+  pico2_w: { label: "Raspberry Pi Pico 2 W", flash: "4MB", notes: "CYW43 LED support" },
+  waveshare_rp2040_zero: { label: "Waveshare RP2040-Zero", flash: "2MB", notes: "Onboard NeoPixel" },
+  waveshare_rp2040_pizero: { label: "Waveshare RP2040-PiZero", flash: "16MB", notes: "DVI/HDMI output" },
+  "waveshare_rp2040_touch_lcd_1.28": { label: "Waveshare RP2040 Touch LCD 1.28", flash: "4MB", notes: "Round LCD, touch, IMU" },
+  "waveshare_rp2350_lcd_1.47_a": { label: "Waveshare RP2350-LCD-1.47-A", flash: "16MB", notes: "LCD, NeoPixel" },
+  "waveshare_rp2350_touch_lcd_1.69": { label: "Waveshare RP2350-Touch-LCD-1.69", flash: "16MB", notes: "LCD, touch, IMU, buzzer" },
+  adafruit_feather_rp2040: { label: "Adafruit Feather RP2040", flash: "8MB", notes: "NeoPixel, STEMMA QT" },
+  seeed_xiao_esp32s3: { label: "Seeed Studio XIAO ESP32-S3", flash: "8MB", notes: "Native USB, onboard LED" },
+});
+
 const featureModule = Object.freeze({
   fs: "fs", process: "process", gpio: "gpio", pwm: "pwm", i2c: "i2c",
   spi: "spi", adc: "adc", neopixel: "neopixel", image: "image",
@@ -355,6 +368,15 @@ boardDescriptors.seeed_xiao_esp32s3 = {
     usb: { classes: ["cdc", "msc"] },
   },
 };
+
+for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
+  const presentation = boardPresentation[boardId];
+  if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
+  descriptor.presentation = Object.freeze({ ...presentation });
+}
+for (const boardId of Object.keys(boardPresentation)) {
+  if (!boardDescriptors[boardId]) throw new Error(`Presentation metadata names unknown MCU.js board: ${boardId}`);
+}
 
 const shippingBoardIds = Object.freeze(Object.keys(boardDescriptors));
 

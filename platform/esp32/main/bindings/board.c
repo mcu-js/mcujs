@@ -128,13 +128,10 @@ static jerry_value_t board_led(const jerry_call_info_t *info,
 
 void js_bind_board(void) {
     jerry_value_t board = jerry_object();
-    js_set_string(board, "name", MCUJS_BOARD_NAME);
-    js_set_string(board, "chip", MCUJS_BOARD_CHIP);
     js_set_number(board, "flashSize", (double)MCUJS_FLASH_SIZE);
     js_set_number(board, "ramSize", (double)MCUJS_RAM_SIZE);
     js_set_number(board, "cpuFreq", (double)MCUJS_CPU_FREQ_HZ);
     js_set_number(board, "ledPin", MCUJS_LED_PIN);
-    js_set_string(board, "version", MCUJS_VERSION);
     js_set_function(board, "freeMemory", board_free_memory);
     js_set_function(board, "uniqueId", board_unique_id);
     js_set_function(board, "reset", board_reset);

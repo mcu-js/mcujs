@@ -12,6 +12,7 @@ const {
   manifestFor,
 } = require("../runtime/board-registry.js");
 const {
+  generatedBoardDocsSection,
   generateRuntimeRegistryHeader,
   generatedHeaderPath,
 } = require("../scripts/generate-runtime-registry.js");
@@ -47,6 +48,35 @@ const capabilityGatedBoardExports = {
   storageReady: (descriptor) => Object.hasOwn(descriptor.capabilities, "fs"),
 };
 
+const expectedPresentation = {
+  pico: { label: "Raspberry Pi Pico", flash: "2MB", notes: "Onboard LED" },
+  pico2: { label: "Raspberry Pi Pico 2", flash: "4MB", notes: "Onboard LED" },
+  pico2_w: { label: "Raspberry Pi Pico 2 W", flash: "4MB", notes: "CYW43 LED support" },
+  waveshare_rp2040_zero: { label: "Waveshare RP2040-Zero", flash: "2MB", notes: "Onboard NeoPixel" },
+  waveshare_rp2040_pizero: { label: "Waveshare RP2040-PiZero", flash: "16MB", notes: "DVI/HDMI output" },
+  "waveshare_rp2040_touch_lcd_1.28": { label: "Waveshare RP2040 Touch LCD 1.28", flash: "4MB", notes: "Round LCD, touch, IMU" },
+  "waveshare_rp2350_lcd_1.47_a": { label: "Waveshare RP2350-LCD-1.47-A", flash: "16MB", notes: "LCD, NeoPixel" },
+  "waveshare_rp2350_touch_lcd_1.69": { label: "Waveshare RP2350-Touch-LCD-1.69", flash: "16MB", notes: "LCD, touch, IMU, buzzer" },
+  adafruit_feather_rp2040: { label: "Adafruit Feather RP2040", flash: "8MB", notes: "NeoPixel, STEMMA QT" },
+  seeed_xiao_esp32s3: { label: "Seeed Studio XIAO ESP32-S3", flash: "8MB", notes: "Native USB, onboard LED" },
+};
+
+const expectedOnboardDevices = {
+  pico: { led: { type: "gpio", pin: 25, activeLow: false } },
+  pico2: { led: { type: "gpio", pin: 25, activeLow: false } },
+  pico2_w: { led: { type: "managed" } },
+  waveshare_rp2040_zero: { neopixel: { type: "neopixel", pin: 16, length: 1, order: "RGB" } },
+  waveshare_rp2040_pizero: {},
+  "waveshare_rp2040_touch_lcd_1.28": {},
+  "waveshare_rp2350_lcd_1.47_a": { neopixel: { type: "neopixel", pin: 22, length: 1, order: "GRB" } },
+  "waveshare_rp2350_touch_lcd_1.69": {},
+  adafruit_feather_rp2040: {
+    led: { type: "gpio", pin: 13, activeLow: false },
+    neopixel: { type: "neopixel", pin: 16, length: 1, order: "GRB" },
+  },
+  seeed_xiao_esp32s3: { led: { type: "gpio", pin: 21, activeLow: true } },
+};
+
 test("all shipping boards have explicit, closed feature maps", () => {
   assert.deepEqual(shippingBoardIds, expectedBoards);
   assert.deepEqual(Object.keys(boardDescriptors), expectedBoards);
@@ -62,6 +92,40 @@ test("all shipping boards have explicit, closed feature maps", () => {
     for (const [name, enabled] of Object.entries(descriptor.features)) {
       assert.equal(typeof enabled, "boolean", `${boardId}.${name}`);
     }
+  }
+});
+
+test("all ten board identities, presentation rows, and onboard inventories are explicit", () => {
+  assert.deepEqual(Object.keys(expectedPresentation), expectedBoards);
+  assert.deepEqual(Object.keys(expectedOnboardDevices), expectedBoards);
+  const version = readFileSync(join(root, "version.txt"), "utf8").trim();
+  for (const boardId of expectedBoards) {
+    const descriptor = boardDescriptors[boardId];
+    assert.deepEqual(descriptor.presentation, expectedPresentation[boardId], `${boardId}.presentation`);
+    assert.deepEqual(descriptor.board.devices, expectedOnboardDevices[boardId], `${boardId}.devices`);
+    assert.equal(descriptor.board.firmwareVersion, version, `${boardId}.firmwareVersion`);
+  }
+});
+
+test("Docusaurus board tables are generated exactly from the shared registry", () => {
+  const docs = readFileSync(join(root, "docs/docs/hardware-boards.md"), "utf8");
+  assert.ok(
+    docs.includes(generatedBoardDocsSection()),
+    "docs/docs/hardware-boards.md does not contain the generated board tables",
+  );
+});
+
+test("shell release metadata agrees exactly with the shared board registry", () => {
+  const rows = execFileSync(
+    "bash",
+    ["-c", `source "${join(root, "scripts/lib/boards.sh")}"; for board in "\${MCUJS_RELEASE_BOARDS[@]}"; do printf '%s\\t%s\\t%s\\t%s\\t%s\\n' "$board" "$(mcujs_board_label "$board")" "$(mcujs_board_chip "$board")" "$(mcujs_board_flash "$board")" "$(mcujs_board_features "$board")"; done`],
+    { encoding: "utf8" },
+  ).trim().split("\n");
+  assert.equal(rows.length, expectedBoards.length);
+  for (const row of rows) {
+    const [boardId, label, chip, flash, notes] = row.split("\t");
+    assert.equal(chip, boardDescriptors[boardId].board.chip, `${boardId}.chip`);
+    assert.deepEqual({ label, flash, notes }, boardDescriptors[boardId].presentation, `${boardId}.presentation`);
   }
 });
 

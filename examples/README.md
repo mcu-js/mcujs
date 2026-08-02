@@ -17,6 +17,15 @@ Basic hello world - prints board info and a periodic heartbeat message.
 
 **Concepts:** `console.log`, `board` object, `setInterval`
 
+### board-discovery/
+Prints the canonical board identity, semantic pin map, onboard devices, built-in
+modules, and capability snapshot without branching on a board name.
+
+**Concepts:** `require('board')`, `require('mcujs:module')`, `board.pins`,
+`board.devices`, `board.capabilities()`
+
+**Hardware:** None
+
 ### blink/
 Portable LED blink - uses onboard inventory and toggles the LED every 500ms for 30 seconds.
 

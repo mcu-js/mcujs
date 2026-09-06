@@ -142,3 +142,65 @@ Full `require()` implementation for modular code:
 - **PicoDVI** - DVI/HDMI output library (Luke Wren, BSD-3-Clause)
 - **TinyUSB** - USB stack (via Pico SDK)
 - BMP decoder - Custom implementation (16/24/32-bit uncompressed)
+
+#### Raspberry Pi Docker direct-input pins
+
+The root `Dockerfile` now fixes the direct source inputs selected on 2026-09-05.
+The intended versions remain Alpine 3.19, Pico SDK 2.2.0, picotool 2.2.0,
+JerryScript 3.0.0, FatFs R0.16, and picojpeg 1.1. No APK package names or version
+constraints changed. PicoDVI did not previously select a version; its current
+upstream commit is now explicit. These selections do not reproduce an unknown
+historical builder image: the old Alpine tag, Git tags, and unpinned branches
+could have resolved differently when that image was built.
+
+| Input | Selected identity | Authoritative HTTPS acquisition source |
+|-------|-------------------|----------------------------------------|
+| Alpine 3.19 | `sha256:6baf43584bcb78f2e5847d1de515f23499913ac9f12bdf834811a3145eb11ca1` | [Docker Official Image registry index](https://registry-1.docker.io/v2/library/alpine/manifests/3.19) |
+| Pico SDK 2.2.0 | `a1438dff1d38bd9c65dbd693f0e5db4b9ae91779` | [raspberrypi/pico-sdk](https://github.com/raspberrypi/pico-sdk/tree/a1438dff1d38bd9c65dbd693f0e5db4b9ae91779) |
+| picotool 2.2.0 | `a7eb3988f0645239185fadb4e25d8279478c2dbb` | [raspberrypi/picotool](https://github.com/raspberrypi/picotool/tree/a7eb3988f0645239185fadb4e25d8279478c2dbb) |
+| JerryScript 3.0.0 | `50200152feb724a74a5f64e44d7885151537cfad` | [pando-project/jerryscript](https://github.com/pando-project/jerryscript/tree/50200152feb724a74a5f64e44d7885151537cfad) |
+| FatFs R0.16 | SHA-256 `99f7dc1f7e095356e4a9e3dbe29959090d8b948afe2bbc5441e52fdf4b85449e` | [Elm Chan's ff16.zip](https://elm-chan.org/fsw/ff/arc/ff16.zip) |
+| picojpeg 1.1 | `8ab33a909b4115ace4a952b7ffcb64c350f9298d` | [richgel999/picojpeg](https://github.com/richgel999/picojpeg/tree/8ab33a909b4115ace4a952b7ffcb64c350f9298d) |
+| PicoDVI (previously unversioned) | `dccd738bfa9af75badcb32acde3e41bd6a3fa30a` | [Wren6991/PicoDVI](https://github.com/Wren6991/PicoDVI/tree/dccd738bfa9af75badcb32acde3e41bd6a3fa30a) |
+
+The Alpine digest is the multi-platform OCI index, not an amd64-only manifest.
+It was calculated from the registry response bytes and matched its
+`Docker-Content-Digest` header; no image layers were pulled. Each Git selection
+was resolved through the upstream GitHub commits API and matched `git ls-remote`
+over HTTPS (the named release tags above, or `master` for picojpeg and PicoDVI).
+The picojpeg source still identifies itself as v1.1. FatFs was downloaded from
+the author's HTTPS site, checked as a ZIP, and identified as R0.16 in `source/ff.h`.
+Its SHA-256 was calculated locally from those bytes, not taken from a separately
+signed upstream checksum. Future downloads must pass that checksum before unzip.
+This upstream identity/checksum evidence is historical; the software-only lexical
+checker corrections did not repeat network acquisition or upstream verification.
+
+Git fetches request full commits, detach the checkout, and verify `HEAD`.
+Pico SDK submodules remain at the gitlinks recorded by the selected SDK; the
+build does not use `submodule update --remote`. Existing `/opt` paths and license
+notices are preserved. picojpeg now uses a complete upstream checkout rather
+than two files downloaded from `master`.
+
+Run `node scripts/check-rp-docker-inputs.js --self-test` before rebuilding the
+Raspberry Pi builder. The dependency-free check validates this Dockerfile's
+closed instruction/command set, checks shell syntax with `sh -n`, and rejects
+deliberately weakened copies, including a new RUN after a comment ending in a
+backslash. Full-line comments are removed before folding instruction continuations.
+Leading UTF-8 BOMs are rejected before directive checks or comment removal so
+BOM-prefixed syntax and escape directives cannot be hidden. Before discarding a
+comment, the check rejects syntax/escape/check directives in the same
+leading-whitespace-trimmed representation. This conservatively excludes directive
+forms, including indented escape directives that change continuation semantics;
+it does not imply that every rejected form selects an external frontend.
+Self-tests cover space/tab/mixed indentation and case/spacing/CRLF variants.
+It accepts an optional Dockerfile path for review.
+Hashes remain in Dockerfile; changing acquisition commands requires updating
+and reviewing the focused check. This is not a general Dockerfile linter.
+
+This is direct-input pinning, not complete transitive package reproducibility.
+`apk add` still resolves packages from Alpine repositories; package availability,
+toolchain versions, transitive build downloads, and resulting image/firmware
+bytes are not locked or proven reproducible here. No host packages or SDKs were
+installed. Image construction, all supported firmware targets, and host-platform
+compatibility still require the separate post-review build checks. The ESP32
+Docker build is unchanged.

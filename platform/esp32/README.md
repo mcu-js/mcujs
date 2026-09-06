@@ -69,10 +69,35 @@ compare byte-for-byte.
 
 ## Flash ownership
 
-The current build can warn that the factory `uf2` partition is smaller than the
-runtime application. This is an unresolved pre-flash gate, not resolved by a
-successful compilation or the unified launcher. Do not infer flashing or
-recovery safety from build completion; no partition layout is changed here.
+The build can warn that the factory `uf2` partition is smaller than the runtime
+application. This is a diagnosed target-selection mismatch: pinned ESP-IDF's
+`check_sizes.py partition --type app` compares the runtime against **all** app
+partitions, including the separate 256 KiB TinyUF2 factory recovery application.
+It warns when some app partitions fit and others do not; it fails when none fit.
+The warning neither measures the TinyUF2 image nor indicates a write to factory.
+The ordinary second-stage `bootloader.bin` has its own size check.
+
+Keep this generic diagnostic unchanged: the inspected esptool CMake invocation
+hard-codes `PARTITION_TYPE app`; no supported narrow override was established.
+Although the checker accepts `--subtype`, a missing match only warns and returns,
+so that selector alone would not establish a valid runtime destination. Do not
+filter the warning, disable size checks, or expand/retype the factory partition.
+
+The wrapper separately validates a single runtime image at `ota_0` (`0x10000`)
+and rejects empty images, overflow past `0x410000`, and wrong flash metadata.
+The release verifier additionally requires the supported five-entry partition
+contract (names, types, subtypes, offsets, sizes and no flags) and checks the
+zero-relative, padded UF2 payload against the 4 MiB runtime slot, not factory.
+Its table validation accepts explicit hexadecimal or decimal byte counts, not
+implicit offsets or size suffixes. `make-uf2.py` retains its more conservative
+2 MiB default; this warning-only correction does not raise that generation limit.
+
+Run the host-only regressions with `node --test tests/release-artifacts.test.js`.
+They exercise the release verifier and the wrapper's actual embedded metadata
+validator, not a native ESP-IDF build. Successful validation is **not** flashing
+or recovery clearance: the installed partition table, TinyUF2-aware bootloader,
+factory recovery image and physical recovery behavior still require independent
+verification. No partition layout or loader/update behavior is changed here.
 
 The product-compatible table is byte-identical to TinyUF2 0.35.0's official
 `partitions-8MB-noota.csv` layout:

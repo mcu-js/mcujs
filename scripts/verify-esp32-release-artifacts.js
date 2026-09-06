@@ -34,18 +34,31 @@ function readRequiredFile(path, label) {
 function readOta0PayloadLimit(root) {
   const partitionPath = join(root, "platform", "esp32", "partitions.csv");
   const contents = readRequiredFile(partitionPath, "ESP32 partition table").toString("utf8");
-  for (const sourceLine of contents.split(/\r?\n/)) {
-    const line = sourceLine.replace(/#.*/, "").trim();
-    if (!line) continue;
-    const fields = line.split(",").map((field) => field.trim());
-    if (fields[0] !== "ota_0") continue;
-    const limit = Number.parseInt(fields[4], 0);
-    if (!Number.isSafeInteger(limit) || limit <= 0) {
-      fail(`Invalid ota_0 size in ESP32 partition table: ${fields[4]}`);
+  // This release lane supports the pinned TinyUF2 no-OTA layout only. A
+  // same-named row alone cannot establish the runtime destination or capacity.
+  const expected = [
+    ["nvs", "data", "nvs", 0x9000, 0x5000],
+    ["otadata", "data", "ota", 0xe000, 0x2000],
+    ["ota_0", "app", "ota_0", 0x10000, 0x400000],
+    ["uf2", "app", "factory", 0x410000, 0x40000],
+    ["ffat", "data", "fat", 0x450000, 0x3b0000],
+  ];
+  const rows = contents.split(/\r?\n/)
+    .map((line) => line.replace(/#.*/, "").trim())
+    .filter(Boolean)
+    .map((line) => line.split(",").map((field) => field.trim()));
+  const number = (value) => /^(?:0x[0-9a-f]+|[0-9]+)$/i.test(value) ? Number(value) : NaN;
+  if (rows.length !== expected.length) fail("Unsupported ESP32 partition contract: entry count");
+  for (const [name, type, subtype, offset, size] of expected) {
+    const matches = rows.filter((row) => row[0] === name);
+    const row = matches[0];
+    if (matches.length !== 1 || row.length < 5 || row.length > 6 ||
+        row[1] !== type || row[2] !== subtype || number(row[3]) !== offset ||
+        number(row[4]) !== size || (row[5] || "") !== "") {
+      fail(`Unsupported ESP32 partition contract for ${name}`);
     }
-    return limit;
   }
-  fail(`Missing ota_0 entry in ESP32 partition table: ${partitionPath}`);
+  return 0x400000;
 }
 
 function reconstructUf2(uf2) {

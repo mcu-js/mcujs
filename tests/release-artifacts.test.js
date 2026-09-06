@@ -236,6 +236,96 @@ test("XIAO release verification rejects stale or relabelled firmware", () => {
   }
 });
 
+test("XIAO release capacity requires the supported partition destinations", () => {
+  const { readOta0PayloadLimit } = require(verifierPath);
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "mcujs-partition-contract-"));
+  const partitionPath = join(fixtureRoot, "platform", "esp32", "partitions.csv");
+  const original = readFileSync(join(root, "platform", "esp32", "partitions.csv"), "utf8");
+  try {
+    mkdirSync(join(fixtureRoot, "platform", "esp32"), { recursive: true });
+    writeFileSync(partitionPath, original);
+    assert.equal(readOta0PayloadLimit(fixtureRoot), 0x400000);
+    const mutations = [
+      original.replace(/^ota_0,.*\n/m, ""),
+      original + "ota_0,app,ota_0,0x10000,0x400000,\n",
+      original.replace("app, ota_0", "data, ota_0"),
+      original.replace("app, ota_0", "app, factory"),
+      original.replace("0x10000", "0x410000"),
+      original.replace("0x400000", "0x400000junk"),
+      original.replace("0x400000", "0x400001"),
+      original.replace(/^uf2,.*\n/m, ""),
+      original.replace("app, factory", "data, factory"),
+      original.replace("0x40000,", "0x80000,"),
+      original.replace("0x450000", "0x490000"),
+      original.replace("0x3b0000", "0x370000"),
+      original + "overlap,app,ota_1,0x10000,0x400000,\n",
+    ];
+    for (const [index, table] of mutations.entries()) {
+      writeFileSync(partitionPath, table);
+      assert.throws(() => readOta0PayloadLimit(fixtureRoot), /partition table|partition contract/, `mutation ${index}`);
+    }
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("XIAO runtime fits ota_0 above factory size and rejects padded overrun or wrong destination", () => {
+  const { readOta0PayloadLimit, verifyPayload } = require(verifierPath);
+  const limit = readOta0PayloadLimit(root);
+  for (const size of [0x40001, 0xb6590, 0x400000]) {
+    const binary = Buffer.alloc(size, 0x5a);
+    const uf2 = makeUf2(binary);
+    const before = Buffer.from(uf2);
+    assert.doesNotThrow(() => verifyPayload(binary, uf2, limit));
+    assert.deepEqual(uf2, before, "validation must not rewrite payload bytes");
+    assert.throws(() => verifyPayload(binary, uf2, 0x40000), /exceeds ota_0/);
+    const paddedSize = Math.ceil(size / 256) * 256;
+    assert.doesNotThrow(() => verifyPayload(binary, uf2, paddedSize));
+    assert.throws(() => verifyPayload(binary, uf2, paddedSize - 1), /exceeds ota_0/);
+    uf2.writeUInt32LE(0x410000, 12);
+    assert.throws(() => verifyPayload(binary, uf2, limit), /addresses are not contiguous from zero/);
+  }
+  const overflow = Buffer.alloc(0x400001);
+  assert.throws(() => verifyPayload(overflow, makeUf2(overflow), limit), /exceeds ota_0/);
+});
+
+test("existing app-flash metadata validator enforces runtime bounds and destination without IDF", () => {
+  // Execute the wrapper's actual embedded Python, not idf.py or a simulated build.
+  const source = readFileSync(join(root, "platform", "esp32", "build.sh"), "utf8");
+  const validator = source.match(/validate_app_flash_metadata\(\) \{[\s\S]*?<<'PY'\n([\s\S]*?)\nPY/)[1];
+  const buildDir = mkdtempSync(join(tmpdir(), "mcujs-app-metadata-"));
+  try {
+    const run = (size, offset = "0x10000", extra = "") => {
+      writeFileSync(join(buildDir, "mcujs-esp32s3.bin"), Buffer.alloc(size));
+      writeFileSync(join(buildDir, "app-flash_args"), `--flash_mode dio --flash_freq 80m --flash_size 8MB ${offset} mcujs-esp32s3.bin${extra}\n`);
+      writeFileSync(join(buildDir, "flasher_args.json"), JSON.stringify({ app: { offset, file: "mcujs-esp32s3.bin" } }));
+      return spawnSync("python3", ["-", buildDir], { input: validator, encoding: "utf8" });
+    };
+    for (const size of [0x40001, 0xb6590, 0x400000]) {
+      const result = run(size);
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /Validated app-only flash metadata: 0x10000/);
+    }
+    for (const size of [0, 0x400001]) {
+      const result = run(size);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /exceeds ota_0/);
+    }
+    for (const [offset, extra] of [["0x410000", ""], ["0x10000", " 0x410000 recovery.bin"]]) {
+      const result = run(256, offset, extra);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Unsafe app-flash arguments/);
+    }
+    run(256);
+    writeFileSync(join(buildDir, "flasher_args.json"), JSON.stringify({ app: { offset: "0x410000", file: "mcujs-esp32s3.bin" } }));
+    const wrongJson = spawnSync("python3", ["-", buildDir], { input: validator, encoding: "utf8" });
+    assert.notEqual(wrongJson.status, 0);
+    assert.match(wrongJson.stderr, /Unsafe generated app metadata/);
+  } finally {
+    rmSync(buildDir, { recursive: true, force: true });
+  }
+});
+
 test("XIAO release verification rejects unsupported UF2 flags and ota_0 overrun", () => {
   const buildDir = mkdtempSync(join(tmpdir(), "mcujs-xiao-uf2-bounds-test-"));
   try {

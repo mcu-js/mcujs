@@ -34,12 +34,18 @@ platform/esp32/make-uf2.py
 `make-uf2.py` verifies the dependency pins and independently checks every UF2
 block, family ID, target address, payload, and OTA boundary.
 
-The ESP32 backend also has a dedicated Docker lane, separate from the root
-Pico/RP builder:
+The top-level build entrypoint selects the dedicated ESP32 Docker lane:
 
 ```sh
-platform/esp32/docker-build.sh
+./build.sh seeed_xiao_esp32s3 --prepare-image  # Explicit acquisition phase
+./build.sh seeed_xiao_esp32s3                 # Networkless compilation
 ```
+
+The existing `platform/esp32/docker-build.sh` remains usable directly with the
+same `--prepare-image` flag. Compilation requires an existing local image,
+resolves `MCUJS_ESP32_DOCKER_IMAGE` to its immutable ID, and uses `--pull never`.
+`--docker-network` is preparation-only; `MCUJS_DOCKER_NETWORK` cannot enable a
+runtime network. See [building options](../../docs/docs/advanced-building.md).
 
 It pins the reviewed AMD64 child image for `espressif/idf:v5.3.2`, verifies the
 same ESP-IDF commit, and embeds pinned JerryScript, TinyUF2, Microsoft UF2, and
@@ -62,6 +68,11 @@ isolated builds and fails unless the ELF, application `.bin`, and `.uf2`
 compare byte-for-byte.
 
 ## Flash ownership
+
+The current build can warn that the factory `uf2` partition is smaller than the
+runtime application. This is an unresolved pre-flash gate, not resolved by a
+successful compilation or the unified launcher. Do not infer flashing or
+recovery safety from build completion; no partition layout is changed here.
 
 The product-compatible table is byte-identical to TinyUF2 0.35.0's official
 `partitions-8MB-noota.csv` layout:

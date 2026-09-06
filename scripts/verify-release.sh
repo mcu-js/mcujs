@@ -210,6 +210,8 @@ check_repl_input() {
 check_rp_build_identity() {
     "${ROOT_DIR}/scripts/test-rp-build-identity.sh"
     pass 'RP Docker build identity handoff tests passed'
+    node --test "${ROOT_DIR}/tests/docker-build.test.js"
+    pass 'unified Docker entrypoint recording-stub tests passed (not real builds)'
 }
 
 check_python_syntax() {

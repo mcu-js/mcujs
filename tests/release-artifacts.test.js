@@ -185,6 +185,13 @@ test("release driver freshly builds XIAO before packaging and scopes its flags",
     "verify-release",
     "package-release --force",
   ]);
+  assert.deepEqual(runReleaseHarness(["--rebuild-image"]), [
+    "verify-release",
+    "build.sh all --prepare-image",
+    "build.sh all --clean",
+    "docker-build",
+    "package-release --force",
+  ]);
 
   const help = execFileSync("bash", [releaseScript, "--help"], { encoding: "utf8" });
   assert.match(help, /--no-docker\s+Build RP boards with the local Pico toolchain/);

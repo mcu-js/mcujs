@@ -26,6 +26,7 @@ cat > "${FAKE_BIN}/docker" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "${1:-}" == "image" && "${2:-}" == "inspect" ]]; then
+    printf 'sha256:%064d\n' 1
     exit 0
 fi
 if [[ "${1:-}" == "run" ]]; then
@@ -34,19 +35,22 @@ if [[ "${1:-}" == "run" ]]; then
     git_sha=''
     for argument in "$@"; do
         case "${argument}" in
-            *:/workspace) source_root="${argument%:/workspace}" ;;
+            *:/source:ro) source_root="${argument%:/source:ro}" ;;
             MCUJS_BUILD_GIT_SHA=*) git_sha="${argument#MCUJS_BUILD_GIT_SHA=}" ;;
         esac
     done
     board_index=$(( $# - 1 ))
     board="${!board_index}"
     version="$(tr -d '[:space:]' < "${source_root}/version.txt")"
-    mkdir -p "${source_root}/cmake-build-${board}"
+    mkdir -p "${source_root}/build"
     build_identity="${version}+${git_sha}"
     if [[ "${MCUJS_TEST_BAD_ELF:-0}" -eq 1 ]]; then
         build_identity="${version}+unknown"
     fi
-    elf="${source_root}/cmake-build-${board}/mcujs-${version}-${board}.elf"
+    elf="${source_root}/build/mcujs-${version}-${board}.elf"
+    for ext in bin uf2 elf.map; do
+        printf 'stub artifact\n' > "${source_root}/build/mcujs-${version}-${board}.${ext}"
+    done
     {
         printf '%s\n' "${build_identity}"
         for ((padding_line = 0; padding_line < 10000; padding_line += 1)); do

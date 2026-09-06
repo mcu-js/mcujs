@@ -66,7 +66,7 @@ if [[ "${SKIP_BUILD}" -eq 0 ]]; then
         build_args+=(--no-docker)
     fi
     if [[ "${REBUILD_IMAGE}" -eq 1 ]]; then
-        build_args+=(--rebuild-image)
+        "${ROOT_DIR}/build.sh" all --prepare-image
     fi
     "${ROOT_DIR}/build.sh" "${build_args[@]}"
     "${ROOT_DIR}/platform/esp32/docker-build.sh"

@@ -1,7 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-source /workspace/scripts/lib/boards.sh
+# Compile an ephemeral copy; the caller's checkout is never writable.
+export HOME="${HOME:-/tmp/mcujs-home}"
+ROOT=/tmp/mcujs-workspace
+mkdir -p "${HOME}" "${ROOT}" /output
+tar -C /source --exclude='./.git' --exclude='./build' \
+    --exclude='./cmake-build-*' --exclude='./node_modules' \
+    --exclude='./docs/node_modules' --exclude='./docs/build' \
+    --exclude='./platform/esp32/build' --exclude='./platform/esp32/build-*' \
+    --exclude='./platform/esp32/managed_components' \
+    -cf - . | tar -C "${ROOT}" -xf -
+source "${ROOT}/scripts/lib/boards.sh"
+VERSION="$(tr -d '[:space:]' < "${ROOT}/version.txt")"
 
 BOARDS="${1:-all}"
 BUILD_TYPE="${2:-Release}"
@@ -29,8 +40,8 @@ build_board() {
     log_info "Building mcujs for board: ${board}"
 
     # Create build directory
-    mkdir -p "/workspace/cmake-build-${board}"
-    cd "/workspace/cmake-build-${board}"
+    mkdir -p "${ROOT}/cmake-build-${board}"
+    cd "${ROOT}/cmake-build-${board}"
 
     cmake_args=(
         -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
@@ -48,14 +59,16 @@ build_board() {
     # Build
     make -j"$(nproc)"
 
-    # Copy UF2 to build directory
-    cp "/workspace/cmake-build-${board}"/*.uf2 /workspace/build/ 2>/dev/null || true
+    # Publish only the completed artifacts, owned by the caller's numeric UID/GID.
+    for ext in uf2 bin elf elf.map; do
+        install -m 0644 "${ROOT}/cmake-build-${board}/mcujs-${VERSION}-${board}.${ext}" /output/
+    done
 
     log_info "Build complete for ${board}"
 }
 
 # Ensure build output directory exists
-mkdir -p /workspace/build
+mkdir -p "${ROOT}/build"
 
 # Build requested boards
 if [[ "${BOARDS}" == "all" ]]; then
@@ -74,4 +87,4 @@ else
 fi
 
 log_info "All builds complete!"
-ls -la /workspace/build/*.uf2 2>/dev/null || log_warn "No UF2 files found in build directory"
+ls -la /output/*.uf2

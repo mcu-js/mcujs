@@ -351,17 +351,30 @@ Files written from JavaScript are always persisted to flash immediately - they w
 ### Build with Docker
 
 ```bash
+# Prepare SDK images explicitly (may download dependencies)
+./build.sh pico --prepare-image
+./build.sh seeed_xiao_esp32s3 --prepare-image
+
 # Build for Pico
 ./build.sh pico
 
 # Build for Pico 2
 ./build.sh pico2
 
-# Build all boards
+# Build all RP boards (the existing default)
 ./build.sh all
+
+# Build for Seeed XIAO ESP32-S3
+./build.sh seeed_xiao_esp32s3
 ```
 
-Output files are written to `build/` as `mcujs-<version>-<board>.uf2`.
+Compilation is networkless and never builds or pulls a missing SDK image. Source
+is mounted read-only; outputs use the caller's UID/GID. RP artifacts are written
+to `build/`, with UF2 names `mcujs-<version>-<board>.uf2`. XIAO artifacts stay in
+`platform/esp32/build-docker/`. Override local builders with
+`MCUJS_RP_DOCKER_IMAGE` or `MCUJS_ESP32_DOCKER_IMAGE`.
+See [building options](docs/docs/advanced-building.md) for preparation-only network
+flags, the changed `--rebuild-image` alias, and architecture/verification limits.
 
 ### XIAO ESP32-S3 Release Build
 
@@ -370,7 +383,7 @@ Build its application-only UF2 and capability manifest with the pinned ESP-IDF
 5.3.2 Docker lane:
 
 ```bash
-platform/esp32/docker-build.sh
+./build.sh seeed_xiao_esp32s3
 ```
 
 See [`platform/esp32/README.md`](platform/esp32/README.md) for dependency pins,

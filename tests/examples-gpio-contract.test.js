@@ -3,6 +3,174 @@ const { join, relative } = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { boardDescriptors } = require("../runtime/board-registry.js");
+const vm = require("node:vm");
+
+// Host-only execution: real example JS, simulated clock and GPIO/board SDK.
+// This is not JerryScript, native binding, electrical, or device evidence.
+function blinkRuntime(boardId, { initError } = {}) {
+  const descriptor = boardDescriptors[boardId];
+  const timers = new Map();
+  const writes = [];
+  const logs = [];
+  const imports = [];
+  let now = 0;
+  let nextId = 1;
+  let initialized = false;
+  function timer(callback, delay, repeat) {
+    const id = nextId++;
+    timers.set(id, { callback, due: now + delay, delay, repeat });
+    return id;
+  }
+  const gpio = {
+    OUTPUT: 0,
+    init(pin, mode) {
+      assert.equal(mode, 0);
+      assert.ok(descriptor.capabilities.gpio.outputPins.includes(pin));
+      if (initError) throw initError;
+      initialized = true;
+    },
+    set(pin, value) {
+      assert.ok(initialized, "GPIO must be initialized before writing");
+      assert.equal(pin, descriptor.board.devices.led.pin);
+      assert.equal(typeof value, "boolean");
+      writes.push([now, pin, value]);
+    },
+  };
+  const context = vm.createContext({
+    require(name) {
+      imports.push(name);
+      if (name === "board") return {
+        devices: descriptor.board.devices,
+        led(value) {
+          assert.equal(descriptor.board.devices.led.type, "managed");
+          assert.equal(typeof value, "boolean");
+          writes.push([now, "managed", value]);
+        },
+      };
+      if (name === "gpio") return gpio;
+      throw new Error(`unexpected module: ${name}`);
+    },
+    console: { log(...parts) { logs.push(parts.join(" ")); } },
+    setInterval: (callback, delay) => timer(callback, delay, true),
+    setTimeout: (callback, delay) => timer(callback, delay, false),
+    clearInterval: (id) => timers.delete(id),
+    clearTimeout: (id) => timers.delete(id),
+  });
+  return {
+    writes, logs, imports, timers, context,
+    run(filename, edit = (source) => source) {
+      const path = join(__dirname, "../examples/blink", filename);
+      vm.runInContext(edit(readFileSync(path, "utf8")), context, { filename: path });
+    },
+    advance(ms) {
+      const end = now + ms;
+      for (;;) {
+        const next = [...timers].sort((a, b) => a[1].due - b[1].due || a[0] - b[0])[0];
+        if (!next || next[1].due > end) break;
+        const [id, entry] = next;
+        now = entry.due;
+        if (entry.repeat) entry.due += entry.delay;
+        else timers.delete(id);
+        entry.callback();
+      }
+      now = end;
+    },
+  };
+}
+
+for (const filename of ["index.js", "blink.js"]) {
+  for (const [boardId, pin, off, on] of [
+    ["pico", 25, false, true],
+    ["seeed_xiao_esp32s3", 21, true, false],
+  ]) {
+    test(`simulated blink ${filename} on ${boardId}: transitions and 30s stop`, () => {
+      const runtime = blinkRuntime(boardId);
+      runtime.run(filename);
+      assert.deepEqual(runtime.writes, [[0, pin, off]]);
+      runtime.advance(499);
+      assert.equal(runtime.writes.length, 1);
+      runtime.advance(1);
+      runtime.advance(500);
+      assert.deepEqual(runtime.writes, [[0, pin, off], [500, pin, on], [1000, pin, off]]);
+      runtime.advance(28999);
+      assert.equal(runtime.logs.includes("Demo complete!"), false);
+      runtime.advance(1);
+      assert.deepEqual(runtime.writes.at(-1), [30000, pin, off]);
+      assert.equal(runtime.logs.at(-1), "Demo complete!");
+      assert.equal(runtime.timers.size, 0);
+      const count = runtime.writes.length;
+      runtime.advance(1000);
+      assert.equal(runtime.writes.length, count);
+      runtime.run(filename);
+      runtime.advance(500);
+      assert.deepEqual(runtime.writes.at(-1), [31500, pin, on]);
+    });
+
+    test(`simulated blink ${filename} on ${boardId}: one timing edit updates output and message`, () => {
+      const runtime = blinkRuntime(boardId);
+      runtime.run(filename, (source) => source.replace("var blinkPeriodMs = 500;", "var blinkPeriodMs = 250;"));
+      runtime.advance(249);
+      assert.deepEqual(runtime.writes, [[0, pin, off]]);
+      runtime.advance(1);
+      assert.deepEqual(runtime.writes.at(-1), [250, pin, on]);
+      runtime.advance(250);
+      assert.deepEqual(runtime.writes.at(-1), [500, pin, off]);
+      assert.equal(runtime.logs[0], "Blinking onboard LED every 250 ms.");
+      runtime.advance(29500);
+      assert.equal(runtime.timers.size, 0);
+      assert.deepEqual(runtime.writes.at(-1), [30000, pin, off]);
+    });
+
+    test(`simulated blink ${filename} on ${boardId}: rerun replaces both timers`, () => {
+      const runtime = blinkRuntime(boardId);
+      runtime.run(filename);
+      runtime.advance(750);
+      const oldTimers = [...runtime.timers.keys()];
+      runtime.run(filename);
+      assert.equal(runtime.timers.size, 2);
+      for (const id of oldTimers) assert.equal(runtime.timers.has(id), false);
+      assert.deepEqual(runtime.writes.at(-1), [750, pin, off]);
+      runtime.advance(500);
+      assert.deepEqual(runtime.writes.slice(-2), [[750, pin, off], [1250, pin, on]]);
+      runtime.advance(28750);
+      assert.equal(runtime.logs.includes("Demo complete!"), false, "old deadline must not stop the new run");
+      runtime.advance(750);
+      assert.equal(runtime.logs.filter((line) => line === "Demo complete!").length, 1);
+      assert.equal(runtime.timers.size, 0);
+      assert.deepEqual(runtime.writes.at(-1), [30750, pin, off]);
+    });
+  }
+
+  test(`simulated blink ${filename}: managed LED and absent onboard LED`, () => {
+    const managed = blinkRuntime("pico2_w");
+    managed.run(filename);
+    managed.advance(1000);
+    assert.deepEqual(managed.writes, [[0, "managed", false], [500, "managed", true], [1000, "managed", false]]);
+    assert.deepEqual(managed.imports, ["board"]);
+    managed.advance(29000);
+    assert.equal(managed.timers.size, 0);
+    assert.deepEqual(managed.writes.at(-1), [30000, "managed", false]);
+    const absent = blinkRuntime("waveshare_rp2040_pizero");
+    absent.run(filename);
+    absent.advance(30000);
+    assert.deepEqual(absent.logs, ["This board has no onboard LED."]);
+    assert.deepEqual(absent.imports, ["board"]);
+    assert.deepEqual(absent.writes, []);
+    assert.equal(absent.timers.size, 0);
+  });
+
+  test(`simulated blink ${filename}: GPIO ownership error propagates before timers or writes`, () => {
+    // Inject the public error shape; do not claim to test native pin arbitration.
+    const error = Object.assign(new Error("GPIO pin is owned by another peripheral"), {
+      name: "ResourceBusyError", code: "EBUSY", resource: "gpio", pin: 21,
+    });
+    const runtime = blinkRuntime("seeed_xiao_esp32s3", { initError: error });
+    assert.throws(() => runtime.run(filename), (thrown) => thrown === error);
+    assert.deepEqual(runtime.writes, []);
+    assert.deepEqual(runtime.logs, []);
+    assert.equal(runtime.timers.size, 0);
+  });
+}
 
 const root = join(__dirname, "..");
 const examplesRoot = join(root, "examples");

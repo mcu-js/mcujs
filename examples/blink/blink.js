@@ -22,13 +22,14 @@
         writeLed = function (on) { boardApi.led(on); };
     }
 
+    var blinkPeriodMs = 500; // Change this one value to adjust the blink.
     globalThis.blinkLedOn = false;
     writeLed(false);
-    console.log('Blinking onboard LED every 500 ms.');
+    console.log('Blinking onboard LED every ' + blinkPeriodMs + ' ms.');
     globalThis.blinkInterval = setInterval(function () {
         globalThis.blinkLedOn = !globalThis.blinkLedOn;
         writeLed(globalThis.blinkLedOn);
-    }, 500);
+    }, blinkPeriodMs);
     globalThis.blinkTimeout = setTimeout(function () {
         clearInterval(globalThis.blinkInterval);
         globalThis.blinkInterval = undefined;

@@ -4,11 +4,12 @@ Example programs demonstrating MCU.js features across supported boards.
 
 ## Usage
 
-Copy the `index.js` file from an example folder to the board's MCU.js filesystem.
+Start with [First light: blink an onboard LED](blink/README.md) for exact
+load, run, stop, and timing-edit steps on Pico and XIAO ESP32-S3.
 
-1. Mount the Pico filesystem: `udisksctl mount -b /dev/sda`
-2. Copy the example: `cp examples/blink/index.js /run/media/$USER/MCUJS/`
-3. Reset the Pico or run `.load` in the REPL
+For other examples, copy the JavaScript file to the board's MCU.js filesystem,
+properly eject the volume, then use `.run filename.js` in the serial REPL.
+Use a non-`index.js` destination name if you do not want a startup script.
 
 ## Examples
 
@@ -37,6 +38,7 @@ ownership, `EBUSY`
 
 ### blink/
 Portable LED blink - uses onboard inventory and toggles the LED every 500ms for 30 seconds.
+Follow the [first-light lesson](blink/README.md), then change one timing value.
 
 **Concepts:** `board.devices`, `gpio.init`, strict boolean `gpio.set`, `setInterval`
 

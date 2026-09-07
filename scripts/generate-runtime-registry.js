@@ -66,6 +66,7 @@ function branchFor(boardId, first) {
   }
   lines.push(`#define MCUJS_HAS_DVI ${descriptor.features.dvi ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_ONBOARD_LED ${descriptor.features.onboardLed ? 1 : 0}`);
+  lines.push(`#define MCUJS_REGISTRY_ONBOARD_BUTTON ${descriptor.features.onboardButton ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_ONBOARD_NEOPIXEL ${descriptor.features.onboardNeopixel ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_LED_PIN ${descriptor.board.devices.led?.type === "gpio" ? 1 : 0}`);
   lines.push(`#define MCUJS_REGISTRY_ADC_VSYS ${descriptor.capabilities.adc?.vsys === true ? 1 : 0}`);
@@ -175,6 +176,8 @@ function checkmark(enabled) {
 
 function onboardSummary(descriptor) {
   const devices = [];
+  const button = descriptor.board.devices.button;
+  if (button) devices.push(`${button.name} button (managed, read-only)`);
   const led = descriptor.board.devices.led;
   if (led?.type === "managed") devices.push("LED (managed)");
   if (led?.type === "gpio") {
@@ -190,6 +193,7 @@ function onboardSummary(descriptor) {
 function shortcutSummary(descriptor) {
   const shortcuts = [];
   if (descriptor.board.devices.led) shortcuts.push("`board.led()`");
+  if (descriptor.board.devices.button) shortcuts.push("`board.buttonPressed()`");
   if (descriptor.board.devices.neopixel) shortcuts.push("`board.neopixel()`");
   return shortcuts.length > 0 ? shortcuts.join(" + ") : "—";
 }

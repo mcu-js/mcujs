@@ -25,16 +25,21 @@
  * tied to the flash chip. Reading it requires temporarily disabling flash
  * access and reading the GPIO state.
  * 
- * WARNING: This function must be called with interrupts disabled and
- * must not execute from flash (it's marked __no_inline_not_in_flash_func).
+ * Sampling follows raspberrypi/pico-examples picoboard/button/button.c:
+ * run from SRAM, mask interrupts, float CS, and allow 1000 settling iterations.
+ * Restore the entire original control register before unmasking interrupts.
+ * Runtime use is restricted to Pico RP2040: core 1 is idle (only DVI launches
+ * it, on a different board), and SPI DMA completes synchronously. Do not call
+ * while another core, DMA, or an XIP streamer can access flash.
  */
-static bool __no_inline_not_in_flash_func(get_bootsel_button)(void) {
+bool __no_inline_not_in_flash_func(boot_button_pressed)(void) {
     const uint CS_PIN_INDEX = 1;  /* QSPI CS is GPIO 1 in QSPI bank */
+    uint32_t ints = save_and_disable_interrupts();
     
     /* Save current state of QSPI CS pin */
     uint32_t saved = ioqspi_hw->io[CS_PIN_INDEX].ctrl;
     
-    /* Set CS pin to input with pull-up disabled */
+    /* Float flash CS (Hi-Z); BOOTSEL pulls it low when pressed. */
     hw_write_masked(&ioqspi_hw->io[CS_PIN_INDEX].ctrl,
                     GPIO_OVERRIDE_LOW << IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_LSB,
                     IO_QSPI_GPIO_QSPI_SS_CTRL_OEOVER_BITS);
@@ -47,6 +52,7 @@ static bool __no_inline_not_in_flash_func(get_bootsel_button)(void) {
     
     /* Restore the original state */
     ioqspi_hw->io[CS_PIN_INDEX].ctrl = saved;
+    restore_interrupts(ints);
     
     return button_pressed;
 }
@@ -55,10 +61,7 @@ static bool __no_inline_not_in_flash_func(get_bootsel_button)(void) {
  * Check if safe mode should be enabled (BOOTSEL held during boot)
  */
 static bool boot_check_safe_mode(void) {
-    uint32_t ints = save_and_disable_interrupts();
-    bool pressed = get_bootsel_button();
-    restore_interrupts(ints);
-    return pressed;
+    return boot_button_pressed();
 }
 
 // Maximum file size for boot script (32KB)

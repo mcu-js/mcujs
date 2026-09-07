@@ -38,4 +38,9 @@ bool boot_run_file(const char* filename);
  */
 bool boot_file_exists(void);
 
+/* RP2 native BOOTSEL sampler. Runtime callers must have no concurrent flash
+ * access (other core / DMA / XIP streamer). Only Pico RP2040 exposes it to JS.
+ * Runs from SRAM, preserving interrupt and QSPI control state. */
+bool boot_button_pressed(void);
+
 #endif // MCUJS_BOOT_H

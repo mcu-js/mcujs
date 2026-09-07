@@ -89,6 +89,9 @@
         "led": {
           "$ref": "#/$defs/onboardLed"
         },
+        "button": {
+          "$ref": "#/$defs/onboardButton"
+        },
         "neopixel": {
           "$ref": "#/$defs/onboardNeopixel"
         }
@@ -130,6 +133,18 @@
           }
         }
       ]
+    },
+    "onboardButton": {
+      "type": "object",
+      "description": "Read-only button managed by board.buttonPressed(). Its reserved hardware pin is not a generic GPIO endpoint.",
+      "additionalProperties": false,
+      "required": ["type", "name", "activeLow", "readOnly"],
+      "properties": {
+        "type": { "const": "managed" },
+        "name": { "type": "string", "minLength": 1 },
+        "activeLow": { "type": "boolean" },
+        "readOnly": { "const": true }
+      }
     },
     "onboardNeopixel": {
       "type": "object",
@@ -1746,6 +1761,26 @@
                     "undefined"
                   ]
                 }
+              }
+            ]
+          },
+          "buttonPressed": {
+            "kind": "method",
+            "availability": "onboardDevice",
+            "onboardDevice": "button",
+            "description": "Read-only instantaneous sample: true while pressed. Any supplied argument throws TypeError. No hardware debounce.",
+            "signatures": [
+              {
+                "arguments": [],
+                "returns": { "types": ["boolean"] },
+                "operationalErrors": ["EIO"],
+                "operationalErrorConditions": [
+                  {
+                    "code": "EIO",
+                    "cause": "nativeIoFailure",
+                    "nativeFailure": "onboardButtonConfigure"
+                  }
+                ]
               }
             ]
           },

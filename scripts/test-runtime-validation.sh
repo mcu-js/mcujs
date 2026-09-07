@@ -368,6 +368,7 @@ compile_rp_board_surface_test() {
         -I"${ROOT}/host/bindings" \
         -I"${ROOT}/board" \
         -I"${ROOT}/board/${board_id}" \
+        -I"${ROOT}/src" \
         -I"${ROOT}/src/filesystem" \
         -I"${ROOT}/platform/rp2/bindings" \
         -I"${ROOT}/tests" \
@@ -389,6 +390,15 @@ compile_rp_board_surface_test() {
         -lm \
         -o "${output}"
 }
+
+RP2_BUTTON_SURFACE_TEST="${TMP_ROOT}/runtime-rp2-button-surface"
+compile_rp_board_surface_test "${RP2_BUTTON_SURFACE_TEST}" \
+    pico MCUJS_BOARD_PICO \
+    -DMCUJS_TEST_EXPECT_LED_PIN=1 -DMCUJS_TEST_LED_PIN_STRING='"25"' \
+    -DMCUJS_TEST_EXPECT_LED_METHOD=1 -DMCUJS_TEST_EXPECT_BUTTON=1 \
+    -DMCUJS_TEST_EXPECT_VSYS=1 -DMCUJS_TEST_EXPECT_NEOPIXEL=0 \
+    -DMCUJS_TEST_EXPECT_ADC_CHANNEL3=1
+"${RP2_BUTTON_SURFACE_TEST}"
 
 RP2_NO_LED_SURFACE_TEST="${TMP_ROOT}/runtime-rp2-no-led-surface"
 compile_rp_board_surface_test "${RP2_NO_LED_SURFACE_TEST}" \

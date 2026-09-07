@@ -148,11 +148,46 @@ Operation arguments and results carry executable limit annotations in `x-mcujs-c
 }());
 ```
 
-`board.led()` and `board.neopixel()` are onboard-device-gated: they are absent when the corresponding key in `board.devices` is absent. No board gets a fake no-op shortcut.
+`board.led()`, `board.buttonPressed()`, and `board.neopixel()` are onboard-device-gated: they are absent when the corresponding key in `board.devices` is absent. No board gets a fake no-op shortcut.
 
 An LED descriptor is either `{type: 'gpio', pin, activeLow}` or the transport-neutral `{type: 'managed'}`. A managed LED is still physically onboard and still enables `board.led()`, but it must not publish a wireless-controller or expander-local identifier as an MCU GPIO pin.
 
 The LED shortcut preserves both existing signatures: `board.led()` returns the current logical boolean state, while `board.led(on)` requires a boolean and returns `undefined`.
+
+### Onboard button (no wiring)
+
+`board.buttonPressed(): boolean` takes **no arguments** and returns `true` while
+the button is pressed, `false` when released. This is a read-only instantaneous
+sample, not a debounced event or a setter. Any argument (including `undefined`)
+throws `TypeError` before sampling. A native input-configuration failure throws
+an operational error with `code: 'EIO'`; the method stays present.
+
+Only **Raspberry Pi Pico (RP2040)** and **Seeed XIAO ESP32-S3** currently support
+this method. Pico uses the **BOOTSEL** button; XIAO uses **BOOT**, not RESET.
+Pico 2 and other boards omit both `buttonPressed` and `devices.button`.
+The immutable descriptor is `{type: 'managed', name: 'BOOTSEL', activeLow: true,
+readOnly: true}` on Pico, with `name: 'BOOT'` on XIAO. Neither descriptor has a
+`pin`: Pico's flash chip-select and XIAO's GPIO0 are reserved implementation
+endpoints, not generic GPIO/PWM/ADC/I2C/SPI/NeoPixel pins or aliases. XIAO samples
+GPIO0 as input with a pull-up; its boot/recovery strapping policy is unchanged.
+
+**Do not hold BOOT/BOOTSEL during reset or power-on** when using this demo:
+that can enter the bootloader/recovery path rather than running the application.
+Press only after firmware has started. Poll with a timer, not a busy loop.
+The shared `examples/onboard-button/index.js` runs manually for 60 seconds,
+debounces both edges with three matching 10ms samples, logs state changes, then
+clears its interval, switches the LED off, and prints `Demo complete!`.
+It uses `board.led(board.buttonPressed())` for the initial state and the same
+portable board methods for debounced updates; there is no board-name branching.
+
+Pico sampling reuses the native boot sampler, following the SRAM-only,
+interrupt-masked settling sequence in Raspberry Pi's
+[official button example](https://github.com/raspberrypi/pico-examples/blob/master/picoboard/button/button.c),
+and restores the original QSPI control register before interrupts. Runtime
+exposure is restricted to Pico: core 1 stays idle, DVI is disabled, SPI DMA
+completes synchronously, and no XIP streamer is used. Any future asynchronous
+flash access or core-1 use must revisit this safety constraint before enabling
+button sampling.
 
 The compatibility-only NeoPixel shortcut preserves its four input shapes: one color as `[r, g, b]` or `{r, g, b}`, and multiple colors as `[[r, g, b], ...]` or `[{r, g, b}, ...]`. Missing color components default to zero. Object fields are logical RGB; color-array positions follow the active NeoPixel order. A color array longer than three bytes or a multi-pixel list longer than `board.devices.neopixel.length` throws `RangeError`; it is never truncated.
 

@@ -334,6 +334,11 @@ test("schema availability drives absent modules and optional methods without boa
       Object.hasOwn(descriptor.board.devices, "led"),
       `${boardId} onboard LED shortcut availability`,
     );
+    assert.equal(
+      surface.exports.board.includes("buttonPressed"),
+      Object.hasOwn(descriptor.board.devices, "button"),
+      `${boardId} onboard button shortcut availability`,
+    );
   }
 });
 

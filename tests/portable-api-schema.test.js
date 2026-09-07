@@ -909,6 +909,7 @@ test("all contract modules, public names, types, and units are explicit", () => 
   const expectedExports = {
     board: [
       "apiVersion",
+      "buttonPressed",
       "capabilities",
       "capability",
       "chip",

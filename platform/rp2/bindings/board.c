@@ -10,6 +10,7 @@
 #include "jerryscript.h"
 #include "board_config.h"
 #include "board.h"
+#include "boot.h"
 #include "fs.h"
 #include "usb/usb_cdc.h"
 #include "neopixel.h"
@@ -432,6 +433,21 @@ static jerry_value_t board_neopixel_handler(const jerry_call_info_t *call_info_p
 }
 #endif
 
+#if MCUJS_REGISTRY_ONBOARD_BUTTON
+#if !defined(MCUJS_BOARD_PICO) || MCUJS_HAS_DVI
+#error "Runtime BOOTSEL sampling requires Pico RP2040 with core 1 idle"
+#endif
+static jerry_value_t board_button_pressed_handler(const jerry_call_info_t *info,
+                                                  const jerry_value_t args[],
+                                                  jerry_length_t argc) {
+    (void)info; (void)args;
+    if (argc != 0) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE, "board.buttonPressed takes no arguments");
+    }
+    return jerry_boolean(boot_button_pressed());
+}
+#endif
+
 /* Create the RP board object before registering its global compatibility alias. */
 jerry_value_t mcujs_rp2_create_board_module(void) {
     jerry_value_t board = jerry_object();
@@ -456,6 +472,9 @@ jerry_value_t mcujs_rp2_create_board_module(void) {
     js_set_function(board, "millis", board_millis_handler);
     js_set_function(board, "enterUf2", board_enter_uf2_handler);
     js_set_function(board, "delay", board_delay_handler);
+#if MCUJS_REGISTRY_ONBOARD_BUTTON
+    js_set_function(board, "buttonPressed", board_button_pressed_handler);
+#endif
 #if MCUJS_REGISTRY_ONBOARD_LED
     js_set_function(board, "led", board_led_handler);
 #endif

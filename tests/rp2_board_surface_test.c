@@ -8,6 +8,16 @@
 
 extern jerry_value_t mcujs_rp2_create_board_module(void);
 
+/* Native binding seam only: physical QSPI sampling is verified on hardware. */
+#if MCUJS_TEST_EXPECT_BUTTON
+static bool button_pressed;
+static unsigned button_samples;
+bool boot_button_pressed(void) {
+    button_samples++;
+    return button_pressed;
+}
+#endif
+
 static bool eval_source(const char *source) {
     jerry_value_t result = jerry_eval((const jerry_char_t *)source,
                                       strlen(source), JERRY_PARSE_NO_OPTS);
@@ -44,6 +54,22 @@ int main(void) {
     install_module("board", mcujs_rp2_create_board_module());
     install_module("GPIO", js_create_gpio_module());
     install_module("adc", js_create_adc_module());
+#if MCUJS_TEST_EXPECT_BUTTON
+    assert(eval_source("if (board.buttonPressed() !== false) throw new Error('released button');"));
+    button_pressed = true;
+    assert(eval_source("if (board.buttonPressed() !== true) throw new Error('pressed button');"));
+    button_pressed = false;
+    assert(eval_source("if (board.buttonPressed() !== false) throw new Error('button release');"));
+    assert(button_samples == 3);
+    assert(eval_source(
+        "[true, false, 0, 1, null, undefined, {}, 'pressed'].forEach(function (value) {"
+        " var error; try { board.buttonPressed(value); } catch (caught) { error = caught; }"
+        " if (!(error instanceof TypeError)) throw new Error('button accepted argument');"
+        "});"));
+    assert(button_samples == 3); /* Reject writes before touching the sampler. */
+#else
+    assert(eval_source("if ('buttonPressed' in board) throw new Error('button method must be absent');"));
+#endif
 #if MCUJS_TEST_EXPECT_NEOPIXEL
     install_module("neopixel", js_create_neopixel_module());
 #endif
@@ -82,7 +108,12 @@ int main(void) {
 #if MCUJS_TEST_EXPECT_ADC_CHANNEL3
     assert(eval_source("adc.readChannel(3); adc.readVoltageChannel(3);"));
     assert(mcujs_test_adc_init_calls > adc_init_calls);
+#if MCUJS_TEST_EXPECT_VSYS
+    /* Pico channel 3 is its internal VSYS path, not an exposed ADC pad. */
+    assert(mcujs_test_adc_gpio_init_calls == adc_gpio_init_calls);
+#else
     assert(mcujs_test_adc_gpio_init_calls > adc_gpio_init_calls);
+#endif
     assert(mcujs_test_adc_select_calls > adc_select_calls);
     assert(mcujs_test_adc_read_calls > adc_read_calls);
 #else

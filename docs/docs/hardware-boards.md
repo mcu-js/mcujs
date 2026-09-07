@@ -38,7 +38,7 @@ output, and DVI are independent capabilities; none implies another.
 
 | Target | GPIO | PWM | I2C | SPI | ADC | NeoPixel | Image (max input) | Graphics | Screen/display | DVI | CDC | MSC | Keyboard HID | Mouse HID | Onboard devices |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `pico` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (16 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | LED (GPIO 25, active-high) |
+| `pico` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (16 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | BOOTSEL button (managed, read-only) + LED (GPIO 25, active-high) |
 | `pico2` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (192 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | LED (GPIO 25, active-high) |
 | `pico2_w` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (192 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | LED (managed) |
 | `waveshare_rp2040_zero` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (16 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | NeoPixel (GPIO 16, 1 × RGB) |
@@ -47,7 +47,7 @@ output, and DVI are independent capabilities; none implies another.
 | `waveshare_rp2350_lcd_1.47_a` | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ (192 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | NeoPixel (GPIO 22, 1 × GRB) |
 | `waveshare_rp2350_touch_lcd_1.69` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (192 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | — |
 | `adafruit_feather_rp2040` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (16 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | LED (GPIO 13, active-high) + NeoPixel (GPIO 16, 1 × GRB) |
-| `seeed_xiao_esp32s3` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ | ✓ | — | — | LED (GPIO 21, active-low) |
+| `seeed_xiao_esp32s3` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ | ✓ | — | — | BOOT button (managed, read-only) + LED (GPIO 21, active-low) |
 
 ## Runtime board discovery
 
@@ -58,7 +58,7 @@ corresponding physical device is listed.
 
 | Target | Semantic aliases | Onboard devices | Optional shortcuts |
 | --- | --- | --- | --- |
-| `pico` | `A0=26`, `A1=27`, `A2=28`, `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=16`, `LED=25` | LED (GPIO 25, active-high) | `board.led()` |
+| `pico` | `A0=26`, `A1=27`, `A2=28`, `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=16`, `LED=25` | BOOTSEL button (managed, read-only) + LED (GPIO 25, active-high) | `board.led()` + `board.buttonPressed()` |
 | `pico2` | `A0=26`, `A1=27`, `A2=28`, `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=16`, `LED=25` | LED (GPIO 25, active-high) | `board.led()` |
 | `pico2_w` | `A0=26`, `A1=27`, `A2=28`, `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=16` | LED (managed) | `board.led()` |
 | `waveshare_rp2040_zero` | `A0=26`, `A1=27`, `A2=28`, `A3=29`, `SDA=4`, `SCL=5`, `SCK=10`, `MOSI=11`, `MISO=12`, `NEOPIXEL=16` | NeoPixel (GPIO 16, 1 × RGB) | `board.neopixel()` |
@@ -67,7 +67,7 @@ corresponding physical device is listed.
 | `waveshare_rp2350_lcd_1.47_a` | `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=0`, `NEOPIXEL=22` | NeoPixel (GPIO 22, 1 × GRB) | `board.neopixel()` |
 | `waveshare_rp2350_touch_lcd_1.69` | `A0=26`, `A1=27`, `A2=28`, `SDA=6`, `SCL=7`, `SCK=10`, `MOSI=11`, `MISO=12` | — | — |
 | `adafruit_feather_rp2040` | `A0=26`, `A1=27`, `A2=28`, `A3=29`, `SDA=2`, `SCL=3`, `SCK=18`, `MOSI=19`, `MISO=20`, `LED=13`, `NEOPIXEL=16` | LED (GPIO 13, active-high) + NeoPixel (GPIO 16, 1 × GRB) | `board.led()` + `board.neopixel()` |
-| `seeed_xiao_esp32s3` | `A0=1`, `A1=2`, `A2=3`, `A3=4`, `A4=5`, `A5=6`, `A6=7`, `A7=8`, `A8=9`, `SDA=5`, `SCL=6`, `SCK=7`, `MISO=8`, `MOSI=9`, `LED=21` | LED (GPIO 21, active-low) | `board.led()` |
+| `seeed_xiao_esp32s3` | `A0=1`, `A1=2`, `A2=3`, `A3=4`, `A4=5`, `A5=6`, `A6=7`, `A7=8`, `A8=9`, `SDA=5`, `SCL=6`, `SCK=7`, `MISO=8`, `MOSI=9`, `LED=21` | BOOT button (managed, read-only) + LED (GPIO 21, active-low) | `board.led()` + `board.buttonPressed()` |
 <!-- END GENERATED BOARD REGISTRY -->
 
 All targets also enable `board`, `fs`, `process`, `mcujs:module`, and the shared

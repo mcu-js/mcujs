@@ -48,6 +48,12 @@
         "type": "gpio",
         "pin": 21,
         "activeLow": true
+      },
+      "button": {
+        "type": "managed",
+        "name": "BOOT",
+        "activeLow": true,
+        "readOnly": true
       }
     }
   },

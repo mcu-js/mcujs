@@ -104,10 +104,10 @@ compile_binding_test "${FULL}" platform/rp2 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
     -I"${ROOT}/tests/native_stubs/rp2"
 for factory in gpio i2c neopixel pwm; do
-    nm -g "${FULL}" | grep -Eq " T js_create_${factory}_module$"
+    nm -g "${FULL}" | grep -E " T js_create_${factory}_module$" >/dev/null
 done
 for factory in keyboard mouse; do
-    nm -g "${FULL}" | grep -Eq " T js_create_${factory}_module$"
+    nm -g "${FULL}" | grep -E " T js_create_${factory}_module$" >/dev/null
 done
 "${FULL}"
 
@@ -116,10 +116,10 @@ compile_binding_test "${CONSTRAINED_RP}" platform/rp2 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A=1 \
     -I"${ROOT}/tests/native_stubs/rp2"
 for factory in gpio i2c neopixel pwm; do
-    nm -g "${CONSTRAINED_RP}" | grep -Eq " T js_create_${factory}_module$"
+    nm -g "${CONSTRAINED_RP}" | grep -E " T js_create_${factory}_module$" >/dev/null
 done
 for factory in keyboard mouse; do
-    nm -g "${CONSTRAINED_RP}" | grep -Eq " T js_create_${factory}_module$"
+    nm -g "${CONSTRAINED_RP}" | grep -E " T js_create_${factory}_module$" >/dev/null
 done
 "${CONSTRAINED_RP}"
 
@@ -129,10 +129,10 @@ compile_binding_test "${CONSTRAINED}" platform/esp32/main \
     -I"${ROOT}/tests/native_stubs/esp32" \
     -I"${ROOT}/platform/esp32/main/bindings"
 for factory in gpio i2c neopixel pwm; do
-    nm -g "${CONSTRAINED}" | grep -Eq " T js_create_${factory}_module$"
+    nm -g "${CONSTRAINED}" | grep -E " T js_create_${factory}_module$" >/dev/null
 done
 for factory in keyboard mouse; do
-    if nm -g "${CONSTRAINED}" | grep -Eq " T js_create_${factory}_module$"; then
+    if nm -g "${CONSTRAINED}" | grep -E " T js_create_${factory}_module$" >/dev/null; then
         printf 'Unavailable ESP32 HID factory was linked: %s\n' "${factory}" >&2
         exit 1
     fi

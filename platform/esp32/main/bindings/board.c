@@ -127,6 +127,38 @@ static jerry_value_t board_led(const jerry_call_info_t *info,
     return jerry_boolean(gpio_get_level(MCUJS_LED_PIN) == 0);
 }
 
+#if MCUJS_REGISTRY_ONBOARD_BUTTON
+static jerry_value_t board_button_pressed(const jerry_call_info_t *info,
+                                           const jerry_value_t args[], jerry_length_t argc) {
+    (void)info; (void)args;
+    if (argc != 0) {
+        return jerry_throw_sz(JERRY_ERROR_TYPE, "board.buttonPressed takes no arguments");
+    }
+    static bool initialized;
+    if (!initialized) {
+        const gpio_config_t config = {
+            .pin_bit_mask = 1ULL << MCUJS_BUTTON_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE,
+        };
+        esp_err_t error = gpio_config(&config);
+        if (error != ESP_OK) {
+            const mcujs_error_details_t details = {
+                .resource = "button",
+                .has_native_code = true,
+                .native_code = error,
+            };
+            return mcujs_throw_operational_error(MCUJS_ERROR_IO,
+                "Unable to configure onboard button input", &details);
+        }
+        initialized = true;
+    }
+    return jerry_boolean(gpio_get_level(MCUJS_BUTTON_PIN) == 0);
+}
+#endif
+
 void js_bind_board(void) {
     jerry_value_t board = jerry_object();
     js_set_number(board, "flashSize", (double)MCUJS_FLASH_SIZE);
@@ -139,6 +171,9 @@ void js_bind_board(void) {
     js_set_function(board, "millis", board_millis);
     js_set_function(board, "delay", board_delay);
     js_set_function(board, "enterUf2", board_enter_uf2);
+#if MCUJS_REGISTRY_ONBOARD_BUTTON
+    js_set_function(board, "buttonPressed", board_button_pressed);
+#endif
 #if MCUJS_REGISTRY_ONBOARD_LED
     js_set_function(board, "led", board_led);
 #endif

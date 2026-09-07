@@ -63,7 +63,10 @@ const expectedPresentation = {
 };
 
 const expectedOnboardDevices = {
-  pico: { led: { type: "gpio", pin: 25, activeLow: false } },
+  pico: {
+    led: { type: "gpio", pin: 25, activeLow: false },
+    button: { type: "managed", name: "BOOTSEL", activeLow: true, readOnly: true },
+  },
   pico2: { led: { type: "gpio", pin: 25, activeLow: false } },
   pico2_w: { led: { type: "managed" } },
   waveshare_rp2040_zero: { neopixel: { type: "neopixel", pin: 16, length: 1, order: "RGB" } },
@@ -75,8 +78,36 @@ const expectedOnboardDevices = {
     led: { type: "gpio", pin: 13, activeLow: false },
     neopixel: { type: "neopixel", pin: 16, length: 1, order: "GRB" },
   },
-  seeed_xiao_esp32s3: { led: { type: "gpio", pin: 21, activeLow: true } },
+  seeed_xiao_esp32s3: {
+    led: { type: "gpio", pin: 21, activeLow: true },
+    button: { type: "managed", name: "BOOT", activeLow: true, readOnly: true },
+  },
 };
+
+test("only Pico RP2040 and XIAO advertise a managed read-only onboard button", () => {
+  const names = { pico: "BOOTSEL", seeed_xiao_esp32s3: "BOOT" };
+  for (const boardId of shippingBoardIds) {
+    const descriptor = boardDescriptors[boardId];
+    assert.equal(descriptor.features.onboardButton, Object.hasOwn(names, boardId), boardId);
+    if (names[boardId]) {
+      assert.deepEqual(descriptor.board.devices.button, {
+        type: "managed", name: names[boardId], activeLow: true, readOnly: true,
+      });
+      const manifest = manifestFor(boardId);
+      assert.equal(validatePortableApiManifest(manifest).valid, true);
+      manifest.board.devices.button.pin = 0;
+      assert.equal(validatePortableApiManifest(manifest).valid, false, "managed buttons do not expose pins");
+    } else {
+      assert.equal("button" in descriptor.board.devices, false, boardId);
+    }
+  }
+  const xiao = boardDescriptors.seeed_xiao_esp32s3;
+  assert.equal(xiao.board.exposedPins.includes(0), false);
+  for (const name of ["gpio", "pwm", "adc", "neopixel"]) {
+    assert.equal(xiao.capabilities[name].pins.includes(0), false, name);
+  }
+  assert.equal(boardDescriptors.pico.features.dvi, false, "BOOTSEL must not race DVI core 1");
+});
 
 test("all shipping boards have explicit, closed feature maps", () => {
   assert.equal(

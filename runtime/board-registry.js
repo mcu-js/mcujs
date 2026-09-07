@@ -8,7 +8,7 @@ const firmwareVersion = readFileSync(join(__dirname, "..", "version.txt"), "utf8
 const featureNames = Object.freeze([
   "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi",
   "adc", "neopixel", "process", "require", "fs", "image", "keyboard", "mouse",
-  "graphics", "screen", "dvi", "onboardLed", "onboardNeopixel", "safeMode",
+  "graphics", "screen", "dvi", "onboardLed", "onboardNeopixel", "onboardButton", "safeMode",
 ]);
 
 const moduleOrder = Object.freeze([
@@ -168,7 +168,7 @@ function modulesFor(features) {
 const rpFeatureMaps = Object.freeze({
   pico: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed",
+    "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed", "onboardButton",
   ),
   pico2: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
@@ -256,7 +256,10 @@ const boardDescriptors = {
     name: "pico", chip: "RP2040", exposedPins: picoExposed,
     features: rpFeatureMaps.pico,
     aliases: pinAliases(picoExposed, { ...picoBusAliases, LED: 25 }),
-    devices: { led: { type: "gpio", pin: 25, activeLow: false } },
+    devices: {
+      led: { type: "gpio", pin: 25, activeLow: false },
+      button: { type: "managed", name: "BOOTSEL", activeLow: true, readOnly: true },
+    },
     i2cRoutes: picoI2c, spiRoutes: picoSpi, adcOptions: { vsys: true },
   }),
   pico2: rpDescriptor({
@@ -359,7 +362,7 @@ const boardDescriptors = {
 const xiaoPins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 21];
 const xiaoFeatures = featureMap(
   "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-  "process", "require", "fs", "onboardLed", "safeMode",
+  "process", "require", "fs", "onboardLed", "onboardButton", "safeMode",
 );
 boardDescriptors.seeed_xiao_esp32s3 = {
   board: {
@@ -371,7 +374,10 @@ boardDescriptors.seeed_xiao_esp32s3 = {
       A0: 1, A1: 2, A2: 3, A3: 4, A4: 5, A5: 6, A6: 7, A7: 8, A8: 9,
       SDA: 5, SCL: 6, SCK: 7, MISO: 8, MOSI: 9, LED: 21,
     },
-    devices: { led: { type: "gpio", pin: 21, activeLow: true } },
+    devices: {
+      led: { type: "gpio", pin: 21, activeLow: true },
+      button: { type: "managed", name: "BOOT", activeLow: true, readOnly: true },
+    },
   },
   features: xiaoFeatures,
   modules: modulesFor(xiaoFeatures),

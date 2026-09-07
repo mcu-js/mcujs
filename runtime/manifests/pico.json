@@ -77,6 +77,12 @@
         "type": "gpio",
         "pin": 25,
         "activeLow": false
+      },
+      "button": {
+        "type": "managed",
+        "name": "BOOTSEL",
+        "activeLow": true,
+        "readOnly": true
       }
     }
   },

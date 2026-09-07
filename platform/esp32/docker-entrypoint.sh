@@ -33,7 +33,7 @@ tar -C "${SOURCE_ROOT}" \
     --exclude='./platform/esp32/build' \
     --exclude='./platform/esp32/build-*' \
     --exclude='./platform/esp32/managed_components' \
-    -cf - . | tar -C "${ROOT}" -xf -
+    -cf - . | tar --no-same-owner -C "${ROOT}" -xf -
 cp -R /opt/mcujs-managed-components "${ESP_DIR}/managed_components"
 
 git config --global --add safe.directory "${ROOT}"

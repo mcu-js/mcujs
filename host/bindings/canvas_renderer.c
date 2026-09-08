@@ -9,6 +9,8 @@
 #define CTX_PARSER 0
 #define CTX_FORMATTER 0
 #define CTX_VT 0
+#define CTX_PTY 0
+#define CTX_TERM 0
 #define CTX_SDL 0
 #define CTX_KMS 0
 #define CTX_FB 0

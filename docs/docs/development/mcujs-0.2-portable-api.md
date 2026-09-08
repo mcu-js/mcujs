@@ -1,8 +1,103 @@
 # MCU.js 0.2 portable API and capability-discovery design
 
-Status: proposed
-Target: MCU.js 0.2.x development series
+Status: implementation in progress; release qualification pending
+Target: MCU.js 0.2.0
 Goal: make ordinary JavaScript portable across shipping boards without pretending unavailable hardware exists.
+
+## 0.2.0 release checklist
+
+This is the current release checklist, not a claim that every design proposal
+below is implemented. Reconciled against development source `d993b27` and the
+hardware run of firmware `0.1.0+5fc1294` on 2026-09-07.
+
+**Working policy:** push ongoing work to GitHub's `development` branch. Source
+checks and docs builds run there; Pages deployment is skipped. Keep `main`,
+release tags, and published firmware unchanged until release approval. The
+runtime version remains `0.1.0` until the release-candidate versioning step.
+
+### Implemented in development
+
+- **Implemented:** canonical `require('board')`, `board.apiVersion`, pin/device
+  metadata, capability queries, `modules.has()`, the shared registry, and
+  generated board manifests.
+- **Implemented:** strict validation and portable GPIO, PWM, ADC, I2C, SPI, and
+  external NeoPixel contracts. Native tests cover simulated backend behavior;
+  these are not electrical measurements.
+- **Implemented:** runtime filesystem ownership handoff and current-image USB
+  and image-decoder capability metadata. Portable graphics/display API
+  normalization is still a later-0.x non-goal.
+- **Implemented:** registry-backed `.capabilities` and `.capabilities NAME`,
+  migration documentation, and portable examples. Their final consistency
+  audit remains open below; they do not need to be rebuilt from scratch.
+- **Implemented:** read-only onboard-button input and a bounded, debounced
+  button-to-LED example for Pico and XIAO ESP32-S3.
+- **CI verified:** [source checks at d993b27](https://github.com/mcu-js/mcujs/actions/runs/34173032693)
+  and [docs typecheck/build at d993b27](https://github.com/mcu-js/mcujs/actions/runs/34173032719)
+  passed. Pages artifact upload and deployment were skipped. These checks do
+  not build or physically test every shipping firmware image.
+
+### Hardware evidence recorded
+
+The same `examples/onboard-button/index.js` ran manually on both boards for
+60 seconds using firmware built from `5fc1294ad378e92356a7cbe16b182086309eef91`.
+The native validation lane and both target builds exited successfully. Both
+UF2 payloads were checked against their application binaries.
+
+- **Pico / RP2040:** serial output recorded two presses followed by releases.
+  The final button and LED readings were false, storage was device-ready, and
+  the temporary demo file was removed, leaving an empty filesystem.
+  UF2 SHA-256: `b7872682fa32b74c337a4656ca4e673efe298d26f10cd5c27525c2ecd16a7e4f`.
+- **XIAO ESP32-S3:** serial output recorded four presses followed by releases.
+  The final button and LED readings were false, storage was device-ready, and
+  the temporary demo file was removed, leaving an empty filesystem.
+  UF2 SHA-256: `9d379f8a39e8a362e465b69368b6df280fb3f7575b700e54cc4ff06f4e4dfa1f`.
+- **Both:** runtime build identity matched; `buttonPressed()` returned a
+  boolean and rejected supplied arguments with `TypeError`.
+
+This is hardware-executed button/demo evidence, not an all-peripheral pass,
+measured PWM waveform evidence, or qualification of a future release candidate.
+The firmware hashes above identify local test artifacts, not published assets.
+
+### Still needed, in order
+
+1. **Open — finish discovery/help consistency.** `.help` currently omits
+   `board.buttonPressed()` even on supported boards. Add registry-derived help
+   coverage without advertising it on unsupported targets. Check registration,
+   `builtinModules`, `modules.has()`, optional exports, capability metadata,
+   generated manifests, and help against each shipping image, including the
+   independent graphics/screen/DVI surfaces. Close only with matching tests and
+   target observations; source CI alone is not a full hardware discovery audit.
+2. **Open — finish the release-facing docs and example audit.** The migration
+   guide and examples exist, but `CHANGELOG.md` has no 0.2.0 entry yet. Reconcile
+   the final API changes, supported targets, breaking behavior, and limitations.
+   Re-run applicable examples on both backend families, including repeated
+   execution and cleanup. The existing PWM fade uses the onboard LED only if
+   its pin is advertised for PWM: Pico qualifies, but XIAO GPIO21 is currently
+   excluded from its PWM capability. Investigate that restriction before
+   promising a no-wiring two-board fade; do not silently widen the pin policy.
+3. **Open — prepare one immutable release candidate.** Finish the 0.2.0 version
+   and release notes, obtain the required independent review, and build all nine RP
+   targets plus XIAO ESP32-S3 from that exact commit. Verify packaging,
+   checksums, generated manifests, recovery/update layout, and applicable
+   host/container reproducibility. Older builds remain historical evidence,
+   not qualification of a different candidate.
+4. **Open — qualify that candidate on shipping hardware.** Record per-board
+   discovery, recovery, storage ownership/persistence, and supported peripheral
+   results. Use the existing [ADC](./adc-voltage-protocol.md),
+   [PWM](./pwm-waveform-protocol.md), [I2C](./i2c-peripheral-protocol.md),
+   [SPI](./spi-loopback-protocol.md), and
+   [NeoPixel](./neopixel-hardware-protocol.md) protocols. Missing hardware,
+   instruments, and unperformed checks stay explicit; any release waiver
+   requires maintainer approval. Today's Pico/XIAO demo is not a substitute for
+   the remaining targets or electrical tests.
+5. **Open — approve and publish 0.2.0.** Complete exact-candidate verification,
+   then review the `development` to `main` PR
+   before merging. Only after approval and merge: tag, publish firmware and
+   documentation, and smoke-test downloads from the public release. Routine
+   development pushes do not authorize any of these release actions.
+
+**Next bounded change:** make `.help` accurately expose the supported onboard
+button method, add a regression test, verify it, and push to `development`.
 
 ## Design principles
 
@@ -476,7 +571,7 @@ Do not call the API stable until:
 9. Normalize NeoPixel validation and onboard/external separation.
 10. Generate/validate `.help`, `builtinModules`, examples, and docs from the registry.
 11. Run native conformance, every RP release board, ESP clean/repro builds, and target hardware tests.
-12. Obtain exact-index review, bump to 0.2.0 with migration notes, then commit locally unless push is explicitly requested.
+12. Finish the 0.2.0 version and migration notes before freezing an independently reviewed candidate. Keep development work pushed to `development`; follow the release checklist above for exact-candidate QA and the separately approved `main` merge, tag, and publication.
 
 ## Acceptance tests
 

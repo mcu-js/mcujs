@@ -31,6 +31,8 @@
 #include "hardware/vreg.h"
 #include "hardware/clocks.h"
 #include "mcujs_dvi.h"
+#include "hardware/watchdog.h"
+#include "pico/bootrom.h"
 #endif
 
 /* Version info (from CMake) */
@@ -52,6 +54,12 @@ static void boot_status_off(void);
 
 int main(void) {
 #if MCUJS_HAS_DVI
+    /* Diagnostic candidate only: a stalled experiment returns to ROM USB
+     * recovery instead of requiring another physical power/BOOTSEL cycle. */
+    if (watchdog_caused_reboot()) {
+        reset_usb_boot(0, 0);
+    }
+    watchdog_enable(8000, true);
     /* DVI requires 252 MHz system clock - set this BEFORE USB init
      * This must happen early to ensure USB is configured for the correct clock
      */
@@ -184,6 +192,9 @@ static void print_banner_once(void) {
  */
 static void main_loop(void) {
     while (1) {
+#if MCUJS_HAS_DVI
+        watchdog_update();
+#endif
         /* Process USB tasks */
         tud_task();
         usb_msc_task();

@@ -7,7 +7,7 @@ HTML Canvas, `HTMLCanvasElement`, or `OffscreenCanvas`. It exposes ordinary Canv
 
 ## Application interface
 
-Install `lib/canvas.js` on the board as **`/canvas.js`**, so the runtime module
+Install `lib/lib/canvas.js` on the board as **`/lib/canvas.js`**, so the runtime module
 loader can resolve:
 
 ```js
@@ -92,7 +92,7 @@ native must support this same maximum and must not retain a pointer to JS storag
 
 This native backend is enabled only with `-DMCUJS_EXPERIMENTAL_CANVAS=ON`
 on the PiZero. Standard firmware remains unchanged. Install this JS module as
-`/canvas.js`; the private native module is not the application API.
+`/lib/canvas.js`; the private native module is not the application API.
 
 - Coordinates and rectangle dimensions are restricted to `[-512, 512]`, and
   native line width to `(0, 640]`, to bound fixed-point edge arithmetic.
@@ -101,8 +101,16 @@ on the PiZero. Standard firmware remains unchanged. Install this JS module as
   scope, not evidence of correct general joins or `miterLimit`.
 - RGB565 quantization and antialiasing differ from Chromium. Browser comparisons
   are evidence about the named drawing only, not whole-API conformance.
-- Native OOM behavior and sustained display scheduling still need device testing.
-  This is a local experimental port, not a release candidate.
+- Native OOM behavior, repeated stop/start, long-running updates, and general
+  Canvas conformance remain unqualified. This is not a release candidate.
+- The experimental RP2040 linker layout reserves a separate 12 KiB Core 0
+  stack in main RAM and explicitly retains a 2 KiB Core 1 stack. Do not infer
+  stack capacity from `__StackTop - __StackLimit`: use `__StackBottom` and verify
+  heap, both stacks, and TMDS scratch code are disjoint. Pico SDK otherwise
+  defaults Core 1's stack size to `PICO_STACK_SIZE`.
+- Scanline production runs in the native Core 1 DMA callback. Frame publication
+  waits until the previous source frame has been copied, not for JavaScript to
+  keep feeding scanlines.
 
 ### Colors
 
@@ -194,3 +202,23 @@ implementation was added; the completed suite passes.
 pixel-equivalence, firmware, or hardware passes.** Native rendering verification,
 module installation, and board execution belong to the integration stage. No
 hardware, Docker, deployment, or native code was exercised by this slice.
+
+## On-device qualification
+
+Diagnostic firmware **0.1.0+20b9f46** passed a bounded PiZero hardware run:
+`getContext('2d')`, fill, single-segment stroke, and loading the complete example
+while DVI was already running all returned successfully. ShadowCast captured
+the cyan border, crossing white/green diagonals, and red/yellow squares. The
+same drawing function was compared visually with the Chromium reference;
+geometry agrees, while RGB565/capture colors and antialiasing differ.
+The demo was stopped and `.info` remained responsive. No autorun was added.
+
+The UF2 payload was checked against the compiled binary. The linker check passed
+with non-overlapping heap, main stack, Core 1 stack, and TMDS scratch code.
+This qualifies this drawing, not all methods, failure paths, or sustained use.
+
+Check a compiled experimental image with:
+
+```sh
+python3 tests/check_canvas_stack_layout.py path/to/firmware.elf.map
+```

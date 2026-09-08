@@ -41,6 +41,25 @@ runtime version remains `0.1.0` until the release-candidate versioning step.
   passed. Pages artifact upload and deployment were skipped. These checks do
   not build or physically test every shipping firmware image.
 
+### Development build and package evidence
+
+Development commit `4a2bb00e05372c34b2ca8ad60adb7f4ec39fe1ad` passed fresh
+network-isolated builds for all nine RP boards and XIAO ESP32-S3 using the
+existing pinned builder images. All ten UF2 application payloads matched their
+adjacent binaries, and all binaries and ELFs contained `0.1.0+4a2bb00`.
+RP2350 auxiliary UF2 compatibility blocks were kept separate from application
+payload comparisons. The XIAO partition/UF2/build-identity/manifest verifier
+also passed.
+
+A local-only packaging test in the isolated build clone produced ten UF2s and
+ten capability manifests. All twenty checksum entries matched, and the archive
+files matched the staged package byte-for-byte. No firmware was flashed and
+nothing was uploaded or published. [Source CI](https://github.com/mcu-js/mcujs/actions/runs/34181728104)
+and [docs](https://github.com/mcu-js/mcujs/actions/runs/34181728071) passed on that
+exact commit; Pages deployment was skipped. These are development-build and
+packaging results, not a qualified 0.2.0 candidate or a repeated-build
+reproducibility result. The final-candidate and physical gates below stay open.
+
 ### Hardware evidence recorded
 
 The same `examples/onboard-button/index.js` ran manually on both boards for
@@ -111,10 +130,10 @@ The firmware hashes above identify local test artifacts, not published assets.
    documentation, and smoke-test downloads from the public release. Routine
    development pushes do not authorize any of these release actions.
 
-**Next verification gate:** build the development tip across all shipping
-targets in the pinned offline containers, without changing the version or
-publishing artifacts. Keep that build evidence separate from final candidate
-qualification and from the installed `5fc1294` hardware results above.
+**Next verification gate:** recovery-safe installation and on-device checking
+of the newly built images, starting with Pico and XIAO. The installed boards
+still run `5fc1294`; native help tests and successful `4a2bb00` builds do not
+close that gap. Keep electrical tests and untested shipping boards explicit.
 
 ## Design principles
 

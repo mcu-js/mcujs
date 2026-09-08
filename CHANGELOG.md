@@ -86,6 +86,12 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 - Full exact-candidate builds, per-board hardware discovery/recovery/storage
   qualification, and electrical peripheral measurements remain release gates.
   Host/native tests and CI do not substitute for those measurements.
+- Development commit `4a2bb00` built successfully for all ten shipping targets
+  in pinned, network-isolated containers. Every UF2 application payload matched
+  its binary, and all binaries/ELFs contained the expected build ID. A local
+  packaging test verified ten firmware files, ten capability manifests, their
+  checksums, and archive contents. These artifacts were neither flashed nor
+  published; final 0.2.0 candidate qualification remains open.
 - The PWM fade example exists, but XIAO's onboard LED pin (GPIO21) is not in its
   current PWM capability; do not assume a no-wiring fade works on both boards.
 - Portable graphics/display normalization and resource-handle API redesign are

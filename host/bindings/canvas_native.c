@@ -3,6 +3,12 @@
 #include "canvas_renderer.h"
 #include "mcujs_dvi.h"
 #include <math.h>
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+#include "hardware/watchdog.h"
+#define CANVAS_STAGE(n) (watchdog_hw->scratch[0] = (n))
+#else
+#define CANVAS_STAGE(n) ((void)0)
+#endif
 #include <string.h>
 #define WIDTH 160
 #define HEIGHT 120
@@ -49,18 +55,22 @@ static jerry_value_t draw(const jerry_call_info_t *info,const jerry_value_t args
     const mcujs_dvi_state_t *state=mcujs_dvi_get_state();
     if(state->initialized && (state->width!=WIDTH || state->height!=HEIGHT))
         return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas display already configured incompatibly");
+    CANVAS_STAGE(201);
     if(!mcujs_dvi_is_running()) {
         last_presented=NULL;
         if(!mcujs_dvi_init(WIDTH,HEIGHT) || !mcujs_dvi_start())
             return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas display unavailable");
     }
+    CANVAS_STAGE(202);
     uint16_t *pixels=mcujs_dvi_get_draw_buffer();
     if(!pixels) return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas draw surface unavailable");
     /* DVI is double buffered; retain earlier Canvas drawing without a third allocation. */
     if(last_presented && pixels!=last_presented) memcpy(pixels,last_presented,WIDTH*HEIGHT*sizeof(uint16_t));
     if(!canvas_render(pixels,WIDTH,HEIGHT,ops,count,stroke,rgba,width))
         return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas renderer rejected draw");
+    CANVAS_STAGE(204);
     if(!mcujs_dvi_swap_and_show()) return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas presentation failed");
+    CANVAS_STAGE(205);
     last_presented=pixels;
     return jerry_undefined();
 }

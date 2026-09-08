@@ -57,6 +57,8 @@ int main(void) {
     /* Diagnostic candidate only: a stalled experiment returns to ROM USB
      * recovery instead of requiring another physical power/BOOTSEL cycle. */
     if (watchdog_enable_caused_reboot()) {
+        /* Consume the diagnostic marker so a ROM reboot can retry the app. */
+        watchdog_hw->scratch[4] = 0;
         reset_usb_boot(0, 0);
     }
     watchdog_enable(8000, true);

@@ -1,6 +1,12 @@
 /* ctx.graphics 0.1.18 supplies rasterization; this is an MCU memory profile. */
 #include "canvas_renderer.h"
 #include <math.h>
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+#include "hardware/watchdog.h"
+#define CANVAS_STAGE(n) (watchdog_hw->scratch[0] = (n))
+#else
+#define CANVAS_STAGE(n) ((void)0)
+#endif
 #define CTX_IMPLEMENTATION
 #define CTX_RASTERIZER 1
 #define CTX_RASTERIZER_AA 3
@@ -56,8 +62,10 @@ bool canvas_render(uint16_t *pixels, int width, int height, const float *ops,
         if (n>count-i) return false;
         i+=n;
     }
+    CANVAS_STAGE(301);
     Ctx *ctx=ctx_new_for_framebuffer(pixels,width,height,width*2,CTX_FORMAT_RGB565);
     if (!ctx) return false;
+    CANVAS_STAGE(302);
     /* A framebuffer context is already initialized. start_frame would reset
      * its clip bounds to zero in ctx 0.1.18, suppressing general paths. */
     ctx_rgba(ctx,rgba[0],rgba[1],rgba[2],rgba[3]);
@@ -81,8 +89,12 @@ bool canvas_render(uint16_t *pixels, int width, int height, const float *ops,
     fprintf(stderr,"trace stroke=%d edges=%d width=%f path=%d\n",stroke,r->edge_list.count,ctx_get_line_width(ctx),ctx->current_path.count);
     for(int j=0;j<r->edge_list.count && j<6;j++){CtxSegment *e=&((CtxSegment*)r->edge_list.entries)[j];fprintf(stderr,"edge %d code=%d x0=%d y0=%d x1=%d y1=%d\n",j,e->code,e->x0,e->y0,e->x1,e->y1);}
 #endif
+    CANVAS_STAGE(303);
     if (stroke) ctx_stroke(ctx); else ctx_fill(ctx);
+    CANVAS_STAGE(304);
     ctx_end_frame(ctx);
+    CANVAS_STAGE(305);
     ctx_destroy(ctx);
+    CANVAS_STAGE(306);
     return true;
 }

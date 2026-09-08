@@ -2,6 +2,100 @@
 
 All notable changes to mcujs will be documented in this file.
 
+## [Unreleased — 0.2.0]
+
+Development work toward the portable API release. **Not a published release or
+qualified release candidate.** `version.txt` still reads `0.1.0`; check the
+installed firmware build ID and `board.apiVersion` before using these APIs.
+
+### Added
+
+- Seeed Studio XIAO ESP32-S3 support alongside the existing RP2040/RP2350
+  targets: persistent script storage, boot-script recovery, native USB CDC/MSC,
+  the shared interactive REPL, and board-qualified UF2 application updates.
+- Canonical `require('board')`, immutable `board.apiVersion`, semantic pins,
+  onboard-device inventory, and per-module capability discovery.
+  `require('mcujs:module').has(name)` enables feature detection without board-name
+  branches. Generated capability manifests describe each firmware image.
+- Read-only `board.buttonPressed()` on Pico (BOOTSEL) and XIAO ESP32-S3 (BOOT),
+  plus a portable, bounded button-to-LED example and a first-light lesson.
+  BOOT/BOOTSEL remain recovery controls; they are not general-purpose outputs.
+- Registry-backed `.capabilities` / `.capabilities NAME` commands and
+  board-specific `.help`, including button help only on supported boards.
+- Portable contract/schema validation, native backend conformance tests,
+  board-specific REPL tests, and electrical acceptance protocols.
+
+### Changed / breaking
+
+- Firmware selects an explicit feature map. Unsupported modules, optional
+  methods, and onboard shortcuts are absent rather than stubs or no-ops.
+  An external peripheral driver does not imply an onboard device exists.
+- GPIO requires initialization and strict booleans for writes. Peripheral
+  takeover invalidates stale GPIO state; explicitly reinitialize GPIO after
+  the peripheral releases the pin.
+- PWM duty uses only a finite `0..1` ratio. Out-of-range values throw instead of
+  clamping; in-range duty/frequency requests that cannot be represented exactly
+  throw `ERR_NOT_SUPPORTED`. Resource conflicts and exhaustion are explicit.
+- I2C/SPI options use advertised routes and transfer limits. Bytes, lengths,
+  addresses, modes, and frequencies are validated before native conversion;
+  oversized transfers are not truncated. SPI uses fixed 8-bit words and
+  MSB-first bit order, with supported modes and transfer limits reported per
+  backend.
+- ADC uses discovered pins/channels and support-gated voltage/temperature
+  methods. Voltage is in volts and temperature in degrees Celsius. RP-only
+  `adc.TEMP` / `adc.VSYS` aliases are not portable channel discovery.
+- External NeoPixel options, RGB bytes, pixel counts, ordering, pin ownership,
+  and operational errors follow a shared strict contract. Onboard multi-pixel
+  shortcuts reject oversized input rather than silently discarding it.
+- Programming errors remain `TypeError` / `RangeError`; migrated peripheral
+  operations expose stable error codes for contention, unsupported native
+  configurations, resource exhaustion, missing I2C devices, and I/O failures.
+- Filesystem access observes host/device ownership: eject host-mounted storage
+  before runtime access rather than allowing concurrent writers.
+
+### Compatibility and build tooling
+
+- Existing globals and documented positional I2C/SPI forms remain compatibility
+  aliases through 0.x where supported; new code should use canonical lower-case
+  modules and feature detection. RP SPI DMA and boot recovery extensions remain
+  explicitly capability-gated, not universal portable APIs.
+- USB HID and image-decoder metadata report current-image capabilities without
+  promising portable graphics/display APIs or HID on ESP32-S3.
+- Unified Docker build entrypoints support pinned offline builder images,
+  source build identity, board manifests, and validated XIAO partition/UF2
+  packaging. Factory recovery, application updates, and project storage remain
+  separate operations.
+- Pushes and PRs targeting `development` run source checks and docs builds.
+  Development does not upload/deploy Pages or automatically publish releases.
+
+### Verification and remaining limitations
+
+- The same button example ran on Pico and XIAO firmware `0.1.0+5fc1294`:
+  press/release events were recorded, the demos completed, final LED readings
+  were off, and temporary scripts were removed. This is not an all-peripheral
+  or all-board qualification.
+- Native REPL checks cover all ten shipping board configurations, including
+  presence/absence of button help. The newer help change has not yet been
+  flashed to those two boards.
+- A read-only discovery pass on those installed images matched all 14 Pico
+  modules, all 11 XIAO modules, and nine capability descriptors on each board
+  against their build's registry. Module loading, `has()`, help's module list,
+  board metadata, and the checked optional board methods agreed. Storage
+  remained device-ready and empty; no peripheral outputs or project files
+  were written during this pass.
+- Full exact-candidate builds, per-board hardware discovery/recovery/storage
+  qualification, and electrical peripheral measurements remain release gates.
+  Host/native tests and CI do not substitute for those measurements.
+- The PWM fade example exists, but XIAO's onboard LED pin (GPIO21) is not in its
+  current PWM capability; do not assume a no-wiring fade works on both boards.
+- Portable graphics/display normalization and resource-handle API redesign are
+  outside the 0.2.0 scope.
+
+See the [0.1 → 0.2 migration guide](docs/docs/migration/0.2.md) for code changes
+and the [release checklist](docs/docs/development/mcujs-0.2-portable-api.md#020-release-checklist)
+for current evidence and open gates. `main`, tags, and publishing require
+separate release approval.
+
 ## [0.1.0] - 2026-05-08
 
 ### Core Features

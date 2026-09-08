@@ -58,6 +58,15 @@ UF2 payloads were checked against their application binaries.
   UF2 SHA-256: `9d379f8a39e8a362e465b69368b6df280fb3f7575b700e54cc4ff06f4e4dfa1f`.
 - **Both:** runtime build identity matched; `buttonPressed()` returned a
   boolean and rejected supplied arguments with `TypeError`.
+- **Follow-up read-only discovery on the same installed build:** all 14 Pico
+  modules, all 11 XIAO modules, and nine capability descriptors per board
+  matched the exact-build registry. `.help` module lists, `builtinModules`,
+  `modules.has()`, actual `require()` availability, board metadata, alias
+  identity, and checked optional board-method presence agreed. Unsupported
+  module probes remained absent. Both filesystems were still empty and
+  device-ready. No project files or peripheral outputs were written. The old
+  images still omit button help, as expected; this does not verify the newer
+  source fix on hardware.
 
 This is hardware-executed button/demo evidence, not an all-peripheral pass,
 measured PWM waveform evidence, or qualification of a future release candidate.
@@ -73,8 +82,9 @@ The firmware hashes above identify local test artifacts, not published assets.
    independent graphics/screen/DVI surfaces. Close only with matching tests and
    target observations; source CI alone is not a full hardware discovery audit.
 2. **Open — finish the release-facing docs and example audit.** The migration
-   guide and examples exist, but `CHANGELOG.md` has no 0.2.0 entry yet. Reconcile
-   the final API changes, supported targets, breaking behavior, and limitations.
+   guide, examples, and an unreleased 0.2.0 changelog entry now exist. Keep their
+   API changes, supported targets, breaking behavior, and limitations aligned
+   with the final candidate.
    Re-run applicable examples on both backend families, including repeated
    execution and cleanup. The existing PWM fade uses the onboard LED only if
    its pin is advertised for PWM: Pico qualifies, but XIAO GPIO21 is currently
@@ -101,9 +111,10 @@ The firmware hashes above identify local test artifacts, not published assets.
    documentation, and smoke-test downloads from the public release. Routine
    development pushes do not authorize any of these release actions.
 
-**Next bounded change:** reconcile the existing 0.2 migration guide into an
-unreleased changelog entry, without changing the firmware version or publishing
-a release. Keep the remaining exact-image and hardware gates above open.
+**Next verification gate:** build the development tip across all shipping
+targets in the pinned offline containers, without changing the version or
+publishing artifacts. Keep that build evidence separate from final candidate
+qualification and from the installed `5fc1294` hardware results above.
 
 ## Design principles
 

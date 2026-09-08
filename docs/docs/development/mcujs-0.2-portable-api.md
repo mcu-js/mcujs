@@ -7,8 +7,10 @@ Goal: make ordinary JavaScript portable across shipping boards without pretendin
 ## 0.2.0 release checklist
 
 This is the current release checklist, not a claim that every design proposal
-below is implemented. Reconciled against development source `d993b27` and the
-hardware run of firmware `0.1.0+5fc1294` on 2026-09-07.
+below is implemented. Software backlog reconciled against development source
+`2366a60` and the preserved original task records on 2026-09-07. Hardware
+observations below remain bound to firmware `0.1.0+5fc1294`, not the current
+source or an unreleased display candidate.
 
 **Working policy:** push ongoing work to GitHub's `development` branch. Source
 checks and docs builds run there; Pages deployment is skipped. Keep `main`,
@@ -91,7 +93,98 @@ This is hardware-executed button/demo evidence, not an all-peripheral pass,
 measured PWM waveform evidence, or qualification of a future release candidate.
 The firmware hashes above identify local test artifacts, not published assets.
 
-### Still needed, in order
+### Software backlog reconciliation
+
+The original `0.2.NN` identifiers below are work-package numbers, not published
+versions. The broad `0.2.12` package was split into `0.2.12a` through `0.2.12e`.
+Old task statuses are historical records, not proof of today's source state.
+Successful builds/package checks do not close unfinished API work.
+
+**Integrated source foundations — retain, do not reimplement:**
+
+- **0.2.00–0.2.03:** development policy, portable schema, shared registry and
+  canonical board/module discovery (`cbda97f`, `ec05042`, `6db9064`, `1717d67`,
+  with subsequent fixes).
+- **0.2.04–0.2.05:** strict validation/error contracts and conformance framework
+  (`81201e7`, `be7fa40`, with subsequent fixes).
+- **0.2.06–0.2.08:** GPIO ownership, PWM units/lifecycle and ADC discovery/units
+  (`17eca90`, `248a0d5`, `8c64cd1`).
+- **0.2.09–0.2.11:** I2C, SPI and external NeoPixel contracts (`a8671f0`,
+  `ed170fc`, `c4f6647`), including I2C timeout and NeoPixel ownership corrections
+  (`4d49da8`, `1e3f7b7`).
+- **0.2.12a–0.2.12d:** board metadata, storage/MSC ownership, USB/HID reporting
+  and image-decoder reporting (`f13c124`, `84a95d1`, `fa9fb66`, `c766771`).
+
+These commits are ancestors of the reconciled development tip. This establishes
+integration, not fresh acceptance of every historical card or electrical
+qualification. The existing conformance suite remains the regression baseline.
+
+**Remaining software work, in execution order:**
+
+1. **0.2.12e — open: graphics/screen/DVI capability reporting.** Recover and
+   adapt the preserved source candidate, then verify and independently review
+   it against current development. Keep graphics buffers, the `screen` module,
+   DVI output, image decoding and physical onboard panels separate. Expose only
+   linked implementations and their actual methods/limits; remove unsupported
+   stubs. A `display` device is not a new `require('display')` module. Full
+   portable graphics/display API redesign remains deferred to later 0.x;
+   current-image reporting is required for 0.2.0.
+2. **0.2.13 — partial: REPL, manifests and documentation consistency.**
+   `.capabilities [NAME]`, generated board tables and per-artifact JSON manifests
+   already exist. Finish their agreement with actual registration, module
+   detection, optional exports, help and the display layers after 0.2.12e.
+   Audit schema-checked JavaScript documentation, docs links/build and installer
+   guidance. The original card made `.d.ts` declarations optional; none are
+   currently tracked, and their absence alone is not a release blocker. Any
+   declarations added must not imply unconditional runtime availability.
+3. **0.2.14 — partial: compatibility, deprecations and portable examples.**
+   Canonical lower-case modules, retained globals/positional forms, migration
+   pages, examples and the unreleased changelog already exist. Finish the
+   compatibility/absence tests and audit deprecation behavior without noisy
+   runtime warnings. Inventory every portable example and execute it on both
+   backend families where capabilities permit, twice in persistent realms when
+   rerunnable, checking cleanup. Keep board-specific demos distinct from portable
+   examples. Existing Pico/XIAO button evidence does not satisfy this whole card.
+4. **0.2.16 — partial: cross-board manual QA protocol and evidence template.**
+   Reuse the existing ADC/PWM/I2C/SPI/NeoPixel protocols and serial conformance
+   envelope. Complete one release-candidate procedure and compact per-target
+   template for all ten boards: inspect/backup/update/recovery, exact artifact
+   identity, discovery, pins/onboard inventory, supported peripherals, USB/MSC
+   persistence, reconnect/watchdog and user-data preservation. Specify wiring,
+   serial logs, measurements, manual photos and explicit maintainer waivers for
+   unavailable hardware/unmeasured behavior. Writing the protocol is software
+   work; executing it on hardware is a separate gate.
+5. **0.2.15 — open and gated: versioned immutable candidate.** After the above,
+   prepare consistently versioned `0.2.0-rc.1` runtime/artifacts/docs/manifests,
+   verify the integrated feature stack and produce exact-commit all-target
+   builds, applicable reproducibility, checksums, manifests, docs preview and
+   release notes. Obtain independent review. Today's development builds and
+   local packaging exercise do not constitute that candidate. No version bump
+   or release action is authorized by this reconciliation.
+
+#### Recovered display candidate versus current development
+
+The preserved uncommitted candidate was reconstructed in isolation on base
+`c76677159127881e6863ae51c1c1d0e7d9856882`. Its Git tree exactly matches the
+historical tree `e10f37136fb948ec8ce998fb3a7af11c015d3774`, including the previously
+untracked display regression test. It changes 27 files, mostly generated
+schema/registry/manifests plus bindings, documentation and tests.
+
+Fresh focused JavaScript checks on that historical tree passed **43/43** and
+its generated-file drift check passed. Running its five display regression
+checks against an isolated copy of current `2366a60` produced **one pass and
+four failures**: discovery descriptors, onboard panel inventory, native
+registration/stub expectations, and generated/schema/docs/example coverage.
+These tests confirm the software gap; they are not firmware or hardware tests.
+
+The saved patch does not apply directly to current development: board docs,
+`host/generated/runtime_registry_data.h` and `scripts/test-runtime-bindings.sh`
+have changed. Adapt source changes in isolation, regenerate outputs rather than
+copying stale generated files, and preserve later onboard-button and native
+build-script fixes. Historical test success is not approval of a rebased
+candidate. No recovered runtime code has been integrated by this reconciliation.
+
+### Release verification gates (after the software backlog)
 
 1. **Open — finish discovery/help consistency.** The button-help omission is
    fixed with positive and negative native coverage across all shipping board
@@ -130,10 +223,12 @@ The firmware hashes above identify local test artifacts, not published assets.
    documentation, and smoke-test downloads from the public release. Routine
    development pushes do not authorize any of these release actions.
 
-**Next verification gate:** recovery-safe installation and on-device checking
-of the newly built images, starting with Pico and XIAO. The installed boards
-still run `5fc1294`; native help tests and successful `4a2bb00` builds do not
-close that gap. Keep electrical tests and untested shipping boards explicit.
+**Next software gate:** adapt and verify the recovered `0.2.12e` display
+capability candidate on current development, then finish `0.2.13`, `0.2.14`
+and the QA-protocol package before the immutable RC. Updated Pico/XIAO flashing
+is a later hardware-verification step, not a substitute for these software
+tasks. The installed boards still run `5fc1294`; native help tests and successful
+`4a2bb00` builds do not close their on-device verification gap.
 
 ## Design principles
 

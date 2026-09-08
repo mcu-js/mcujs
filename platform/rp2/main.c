@@ -52,11 +52,14 @@ static void boot_blink(int count, int on_ms, int off_ms);
 static void boot_status_on(void);
 static void boot_status_off(void);
 
+volatile uint32_t mcujs_canvas_failure_stage __attribute__((section(".uninitialized_data")));
+
 int main(void) {
 #if MCUJS_HAS_DVI
     /* Diagnostic candidate only: a stalled experiment returns to ROM USB
      * recovery instead of requiring another physical power/BOOTSEL cycle. */
     if (watchdog_enable_caused_reboot()) {
+        mcujs_canvas_failure_stage = watchdog_hw->scratch[0];
         /* Consume the diagnostic marker so a ROM reboot can retry the app. */
         watchdog_hw->scratch[4] = 0;
         reset_usb_boot(0, 0);

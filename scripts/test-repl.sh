@@ -2,10 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BINARY_RP="$(mktemp "${TMPDIR:-/tmp}/mcujs-repl-rp-test.XXXXXX")"
-BINARY_CONSTRAINED_RP="$(mktemp "${TMPDIR:-/tmp}/mcujs-repl-constrained-rp-test.XXXXXX")"
-BINARY_ESP="$(mktemp "${TMPDIR:-/tmp}/mcujs-repl-esp-test.XXXXXX")"
-trap 'rm -f "${BINARY_RP}" "${BINARY_CONSTRAINED_RP}" "${BINARY_ESP}"' EXIT
+source "${ROOT}/scripts/lib/boards.sh"
+BINARY="$(mktemp "${TMPDIR:-/tmp}/mcujs-repl-test.XXXXXX")"
+trap 'rm -f "${BINARY}"' EXIT
 
 compile_repl_test() {
     local output="$1"
@@ -25,14 +24,14 @@ compile_repl_test() {
         -o "${output}"
 }
 
-compile_repl_test "${BINARY_RP}" -DMCUJS_BOARD_PICO=1
-"${BINARY_RP}"
-
-compile_repl_test "${BINARY_CONSTRAINED_RP}" \
-    -DMCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A=1
-"${BINARY_CONSTRAINED_RP}"
-
-compile_repl_test "${BINARY_ESP}" \
-    -DMCUJS_PLATFORM_ESP32=1 \
-    -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1
-"${BINARY_ESP}"
+for board in "${MCUJS_RELEASE_BOARDS[@]}"; do
+    define="${board^^}"
+    define="${define//./_}"
+    flags=("-DMCUJS_BOARD_${define}=1" "-I${ROOT}/board/${board}")
+    if [[ "$(mcujs_board_chip "${board}")" == "ESP32-S3" ]]; then
+        flags+=(-DMCUJS_PLATFORM_ESP32=1)
+    fi
+    compile_repl_test "${BINARY}" "${flags[@]}"
+    printf '%s: ' "${board}"
+    "${BINARY}"
+done

@@ -31,6 +31,11 @@ runtime version remains `0.1.0` until the release-candidate versioning step.
   audit remains open below; they do not need to be rebuilt from scratch.
 - **Implemented:** read-only onboard-button input and a bounded, debounced
   button-to-LED example for Pico and XIAO ESP32-S3.
+- **Native REPL verified:** `.help` advertises `buttonPressed()` only on Pico
+  and XIAO, using the same generated flag as native binding registration.
+  `scripts/test-repl.sh` exercises actual REPL input/output for all ten shipping
+  board configurations with their board-specific headers. This is host-native
+  coverage, not a new firmware build or an on-device test of the updated help.
 - **CI verified:** [source checks at d993b27](https://github.com/mcu-js/mcujs/actions/runs/34173032693)
   and [docs typecheck/build at d993b27](https://github.com/mcu-js/mcujs/actions/runs/34173032719)
   passed. Pages artifact upload and deployment were skipped. These checks do
@@ -60,9 +65,9 @@ The firmware hashes above identify local test artifacts, not published assets.
 
 ### Still needed, in order
 
-1. **Open — finish discovery/help consistency.** `.help` currently omits
-   `board.buttonPressed()` even on supported boards. Add registry-derived help
-   coverage without advertising it on unsupported targets. Check registration,
+1. **Open — finish discovery/help consistency.** The button-help omission is
+   fixed with positive and negative native coverage across all shipping board
+   configurations; on-device verification awaits updated firmware. Check registration,
    `builtinModules`, `modules.has()`, optional exports, capability metadata,
    generated manifests, and help against each shipping image, including the
    independent graphics/screen/DVI surfaces. Close only with matching tests and
@@ -96,8 +101,9 @@ The firmware hashes above identify local test artifacts, not published assets.
    documentation, and smoke-test downloads from the public release. Routine
    development pushes do not authorize any of these release actions.
 
-**Next bounded change:** make `.help` accurately expose the supported onboard
-button method, add a regression test, verify it, and push to `development`.
+**Next bounded change:** reconcile the existing 0.2 migration guide into an
+unreleased changelog entry, without changing the firmware version or publishing
+a release. Keep the remaining exact-image and hardware gates above open.
 
 ## Design principles
 

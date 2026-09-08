@@ -860,6 +860,9 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  board methods: freeMemory(), uniqueId(), reset(), enterUf2(), millis(), delay(), capability(), capabilities()\r\n");
         const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
         if (registry->onboard_led) usb_cdc_puts("  board onboard method: led()\r\n");
+#if MCUJS_REGISTRY_ONBOARD_BUTTON
+        usb_cdc_puts("  board onboard method: buttonPressed()\r\n");
+#endif
         if (registry->onboard_neopixel) usb_cdc_puts("  board onboard method: neopixel()\r\n");
         if (registry->safe_mode && registry->storage_ready) {
             usb_cdc_puts("  board recovery methods: safeMode(), storageReady()\r\n");

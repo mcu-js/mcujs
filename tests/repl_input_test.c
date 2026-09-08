@@ -225,6 +225,11 @@ static void test_help_matches_build_features(void) {
     assert(strstr(s_output, "uniqueId()") != NULL);
     assert(strstr(s_output, " led, ids") == NULL);
     const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
+    // These are the two boards with the public read-only button API.
+    // Keep the expectation independent of the generated feature flag.
+    bool has_button = strcmp(registry->board_id, "pico") == 0 ||
+                      strcmp(registry->board_id, "seeed_xiao_esp32s3") == 0;
+    assert((strstr(s_output, "buttonPressed()") != NULL) == has_button);
     for (size_t i = 0; i < registry->builtin_module_count; i++) {
         char expected[192];
         int written = snprintf(expected, sizeof(expected),

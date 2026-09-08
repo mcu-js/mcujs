@@ -22,6 +22,10 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
   BOOT/BOOTSEL remain recovery controls; they are not general-purpose outputs.
 - Registry-backed `.capabilities` / `.capabilities NAME` commands and
   board-specific `.help`, including button help only on supported boards.
+- Registry-backed graphics/screen discovery on RP firmware and DVI discovery
+  on the DVI-enabled PiZero image. Method/limit descriptors and physical panel
+  inventory are independent of image decoding; XIAO omits these display APIs.
+  This exposes the existing display stack, not a newly normalized portable API.
 - Portable contract/schema validation, native backend conformance tests,
   board-specific REPL tests, and electrical acceptance protocols.
 

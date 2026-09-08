@@ -115,9 +115,4 @@ jerry_value_t js_create_dvi_module(void);
 #endif /* MCUJS_HAS_DVI */
 #endif /* MCUJS_HAS_DVI defined */
 
-/* Declare task function even when DVI is disabled (will be a no-op) */
-#if !defined(MCUJS_HAS_DVI) || !MCUJS_HAS_DVI
-void mcujs_dvi_task(void);
-#endif
-
 #endif /* MCUJS_DVI_H */

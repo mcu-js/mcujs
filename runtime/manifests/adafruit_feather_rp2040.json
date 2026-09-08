@@ -388,6 +388,78 @@
           "native"
         ]
       }
+    },
+    "graphics": {
+      "methods": [
+        "createBuffer",
+        "freeBuffer",
+        "getBufferInfo",
+        "getPointer",
+        "fill",
+        "setPixel",
+        "fillRect",
+        "color565"
+      ],
+      "buffer": {
+        "pixelFormat": "rgb565",
+        "bytesPerPixel": 2,
+        "maxWidth": 320,
+        "maxHeight": 320,
+        "maxActiveBuffers": 1
+      },
+      "color565ByteOrder": "swapped",
+      "pointerAccess": true
+    },
+    "screen": {
+      "methods": [
+        "init",
+        "fill",
+        "setPixel",
+        "fillRect",
+        "drawLine",
+        "drawCircle",
+        "fillCircle",
+        "drawText",
+        "rgb",
+        "color",
+        "show",
+        "getWidth",
+        "getHeight",
+        "getBufferHandle",
+        "getByteOrder"
+      ],
+      "constants": [
+        "BLACK",
+        "WHITE",
+        "RED",
+        "GREEN",
+        "BLUE",
+        "CYAN",
+        "MAGENTA",
+        "YELLOW",
+        "ORANGE",
+        "GRAY"
+      ],
+      "framebuffer": {
+        "pixelFormat": "rgb565",
+        "bytesPerPixel": 2,
+        "maxWidth": 320,
+        "maxHeight": 240,
+        "maxActiveBuffers": 1,
+        "byteOrders": [
+          "native",
+          "swapped"
+        ]
+      },
+      "driver": {
+        "requiredMethods": [
+          "show"
+        ],
+        "optionalMethods": [
+          "init"
+        ],
+        "externalBuffer": true
+      }
     }
   }
 }

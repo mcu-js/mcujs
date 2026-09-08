@@ -52,6 +52,42 @@ int main(void) {
     assert(!mcujs_runtime_has_module("mouse"));
 #endif
 
+#if MCUJS_FEATURE_GRAPHICS
+    assert(mcujs_runtime_has_module("graphics"));
+    assert(mcujs_runtime_find_capability("graphics") != NULL);
+    assert(MCUJS_RUNTIME_GRAPHICS_MAX_WIDTH == 320);
+    assert(MCUJS_RUNTIME_GRAPHICS_MAX_HEIGHT == 320);
+#else
+    assert(!mcujs_runtime_has_module("graphics"));
+    assert(mcujs_runtime_find_capability("graphics") == NULL);
+    assert(MCUJS_RUNTIME_GRAPHICS_MAX_WIDTH == 0);
+    assert(MCUJS_RUNTIME_GRAPHICS_MAX_HEIGHT == 0);
+#endif
+
+#if MCUJS_FEATURE_SCREEN
+    assert(mcujs_runtime_has_module("screen"));
+    assert(mcujs_runtime_find_capability("screen") != NULL);
+    assert(MCUJS_RUNTIME_SCREEN_MAX_WIDTH == 320);
+    assert(MCUJS_RUNTIME_SCREEN_MAX_HEIGHT == 240);
+#else
+    assert(!mcujs_runtime_has_module("screen"));
+    assert(mcujs_runtime_find_capability("screen") == NULL);
+    assert(MCUJS_RUNTIME_SCREEN_MAX_WIDTH == 0);
+    assert(MCUJS_RUNTIME_SCREEN_MAX_HEIGHT == 0);
+#endif
+
+#if MCUJS_HAS_DVI
+    assert(mcujs_runtime_has_module("dvi"));
+    assert(mcujs_runtime_find_capability("dvi") != NULL);
+    assert(MCUJS_RUNTIME_DVI_MAX_WIDTH == 160);
+    assert(MCUJS_RUNTIME_DVI_MAX_HEIGHT == 120);
+#else
+    assert(!mcujs_runtime_has_module("dvi"));
+    assert(mcujs_runtime_find_capability("dvi") == NULL);
+    assert(MCUJS_RUNTIME_DVI_MAX_WIDTH == 0);
+    assert(MCUJS_RUNTIME_DVI_MAX_HEIGHT == 0);
+#endif
+
     const mcujs_runtime_capability_t *usb = mcujs_runtime_find_capability("usb");
     assert(usb != NULL);
     assert((strstr(usb->json, "\"cdc\"") != NULL) == (MCUJS_USB_CDC != 0));

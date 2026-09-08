@@ -93,6 +93,12 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_ORDER_RGB ${neopixel?.orders.includes("RGB") ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_NEOPIXEL_ORDER_GRB ${neopixel?.orders.includes("GRB") ? 1 : 0}`);
   lines.push(`#define MCUJS_RUNTIME_IMAGE_MAX_INPUT_BYTES ${descriptor.capabilities.image?.maxInputBytes ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_GRAPHICS_MAX_WIDTH ${descriptor.capabilities.graphics?.buffer.maxWidth ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_GRAPHICS_MAX_HEIGHT ${descriptor.capabilities.graphics?.buffer.maxHeight ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_SCREEN_MAX_WIDTH ${descriptor.capabilities.screen?.framebuffer.maxWidth ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_SCREEN_MAX_HEIGHT ${descriptor.capabilities.screen?.framebuffer.maxHeight ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_DVI_MAX_WIDTH ${descriptor.capabilities.dvi?.framebuffer.maxWidth ?? 0}`);
+  lines.push(`#define MCUJS_RUNTIME_DVI_MAX_HEIGHT ${descriptor.capabilities.dvi?.framebuffer.maxHeight ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MIN_HZ ${descriptor.capabilities.pwm?.frequency.minHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_PWM_MAX_HZ ${descriptor.capabilities.pwm?.frequency.maxHz ?? 0}`);
   const i2c = descriptor.capabilities.i2c;
@@ -186,6 +192,10 @@ function onboardSummary(descriptor) {
   const neopixel = descriptor.board.devices.neopixel;
   if (neopixel) {
     devices.push(`NeoPixel (GPIO ${neopixel.pin}, ${neopixel.length} × ${neopixel.order})`);
+  }
+  const display = descriptor.board.devices.display;
+  if (display) {
+    devices.push(`${display.controller} LCD (${display.width} × ${display.height})`);
   }
   return devices.length > 0 ? devices.join(" + ") : "—";
 }

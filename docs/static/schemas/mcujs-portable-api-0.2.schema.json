@@ -94,6 +94,9 @@
         },
         "neopixel": {
           "$ref": "#/$defs/onboardNeopixel"
+        },
+        "display": {
+          "$ref": "#/$defs/onboardDisplay"
         }
       }
     },
@@ -174,6 +177,37 @@
         }
       }
     },
+    "onboardDisplay": {
+      "type": "object",
+      "description": "Physical onboard LCD panel inventory. This does not imply a screen, graphics, image, or DVI firmware capability.",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "controller",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "type": {
+          "const": "lcd"
+        },
+        "controller": {
+          "enum": [
+            "GC9A01A",
+            "ST7789V2",
+            "ST7789V3"
+          ]
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
     "capabilityMap": {
       "type": "object",
       "description": "Immutable facts compiled into this firmware for this board. Unsupported capabilities are omitted.",
@@ -202,6 +236,15 @@
         },
         "image": {
           "$ref": "#/$defs/imageCapability"
+        },
+        "graphics": {
+          "$ref": "#/$defs/graphicsCapability"
+        },
+        "screen": {
+          "$ref": "#/$defs/screenCapability"
+        },
+        "dvi": {
+          "$ref": "#/$defs/dviCapability"
         },
         "fs": {
           "$ref": "#/$defs/fsCapability"
@@ -833,6 +876,251 @@
         }
       }
     },
+    "graphicsCapability": {
+      "type": "object",
+      "description": "Exact current-firmware RP graphics-buffer exposure. This compatibility descriptor does not standardize a portable graphics or display API.",
+      "additionalProperties": false,
+      "required": [
+        "methods",
+        "buffer",
+        "color565ByteOrder",
+        "pointerAccess"
+      ],
+      "properties": {
+        "methods": {
+          "const": [
+            "createBuffer",
+            "freeBuffer",
+            "getBufferInfo",
+            "getPointer",
+            "fill",
+            "setPixel",
+            "fillRect",
+            "color565"
+          ]
+        },
+        "buffer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pixelFormat",
+            "bytesPerPixel",
+            "maxWidth",
+            "maxHeight",
+            "maxActiveBuffers"
+          ],
+          "properties": {
+            "pixelFormat": {
+              "const": "rgb565"
+            },
+            "bytesPerPixel": {
+              "const": 2
+            },
+            "maxWidth": {
+              "const": 320
+            },
+            "maxHeight": {
+              "const": 320
+            },
+            "maxActiveBuffers": {
+              "const": 1
+            }
+          }
+        },
+        "color565ByteOrder": {
+          "const": "swapped"
+        },
+        "pointerAccess": {
+          "const": true
+        }
+      }
+    },
+    "screenCapability": {
+      "type": "object",
+      "description": "Exact current-firmware RP screen/display abstraction exposure. This compatibility descriptor does not imply an onboard panel or standardize a portable display API.",
+      "additionalProperties": false,
+      "required": [
+        "methods",
+        "constants",
+        "framebuffer",
+        "driver"
+      ],
+      "properties": {
+        "methods": {
+          "const": [
+            "init",
+            "fill",
+            "setPixel",
+            "fillRect",
+            "drawLine",
+            "drawCircle",
+            "fillCircle",
+            "drawText",
+            "rgb",
+            "color",
+            "show",
+            "getWidth",
+            "getHeight",
+            "getBufferHandle",
+            "getByteOrder"
+          ]
+        },
+        "constants": {
+          "const": [
+            "BLACK",
+            "WHITE",
+            "RED",
+            "GREEN",
+            "BLUE",
+            "CYAN",
+            "MAGENTA",
+            "YELLOW",
+            "ORANGE",
+            "GRAY"
+          ]
+        },
+        "framebuffer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pixelFormat",
+            "bytesPerPixel",
+            "maxWidth",
+            "maxHeight",
+            "maxActiveBuffers",
+            "byteOrders"
+          ],
+          "properties": {
+            "pixelFormat": {
+              "const": "rgb565"
+            },
+            "bytesPerPixel": {
+              "const": 2
+            },
+            "maxWidth": {
+              "const": 320
+            },
+            "maxHeight": {
+              "const": 240
+            },
+            "maxActiveBuffers": {
+              "const": 1
+            },
+            "byteOrders": {
+              "const": [
+                "native",
+                "swapped"
+              ]
+            }
+          }
+        },
+        "driver": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requiredMethods",
+            "optionalMethods",
+            "externalBuffer"
+          ],
+          "properties": {
+            "requiredMethods": {
+              "const": [
+                "show"
+              ]
+            },
+            "optionalMethods": {
+              "const": [
+                "init"
+              ]
+            },
+            "externalBuffer": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "dviCapability": {
+      "type": "object",
+      "description": "Exact current-firmware native DVI exposure for the Waveshare RP2040-PiZero image. This compatibility descriptor is independent from graphics, screen, image, and onboard-panel inventory.",
+      "additionalProperties": false,
+      "required": [
+        "methods",
+        "properties",
+        "framebuffer",
+        "output"
+      ],
+      "properties": {
+        "methods": {
+          "const": [
+            "init",
+            "start",
+            "stop",
+            "show",
+            "fill",
+            "isRunning",
+            "getDrawBuffer",
+            "getBufferSize",
+            "swapAndShow"
+          ]
+        },
+        "properties": {
+          "const": [
+            "width",
+            "height",
+            "byteOrder"
+          ]
+        },
+        "framebuffer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pixelFormat",
+            "byteOrder",
+            "maxWidth",
+            "maxHeight",
+            "doubleBuffered"
+          ],
+          "properties": {
+            "pixelFormat": {
+              "const": "rgb565"
+            },
+            "byteOrder": {
+              "const": "native"
+            },
+            "maxWidth": {
+              "const": 160
+            },
+            "maxHeight": {
+              "const": 120
+            },
+            "doubleBuffered": {
+              "const": true
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height",
+            "refreshHz"
+          ],
+          "properties": {
+            "width": {
+              "const": 640
+            },
+            "height": {
+              "const": 480
+            },
+            "refreshHz": {
+              "const": 60
+            }
+          }
+        }
+      }
+    },
     "bootCapability": {
       "type": "object",
       "description": "Static boot and recovery controls compiled into this firmware. Dynamic safe-mode state is queried through board.safeMode().",
@@ -1440,6 +1728,27 @@
       },
       "image": {
         "schema": "#/$defs/imageCapability",
+        "scope": "firmwareCompatibilityModule",
+        "dynamic": false,
+        "portableApi": false,
+        "normalization": "deferredLater0x"
+      },
+      "graphics": {
+        "schema": "#/$defs/graphicsCapability",
+        "scope": "firmwareCompatibilityModule",
+        "dynamic": false,
+        "portableApi": false,
+        "normalization": "deferredLater0x"
+      },
+      "screen": {
+        "schema": "#/$defs/screenCapability",
+        "scope": "firmwareCompatibilityModule",
+        "dynamic": false,
+        "portableApi": false,
+        "normalization": "deferredLater0x"
+      },
+      "dvi": {
+        "schema": "#/$defs/dviCapability",
         "scope": "firmwareCompatibilityModule",
         "dynamic": false,
         "portableApi": false,

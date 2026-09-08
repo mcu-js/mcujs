@@ -6,6 +6,9 @@
     var capabilities = boardApi.capabilities();
     var usb = boardApi.capability('usb');
     var image = boardApi.capability('image');
+    var graphics = boardApi.capability('graphics');
+    var screen = boardApi.capability('screen');
+    var dvi = boardApi.capability('dvi');
 
     console.log('Board:', boardApi.name);
     console.log('Chip:', boardApi.chip);
@@ -17,6 +20,12 @@
     console.log('Mouse module:', modules.has('mouse') ? 'available' : 'unavailable');
     console.log('Image module:', modules.has('image') ? 'available' : 'unavailable');
     console.log('Image capability:', image ? JSON.stringify(image) : 'unavailable');
+    console.log('Graphics module:', modules.has('graphics') ? 'available' : 'unavailable');
+    console.log('Graphics capability:', graphics ? JSON.stringify(graphics) : 'unavailable');
+    console.log('Screen/display module:', modules.has('screen') ? 'available' : 'unavailable');
+    console.log('Screen/display capability:', screen ? JSON.stringify(screen) : 'unavailable');
+    console.log('DVI module:', modules.has('dvi') ? 'available' : 'unavailable');
+    console.log('DVI capability:', dvi ? JSON.stringify(dvi) : 'unavailable');
     console.log('Semantic pins:', JSON.stringify(boardApi.pins));
     console.log('Onboard devices:', JSON.stringify(boardApi.devices));
     console.log('Capabilities:', JSON.stringify(capabilities));

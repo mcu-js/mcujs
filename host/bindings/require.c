@@ -690,6 +690,15 @@ static const builtin_module_t s_builtin_modules[] = {
 #if MCUJS_FEATURE_MOUSE
     {"mouse", js_create_mouse_module},
 #endif
+#if MCUJS_FEATURE_GRAPHICS
+    {"graphics", js_create_graphics_module},
+#endif
+#if MCUJS_FEATURE_SCREEN
+    {"screen", js_create_screen_module},
+#endif
+#if MCUJS_HAS_DVI
+    {"dvi", js_create_dvi_module},
+#endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}
 };

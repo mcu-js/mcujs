@@ -42,6 +42,9 @@ const moduleCapability = {
   adc: "adc",
   neopixel: "neopixel",
   image: "image",
+  graphics: "graphics",
+  screen: "screen",
+  dvi: "dvi",
 };
 
 const capabilityGatedBoardExports = {
@@ -71,9 +74,16 @@ const expectedOnboardDevices = {
   pico2_w: { led: { type: "managed" } },
   waveshare_rp2040_zero: { neopixel: { type: "neopixel", pin: 16, length: 1, order: "RGB" } },
   waveshare_rp2040_pizero: {},
-  "waveshare_rp2040_touch_lcd_1.28": {},
-  "waveshare_rp2350_lcd_1.47_a": { neopixel: { type: "neopixel", pin: 22, length: 1, order: "GRB" } },
-  "waveshare_rp2350_touch_lcd_1.69": {},
+  "waveshare_rp2040_touch_lcd_1.28": {
+    display: { type: "lcd", controller: "GC9A01A", width: 240, height: 240 },
+  },
+  "waveshare_rp2350_lcd_1.47_a": {
+    neopixel: { type: "neopixel", pin: 22, length: 1, order: "GRB" },
+    display: { type: "lcd", controller: "ST7789V3", width: 172, height: 320 },
+  },
+  "waveshare_rp2350_touch_lcd_1.69": {
+    display: { type: "lcd", controller: "ST7789V2", width: 240, height: 280 },
+  },
   adafruit_feather_rp2040: {
     led: { type: "gpio", pin: 13, activeLow: false },
     neopixel: { type: "neopixel", pin: 16, length: 1, order: "GRB" },

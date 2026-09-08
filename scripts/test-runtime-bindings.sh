@@ -63,7 +63,15 @@ python3 "${JERRY_ROOT}/tools/build.py" \
 compile_binding_test() {
     local output="$1"
     local backend="$2"
+    local display_sources=()
     shift 2
+    if [[ "${backend}" == "platform/rp2" ]]; then
+        display_sources=(
+            -Wno-type-limits
+            "${ROOT}/host/bindings/graphics.c"
+            "${ROOT}/host/bindings/screen.c"
+        )
+    fi
     cc -std=gnu17 -Wall -Wextra -Werror \
         -ffunction-sections -fdata-sections \
         "$@" \
@@ -83,6 +91,7 @@ compile_binding_test() {
         "${ROOT}/host/bindings/board_registry.c" \
         "${ROOT}/host/bindings/fs.c" \
         "${ROOT}/host/bindings/require.c" \
+        "${display_sources[@]}" \
         "${ROOT}/${backend}/bindings/pin_policy.c" \
         "${ROOT}/${backend}/bindings/gpio.c" \
         "${ROOT}/${backend}/bindings/i2c.c" \
@@ -103,7 +112,7 @@ compile_binding_test "${FULL}" platform/rp2 \
     -DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
     -I"${ROOT}/tests/native_stubs/rp2"
-for factory in gpio i2c neopixel pwm; do
+for factory in gpio graphics i2c neopixel pwm screen; do
     nm -g "${FULL}" | grep -E " T js_create_${factory}_module$" >/dev/null
 done
 for factory in keyboard mouse; do
@@ -115,7 +124,7 @@ compile_binding_test "${CONSTRAINED_RP}" platform/rp2 \
     -DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 \
     -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A=1 \
     -I"${ROOT}/tests/native_stubs/rp2"
-for factory in gpio i2c neopixel pwm; do
+for factory in gpio graphics i2c neopixel pwm screen; do
     nm -g "${CONSTRAINED_RP}" | grep -E " T js_create_${factory}_module$" >/dev/null
 done
 for factory in keyboard mouse; do
@@ -134,6 +143,12 @@ done
 for factory in keyboard mouse; do
     if nm -g "${CONSTRAINED}" | grep -E " T js_create_${factory}_module$" >/dev/null; then
         printf 'Unavailable ESP32 HID factory was linked: %s\n' "${factory}" >&2
+        exit 1
+    fi
+done
+for factory in graphics screen; do
+    if nm -g "${CONSTRAINED}" | grep -E " T js_create_${factory}_module$" >/dev/null; then
+        printf 'Unavailable ESP32 display factory was linked: %s\n' "${factory}" >&2
         exit 1
     fi
 done

@@ -121,14 +121,16 @@ qualification. The existing conformance suite remains the regression baseline.
 
 **Remaining software work, in execution order:**
 
-1. **0.2.12e — open: graphics/screen/DVI capability reporting.** Recover and
-   adapt the preserved source candidate, then verify and independently review
-   it against current development. Keep graphics buffers, the `screen` module,
-   DVI output, image decoding and physical onboard panels separate. Expose only
-   linked implementations and their actual methods/limits; remove unsupported
-   stubs. A `display` device is not a new `require('display')` module. Full
-   portable graphics/display API redesign remains deferred to later 0.x;
-   current-image reporting is required for 0.2.0.
+1. **0.2.12e — implemented in source: graphics/screen/DVI capability reporting.**
+   The recovered candidate is adapted to the later button/build-script fixes.
+   RP images expose `graphics` and `screen`; only the DVI-enabled PiZero image
+   exposes `dvi`. XIAO omits all three. Registry-generated descriptors describe
+   their current methods/limits, independently from image decoding and onboard
+   panel inventory. Unsupported DVI stubs are removed. A `display` device is
+   not a new `require('display')` module. Native tests check production
+   graphics/screen exports and ESP absence; registry and REPL lanes include
+   DVI availability. Physical display/output behavior remains unqualified.
+   Full portable graphics/display API redesign stays deferred to later 0.x.
 2. **0.2.13 — partial: REPL, manifests and documentation consistency.**
    `.capabilities [NAME]`, generated board tables and per-artifact JSON manifests
    already exist. Finish their agreement with actual registration, module
@@ -223,8 +225,8 @@ candidate. No recovered runtime code has been integrated by this reconciliation.
    documentation, and smoke-test downloads from the public release. Routine
    development pushes do not authorize any of these release actions.
 
-**Next software gate:** adapt and verify the recovered `0.2.12e` display
-capability candidate on current development, then finish `0.2.13`, `0.2.14`
+**Next software gate:** finish the `0.2.13` cross-surface consistency audit,
+then `0.2.14`
 and the QA-protocol package before the immutable RC. Updated Pico/XIAO flashing
 is a later hardware-verification step, not a substitute for these software
 tasks. The installed boards still run `5fc1294`; native help tests and successful

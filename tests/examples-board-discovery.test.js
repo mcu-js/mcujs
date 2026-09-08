@@ -16,6 +16,10 @@ test("board discovery example feature-detects without board-name sniffing", () =
   assert.match(source, /boardApi\.capability\(['"]usb['"]\)/);
   assert.match(source, /modules\.has\(['"]keyboard['"]\)/);
   assert.match(source, /modules\.has\(['"]mouse['"]\)/);
+  for (const name of ["graphics", "screen", "dvi"]) {
+    assert.match(source, new RegExp(`modules\\.has\\(['"]${name}['"]\\)`));
+    assert.match(source, new RegExp(`boardApi\\.capability\\(['"]${name}['"]\\)`));
+  }
   assert.doesNotMatch(source, /boardApi\.name\s*={2,3}/);
   assert.doesNotMatch(source, /switch\s*\(\s*boardApi\.name/);
 });

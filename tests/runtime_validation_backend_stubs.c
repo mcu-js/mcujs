@@ -408,10 +408,10 @@ void dma_channel_configure(int channel, const dma_channel_config *config,
 void dma_channel_wait_for_finish_blocking(int channel) { (void)channel; }
 
 static uint16_t s_graphics_buffer[1];
-uint16_t *graphics_get_buffer_data(graphics_buffer_handle_t handle) {
+__attribute__((weak)) uint16_t *graphics_get_buffer_data(graphics_buffer_handle_t handle) {
     return handle == 1 ? s_graphics_buffer : NULL;
 }
-uint32_t graphics_get_buffer_byte_length(graphics_buffer_handle_t handle) {
+__attribute__((weak)) uint32_t graphics_get_buffer_byte_length(graphics_buffer_handle_t handle) {
     return handle == 1 ? sizeof(s_graphics_buffer) : 0;
 }
 

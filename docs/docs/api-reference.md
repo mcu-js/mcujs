@@ -29,6 +29,14 @@ screen/display output, DVI, and onboard-device inventory. The current RP module
 is an explicitly nonportable compatibility surface; portable image API
 normalization remains deferred to a later 0.x release.
 
+Likewise, feature-detect `graphics`, `screen`, and `dvi` through
+`require('mcujs:module').has(name)` and inspect their separate capability
+descriptors for the exact current-image methods and limits. An onboard LCD entry
+in `board.devices.display` is physical inventory, not proof that any one of
+those modules exists. These RP compatibility surfaces are documented for honest
+discovery only; portable graphics and display API normalization remains deferred
+to a later 0.x release.
+
 ## MCU.js 0.2 portable contract
 
 - API names, types, units, capabilities, and errors: [Portable API contract](./api-design/portable-api-contract.md)

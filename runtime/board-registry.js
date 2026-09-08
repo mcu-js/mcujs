@@ -13,7 +13,8 @@ const featureNames = Object.freeze([
 
 const moduleOrder = Object.freeze([
   "board", "fs", "process", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-  "image", "keyboard", "mouse", "mcujs:module", "node:module",
+  "image", "keyboard", "mouse", "graphics", "screen", "dvi",
+  "mcujs:module", "node:module",
 ]);
 
 const boardPresentation = Object.freeze({
@@ -32,7 +33,8 @@ const boardPresentation = Object.freeze({
 const featureModule = Object.freeze({
   fs: "fs", process: "process", gpio: "gpio", pwm: "pwm", i2c: "i2c",
   spi: "spi", adc: "adc", neopixel: "neopixel", image: "image",
-  keyboard: "keyboard", mouse: "mouse",
+  keyboard: "keyboard", mouse: "mouse", graphics: "graphics", screen: "screen",
+  dvi: "dvi",
 });
 
 const rpUsbClasses = Object.freeze(["cdc", "msc", "keyboardHid", "mouseHid"]);
@@ -153,6 +155,58 @@ function imageCapability(chip) {
   };
 }
 
+function graphicsCapability() {
+  return {
+    methods: [
+      "createBuffer", "freeBuffer", "getBufferInfo", "getPointer",
+      "fill", "setPixel", "fillRect", "color565",
+    ],
+    buffer: {
+      pixelFormat: "rgb565", bytesPerPixel: 2,
+      maxWidth: 320, maxHeight: 320, maxActiveBuffers: 1,
+    },
+    color565ByteOrder: "swapped",
+    pointerAccess: true,
+  };
+}
+
+function screenCapability() {
+  return {
+    methods: [
+      "init", "fill", "setPixel", "fillRect", "drawLine", "drawCircle",
+      "fillCircle", "drawText", "rgb", "color", "show", "getWidth",
+      "getHeight", "getBufferHandle", "getByteOrder",
+    ],
+    constants: [
+      "BLACK", "WHITE", "RED", "GREEN", "BLUE", "CYAN", "MAGENTA",
+      "YELLOW", "ORANGE", "GRAY",
+    ],
+    framebuffer: {
+      pixelFormat: "rgb565", bytesPerPixel: 2,
+      maxWidth: 320, maxHeight: 240, maxActiveBuffers: 1,
+      byteOrders: ["native", "swapped"],
+    },
+    driver: {
+      requiredMethods: ["show"], optionalMethods: ["init"], externalBuffer: true,
+    },
+  };
+}
+
+function dviCapability() {
+  return {
+    methods: [
+      "init", "start", "stop", "show", "fill", "isRunning",
+      "getDrawBuffer", "getBufferSize", "swapAndShow",
+    ],
+    properties: ["width", "height", "byteOrder"],
+    framebuffer: {
+      pixelFormat: "rgb565", byteOrder: "native",
+      maxWidth: 160, maxHeight: 120, doubleBuffered: true,
+    },
+    output: { width: 640, height: 480, refreshHz: 60 },
+  };
+}
+
 function usbCapability(classes) {
   return { classes: [...classes] };
 }
@@ -234,6 +288,9 @@ function rpDescriptor({
   if (features.spi) capabilities.spi = spiCapability(spiRoutes, spiDefaultBus, { dma: true });
   if (features.neopixel) capabilities.neopixel = neopixelCapability(neopixelPins);
   if (features.image) capabilities.image = imageCapability(chip);
+  if (features.graphics) capabilities.graphics = graphicsCapability();
+  if (features.screen) capabilities.screen = screenCapability();
+  if (features.dvi) capabilities.dvi = dviCapability();
   return {
     board: { name, chip, firmwareVersion, exposedPins: [...exposedPins], pins: { ...aliases }, devices: structuredClone(devices) },
     features,
@@ -304,6 +361,7 @@ const boardDescriptors = {
     aliases: pinAliases(pinsBetween(0, 28), {
       A0: 26, A1: 27, A2: 28, SDA: 6, SCL: 7, SCK: 10, MOSI: 11, MISO: 12,
     }),
+    devices: { display: { type: "lcd", controller: "GC9A01A", width: 240, height: 240 } },
     i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }],
     i2cDefaultBus: 1,
     spiRoutes: [{ bus: 1, sck: 10, mosi: 11, miso: 12 }],
@@ -319,7 +377,10 @@ const boardDescriptors = {
     aliases: pinAliases([...pinsBetween(0, 9), 14, 16, 17, 18, 19, 20, 21, 22], {
       SDA: 4, SCL: 5, SCK: 18, MOSI: 19, MISO: 0, NEOPIXEL: 22,
     }),
-    devices: { neopixel: { type: "neopixel", pin: 22, length: 1, order: "GRB" } },
+    devices: {
+      neopixel: { type: "neopixel", pin: 22, length: 1, order: "GRB" },
+      display: { type: "lcd", controller: "ST7789V3", width: 172, height: 320 },
+    },
 
     i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }],
     spiRoutes: [{ bus: 0, sck: 18, mosi: 19, miso: 0 }],
@@ -333,6 +394,7 @@ const boardDescriptors = {
     aliases: pinAliases([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28], {
       A0: 26, A1: 27, A2: 28, SDA: 6, SCL: 7, SCK: 10, MOSI: 11, MISO: 12,
     }),
+    devices: { display: { type: "lcd", controller: "ST7789V2", width: 240, height: 280 } },
     i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }],
     i2cDefaultBus: 1,
     spiRoutes: [{ bus: 1, sck: 10, mosi: 11, miso: 12 }],

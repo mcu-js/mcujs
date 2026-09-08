@@ -3,9 +3,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FULL="$(mktemp "${TMPDIR:-/tmp}/mcujs-registry-full.XXXXXX")"
+DVI="$(mktemp "${TMPDIR:-/tmp}/mcujs-registry-dvi.XXXXXX")"
 CONSTRAINED_RP="$(mktemp "${TMPDIR:-/tmp}/mcujs-registry-constrained-rp.XXXXXX")"
 CONSTRAINED="$(mktemp "${TMPDIR:-/tmp}/mcujs-registry-constrained.XXXXXX")"
-trap 'rm -f "${FULL}" "${CONSTRAINED_RP}" "${CONSTRAINED}"' EXIT
+trap 'rm -f "${FULL}" "${DVI}" "${CONSTRAINED_RP}" "${CONSTRAINED}"' EXIT
 
 compile_registry_test() {
     local output="$1"
@@ -23,6 +24,12 @@ compile_registry_test "${FULL}" \
     -DMCUJS_EXPECTED_BOARD='"pico"' \
     -DMCUJS_EXPECTED_MANIFEST_NAME='"\"name\":\"pico\""'
 "${FULL}"
+
+compile_registry_test "${DVI}" \
+    -DMCUJS_BOARD_WAVESHARE_RP2040_PIZERO=1 \
+    -DMCUJS_EXPECTED_BOARD='"waveshare_rp2040_pizero"' \
+    -DMCUJS_EXPECTED_MANIFEST_NAME='"\"name\":\"waveshare_rp2040_pizero\""'
+"${DVI}"
 
 compile_registry_test "${CONSTRAINED_RP}" \
     -DMCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A=1 \

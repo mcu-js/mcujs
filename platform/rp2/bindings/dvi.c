@@ -507,22 +507,3 @@ void js_bind_dvi(void) {
 
 #endif /* MCUJS_HAS_DVI == 1 */
 #endif /* MCUJS_HAS_DVI defined */
-
-/* Stub implementations when DVI is not available */
-#if !defined(MCUJS_HAS_DVI) || !MCUJS_HAS_DVI
-
-#include "jerryscript.h"
-
-void js_bind_dvi(void) {
-    /* No-op: DVI not available on this board */
-}
-
-jerry_value_t js_create_dvi_module(void) {
-    return jerry_undefined();
-}
-
-void mcujs_dvi_task(void) {
-    /* No-op: DVI not available */
-}
-
-#endif /* !MCUJS_HAS_DVI */

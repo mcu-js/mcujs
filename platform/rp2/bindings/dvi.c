@@ -75,13 +75,48 @@ static uint16_t s_framebuffer_a[FRAME_WIDTH * FRAME_HEIGHT];
 static uint16_t s_framebuffer_b[FRAME_WIDTH * FRAME_HEIGHT];
 
 /* Display buffer - what scanline renderer reads from (set atomically) */
-static volatile const uint16_t *s_display_buffer = NULL;
+static const uint16_t *volatile s_display_buffer = NULL;
 /* Draw buffer - what Core 0 writes to */
 static uint16_t *s_draw_buffer = NULL;
 static uint32_t s_framebuffer_size = 0;
 
 /* Flag for vsync - set when frame rendering completes */
 static volatile bool s_frame_complete = false;
+
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+/* Keep video fed on Core 1 while Core 0 parses or renders JavaScript.
+ * Publish a new front buffer only after the old frame has been copied into
+ * scanline buffers, so the application can safely reuse its old front. */
+static uint16_t *volatile s_pending_buffer;
+static const uint16_t *s_feed_buffer;
+static uint s_feed_line;
+static void __not_in_flash("dvi") feed_scanlines(void) {
+    uint16_t *line;
+    while (queue_try_remove(&s_dvi_inst.q_colour_free, &line)) {
+        if (s_feed_line == 0) {
+            if (s_pending_buffer) {
+                s_display_buffer = s_pending_buffer;
+                __dmb();
+                s_pending_buffer = NULL;
+            }
+            s_feed_buffer = (const uint16_t *)s_display_buffer;
+        }
+        const uint16_t *src = s_feed_buffer + (s_feed_line / 2) * FRAME_WIDTH;
+        for (uint x = 0; x < FRAME_WIDTH; ++x) {
+            line[2*x] = src[x];
+            line[2*x+1] = src[x];
+        }
+        /* Four buffers are conserved between queues: a removed free buffer
+         * always has space in the valid queue. Never block inside this IRQ. */
+        bool queued = queue_try_add(&s_dvi_inst.q_colour_valid, &line);
+        hard_assert(queued);
+        if (++s_feed_line == 240) {
+            s_feed_line = 0;
+            s_frame_complete = true;
+        }
+    }
+}
+#endif
 
 /*
  * Core 1 main - runs dvi_scanbuf_main_16bpp
@@ -109,6 +144,10 @@ static void __not_in_flash("dvi") core1_main(void) {
  * This runs on Core 0 and must keep up with display timing
  */
 static void __not_in_flash("dvi") render_scanlines(void) {
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    /* Core 1's DMA callback owns scanline production in this image. */
+    return;
+#else
     const uint16_t *fb = (const uint16_t *)s_display_buffer;
     if (!fb) return;
     
@@ -141,6 +180,7 @@ static void __not_in_flash("dvi") render_scanlines(void) {
     }
     
     s_frame_complete = true;
+#endif
 }
 
 /*
@@ -158,6 +198,9 @@ bool mcujs_dvi_init(uint16_t width, uint16_t height) {
     /* Configure DVI instance */
     s_dvi_inst.timing = &MCUJS_DVI_TIMING;
     s_dvi_inst.ser_cfg = waveshare_rp2040_pizero;
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    s_dvi_inst.scanline_callback = feed_scanlines;
+#endif
     
     /* Initialize DVI */
     dvi_init(&s_dvi_inst, next_striped_spin_lock_num(), next_striped_spin_lock_num());
@@ -197,6 +240,13 @@ bool mcujs_dvi_start(void) {
         queue_add_blocking(&s_dvi_inst.q_colour_free, &bufptr);
     }
     
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    s_pending_buffer = NULL;
+    s_feed_line = 0;
+    s_feed_buffer = (const uint16_t *)s_display_buffer;
+    feed_scanlines();
+#endif
+
     /* Give DMA priority to Core 1 */
     hw_set_bits(&bus_ctrl_hw->priority, BUSCTRL_BUS_PRIORITY_PROC1_BITS);
     
@@ -239,17 +289,7 @@ bool mcujs_dvi_show(const uint16_t *buffer, uint32_t length) {
     /* Copy to draw buffer */
     memcpy(s_draw_buffer, buffer, expected_size);
     
-    /* Swap buffers atomically */
-    uint16_t *old_display = (uint16_t *)s_display_buffer;
-    s_display_buffer = s_draw_buffer;
-    s_draw_buffer = old_display;
-    __dmb();
-    
-    /* Render the new frame */
-    s_frame_complete = false;
-    render_scanlines();
-    
-    return true;
+    return mcujs_dvi_swap_and_show();
 }
 
 /*
@@ -290,6 +330,15 @@ bool mcujs_dvi_swap_and_show(void) {
     
     /* Swap buffers atomically */
     uint16_t *old_display = (uint16_t *)s_display_buffer;
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    s_frame_complete = false;
+    __dmb();
+    s_pending_buffer = s_draw_buffer;
+    while (s_pending_buffer != NULL) tight_loop_contents();
+    __dmb();
+    s_draw_buffer = old_display;
+    return true;
+#endif
     s_display_buffer = s_draw_buffer;
     s_draw_buffer = old_display;
     __dmb();
@@ -384,14 +433,7 @@ static jerry_value_t js_dvi_fill(
         s_draw_buffer[i] = color;
     }
     
-    /* Swap and render */
-    uint16_t *old_display = (uint16_t *)s_display_buffer;
-    s_display_buffer = s_draw_buffer;
-    s_draw_buffer = old_display;
-    __dmb();
-    
-    s_frame_complete = false;
-    render_scanlines();
+    mcujs_dvi_swap_and_show();
     
     return jerry_undefined();
 }

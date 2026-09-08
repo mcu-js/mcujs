@@ -24,6 +24,9 @@
 #include "../module_loader.h"
 #include "../runtime_features.h"
 #include "../runtime_registry.h"
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+jerry_value_t js_create_canvas_native_module(void);
+#endif
 #include "jerryscript.h"
 #include "fs.h"
 #include "validation.h"
@@ -699,12 +702,16 @@ static const builtin_module_t s_builtin_modules[] = {
 #if MCUJS_HAS_DVI
     {"dvi", js_create_dvi_module},
 #endif
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    {"mcujs:canvas-native", js_create_canvas_native_module},
+#endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}
 };
 
-static jerry_value_t s_builtin_cache[16];
-static bool s_builtin_cached[16];
+enum { BUILTIN_CACHE_SIZE = sizeof(s_builtin_modules) / sizeof(s_builtin_modules[0]) - 1 };
+static jerry_value_t s_builtin_cache[BUILTIN_CACHE_SIZE];
+static bool s_builtin_cached[BUILTIN_CACHE_SIZE];
 
 /*
  * Check if a specifier is a built-in module name

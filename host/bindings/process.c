@@ -46,6 +46,9 @@ void js_bind_process(void) {
     
     /* process.versions - object with all dependency versions */
     jerry_value_t versions = jerry_object();
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    js_set_string(versions, "ctx", "0.1.18");
+#endif
     
     /* mcujs version */
     #ifdef MCUJS_VERSION

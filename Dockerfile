@@ -75,6 +75,15 @@ RUN git init ${PICOJPEG_PATH} \
     && git checkout --detach FETCH_HEAD \
     && test "$(git rev-parse HEAD)" = "${PICOJPEG_COMMIT}"
 
+# ISC-licensed ctx rasterizer for the opt-in Canvas prototype (not vendored).
+ENV CTX_PATH=/opt/ctx
+ENV CTX_SHA256=5e22f1f983edda8f416c20b555e8da49c07ae9ecda0e69ad75146b990517b80c
+RUN wget -q https://ctx.graphics/ctx-0.1.18.tar.bz2 -O /tmp/ctx.tar.bz2 \
+    && printf '%s  %s\n' "${CTX_SHA256}" /tmp/ctx.tar.bz2 | sha256sum -c - \
+    && mkdir -p ${CTX_PATH} \
+    && tar -xjf /tmp/ctx.tar.bz2 --strip-components=1 -C ${CTX_PATH} \
+    && rm /tmp/ctx.tar.bz2
+
 # Clone PicoDVI for DVI/HDMI output support
 ENV PICODVI_PATH=/opt/picodvi
 ENV PICODVI_COMMIT=dccd738bfa9af75badcb32acde3e41bd6a3fa30a

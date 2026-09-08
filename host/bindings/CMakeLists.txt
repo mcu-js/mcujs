@@ -24,6 +24,10 @@ set(BINDINGS_SOURCES
 
 # JavaScript API bindings library
 add_library(mcujs_bindings STATIC ${BINDINGS_SOURCES})
+if(MCUJS_EXPERIMENTAL_CANVAS)
+    target_sources(mcujs_bindings PRIVATE canvas_native.c canvas_renderer.c)
+    target_include_directories(mcujs_bindings PRIVATE $ENV{CTX_PATH})
+endif()
 
 target_include_directories(mcujs_bindings PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}

@@ -10,6 +10,11 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Added
 
+- Opt-in, experimental PiZero Canvas 2D subset, backed by the ISC-licensed
+  ctx 0.1.18 rasterizer supplied by the Docker environment. Not enabled in
+  standard firmware; not a complete Canvas/DOM implementation. See
+  `docs/docs/development/canvas-first-slice.md` for limits and verification.
+
 - Seeed Studio XIAO ESP32-S3 support alongside the existing RP2040/RP2350
   targets: persistent script storage, boot-script recovery, native USB CDC/MSC,
   the shared interactive REPL, and board-qualified UF2 application updates.

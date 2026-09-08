@@ -105,6 +105,15 @@ function check(source) {
     "unzip -q /tmp/ff16.zip -d ${FATFS_PATH}",
     "rm /tmp/ff16.zip", "rm ${FATFS_PATH}/source/ffconf.h",
   ]);
+  expectEnv("CTX_PATH", "/opt/ctx");
+  expectEnv("CTX_SHA256", /^[0-9a-f]{64}$/);
+  expectRun([
+    "wget -q https://ctx.graphics/ctx-0.1.18.tar.bz2 -O /tmp/ctx.tar.bz2",
+    "printf '%s  %s\\n' \"${CTX_SHA256}\" /tmp/ctx.tar.bz2 | sha256sum -c -",
+    "mkdir -p ${CTX_PATH}",
+    "tar -xjf /tmp/ctx.tar.bz2 --strip-components=1 -C ${CTX_PATH}",
+    "rm /tmp/ctx.tar.bz2",
+  ]);
   expectRun(["chmod +x /usr/local/bin/docker-entrypoint.sh"]);
   assert.equal(env.size, 0, "Unexpected ENV may change acquisition behavior");
   assert.deepEqual(runs, [], "Unexpected RUN; review any new direct inputs");
@@ -127,6 +136,8 @@ try {
       ["moving frontend", /^/, "# syntax=docker/dockerfile:latest\n"],
       ["BOM-prefixed syntax directive", /^/, "\uFEFF# syntax=docker/dockerfile:latest\n"],
       ["BOM-prefixed escape directive", /^/, "\uFEFF# escape=`\n"],
+      ["HTTP ctx archive", "https://ctx.graphics", "http://ctx.graphics"],
+      ["floating ctx archive", "ctx-0.1.18.tar.bz2", "ctx-latest.tar.bz2"],
       ["HTTP archive", "https://elm-chan.org", "http://elm-chan.org"],
       ["missing checksum", /    && printf[^\n]+\n/, ""],
       ["ignored checksum failure", "sha256sum -c -", "sha256sum -c - || true"],

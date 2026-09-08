@@ -5,6 +5,7 @@
 #include <math.h>
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
 #include "hardware/watchdog.h"
+#include <malloc.h>
 #define CANVAS_STAGE(n) (watchdog_hw->scratch[0] = (n))
 #else
 #define CANVAS_STAGE(n) ((void)0)
@@ -79,9 +80,31 @@ static void put(jerry_value_t object,const char *name,jerry_value_t value) {
     jerry_value_t result=jerry_object_set(object,key,value);
     jerry_value_free(result);jerry_value_free(key);jerry_value_free(value);
 }
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+/* Test instrumentation, deliberately not part of the public Canvas API.
+ * Compare after collection; mallinfo measures native allocations, not total RAM. */
+static jerry_value_t stats(const jerry_call_info_t *info, const jerry_value_t args[],
+                           jerry_length_t argc) {
+    (void)info; (void)args; (void)argc;
+    jerry_heap_gc(JERRY_GC_PRESSURE_HIGH);
+    jerry_heap_stats_t memory;
+    if (!jerry_heap_stats(&memory))
+        return jerry_throw_sz(JERRY_ERROR_COMMON, "Jerry heap statistics unavailable");
+    struct mallinfo native = mallinfo();
+    jerry_value_t result = jerry_object();
+    put(result, "jsUsed", jerry_number(memory.allocated_bytes));
+    put(result, "jsPeak", jerry_number(memory.peak_allocated_bytes));
+    put(result, "jsTotal", jerry_number(memory.size));
+    put(result, "nativeAllocated", jerry_number(native.uordblks));
+    return result;
+}
+#endif
 jerry_value_t js_create_canvas_native_module(void) {
     jerry_value_t module=jerry_object();
     put(module,"width",jerry_number(WIDTH));put(module,"height",jerry_number(HEIGHT));
     put(module,"draw",jerry_function_external(draw));
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    put(module,"stats",jerry_function_external(stats));
+#endif
     return module;
 }

@@ -15,6 +15,7 @@ const mcujs_dvi_state_t *mcujs_dvi_get_state(void){return &state;}
 uint16_t *mcujs_dvi_get_draw_buffer(void){return back;}
 bool mcujs_dvi_swap_and_show(void){uint16_t *p=display;display=back;back=p;presents++;return true;}
 extern jerry_value_t js_create_canvas_native_module(void);
+extern jerry_value_t js_create_canvas_module(void);
 static jerry_value_t require_native(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc){(void)info;(void)args;assert(argc==1);return js_create_canvas_native_module();}
 static void evaluate(const char *text,size_t size){
  jerry_value_t result=jerry_eval((const jerry_char_t*)text,size,JERRY_PARSE_NO_OPTS);
@@ -31,7 +32,10 @@ int main(int argc,char **argv){
  jerry_value_t global=jerry_current_realm(),key=jerry_string_sz("require"),fn=jerry_function_external(require_native);
  jerry_value_t result=jerry_object_set(global,key,fn);jerry_value_free(result);jerry_value_free(fn);jerry_value_free(key);jerry_value_free(global);
  const char *preamble="var module={exports:{}};";evaluate(preamble,strlen(preamble));
- source(argv[1]);const char *save="var canvasUnderTest=module.exports.canvas;";evaluate(save,strlen(save));
+ jerry_value_t packaged=js_create_canvas_module();assert(!jerry_value_is_exception(packaged));
+ global=jerry_current_realm();key=jerry_string_sz("packagedCanvas");result=jerry_object_set(global,key,packaged);
+ jerry_value_free(result);jerry_value_free(key);jerry_value_free(global);jerry_value_free(packaged);
+ const char *save="var canvasUnderTest=packagedCanvas.canvas;";evaluate(save,strlen(save));
  source(argv[2]);const char *run="module.exports(canvasUnderTest);";evaluate(run,strlen(run));
  assert(presents==6);
  FILE *f=fopen(argv[3],"wb");assert(f);fprintf(f,"P6\n160 120\n255\n");

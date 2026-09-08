@@ -8,6 +8,7 @@ static const char *const s_builtin_modules[] = {
     MCUJS_RUNTIME_BUILTIN_MODULES(MCUJS_MODULE_NAME)
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     "mcujs:canvas-native",
+    "canvas",
 #endif
 };
 #undef MCUJS_MODULE_NAME

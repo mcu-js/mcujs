@@ -52,10 +52,13 @@ static void boot_blink(int count, int on_ms, int off_ms);
 static void boot_status_on(void);
 static void boot_status_off(void);
 
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
 volatile uint32_t mcujs_canvas_failure_stage __attribute__((section(".uninitialized_data")));
+#endif
 
 int main(void) {
 #if MCUJS_HAS_DVI
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
     /* Diagnostic candidate only: a stalled experiment returns to ROM USB
      * recovery instead of requiring another physical power/BOOTSEL cycle. */
     if (watchdog_enable_caused_reboot()) {
@@ -66,6 +69,7 @@ int main(void) {
     }
     watchdog_enable(8000, true);
     watchdog_hw->scratch[0] = 10;
+#endif
     /* DVI requires 252 MHz system clock - set this BEFORE USB init
      * This must happen early to ensure USB is configured for the correct clock
      */
@@ -117,7 +121,7 @@ int main(void) {
     }
     
     /* Initialize filesystem */
-#if MCUJS_HAS_DVI
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
     watchdog_hw->scratch[0] = 20;
 #endif
     fs_result_t fs_result = fs_init();
@@ -130,7 +134,7 @@ int main(void) {
         }
     }
     usb_msc_init();
-#if MCUJS_HAS_DVI
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
     watchdog_hw->scratch[0] = 30;
 #endif
     
@@ -145,14 +149,14 @@ int main(void) {
     }
     
     /* Initialize REPL */
-#if MCUJS_HAS_DVI
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
     watchdog_hw->scratch[0] = 40;
 #endif
     repl_init();
     
     /* Attempt to boot from index.js */
     boot_run_index_js();
-#if MCUJS_HAS_DVI
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
     watchdog_hw->scratch[0] = 50;
 #endif
 
@@ -210,7 +214,7 @@ static void print_banner_once(void) {
  */
 static void main_loop(void) {
     while (1) {
-#if MCUJS_HAS_DVI
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
         watchdog_update();
         watchdog_hw->scratch[0] = 60;
 #endif

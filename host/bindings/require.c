@@ -26,6 +26,7 @@
 #include "../runtime_registry.h"
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
 jerry_value_t js_create_canvas_native_module(void);
+jerry_value_t js_create_canvas_module(void);
 #endif
 #include "jerryscript.h"
 #include "fs.h"
@@ -704,6 +705,7 @@ static const builtin_module_t s_builtin_modules[] = {
 #endif
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     {"mcujs:canvas-native", js_create_canvas_native_module},
+    {"canvas", js_create_canvas_module},
 #endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}
@@ -728,6 +730,11 @@ static jerry_value_t get_builtin_module(const char *specifier) {
         if (strcmp(lookup, s_builtin_modules[i].specifier) == 0) {
             if (!s_builtin_cached[i]) {
                 s_builtin_cache[i] = s_builtin_modules[i].factory();
+                if (jerry_value_is_exception(s_builtin_cache[i])) {
+                    jerry_value_t error = s_builtin_cache[i];
+                    s_builtin_cache[i] = jerry_undefined();
+                    return error;
+                }
                 s_builtin_cached[i] = true;
             }
             return jerry_value_copy(s_builtin_cache[i]);

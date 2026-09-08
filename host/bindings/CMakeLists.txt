@@ -25,7 +25,13 @@ set(BINDINGS_SOURCES
 # JavaScript API bindings library
 add_library(mcujs_bindings STATIC ${BINDINGS_SOURCES})
 if(MCUJS_EXPERIMENTAL_CANVAS)
-    target_sources(mcujs_bindings PRIVATE canvas_native.c canvas_renderer.c)
+    # Embed the reviewed JS source in the experimental UF2; no FS installation.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/lib/canvas.js")
+    file(READ "${CMAKE_SOURCE_DIR}/lib/canvas.js" CANVAS_SOURCE_HEX HEX)
+    string(REGEX REPLACE "(..)" "0x\\1," CANVAS_SOURCE_BYTES "${CANVAS_SOURCE_HEX}")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/canvas_source.h"
+        "static const jerry_char_t canvas_source[] = {${CANVAS_SOURCE_BYTES}};\n")
+    target_sources(mcujs_bindings PRIVATE canvas_native.c canvas_renderer.c canvas_module.c)
     target_include_directories(mcujs_bindings PRIVATE $ENV{CTX_PATH})
 endif()
 

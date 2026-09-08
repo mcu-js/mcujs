@@ -1,5 +1,20 @@
 # Workflow Notes
 
+## Development checks
+
+Every push to `development`, and every pull request targeting it, runs source
+checks plus docs typechecking and a production build. CI installs the locked
+docs dependencies because the source tests share their JSON Schema validator.
+
+Development builds have read-only repository permissions. They do not upload
+Pages artifacts, deploy the website, trigger its fallback mirror, or publish
+firmware. Pages upload/deployment remains limited to pushes on `main` or the
+legacy `master` branch. Automatic releases still require a `v*` tag push.
+
+Workflow guard regressions run with `node --test tests/workflows.test.js` after
+`npm ci --prefix docs`. Docs concurrency is separated by ref so development
+checks do not occupy the production branch's queue.
+
 ## Configure Pages DNS
 
 `configure-pages-dns.yml` is a manual workflow for finishing the mcujs.org and

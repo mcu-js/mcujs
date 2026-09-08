@@ -56,10 +56,11 @@ int main(void) {
 #if MCUJS_HAS_DVI
     /* Diagnostic candidate only: a stalled experiment returns to ROM USB
      * recovery instead of requiring another physical power/BOOTSEL cycle. */
-    if (watchdog_caused_reboot()) {
+    if (watchdog_enable_caused_reboot()) {
         reset_usb_boot(0, 0);
     }
     watchdog_enable(8000, true);
+    watchdog_hw->scratch[0] = 10;
     /* DVI requires 252 MHz system clock - set this BEFORE USB init
      * This must happen early to ensure USB is configured for the correct clock
      */
@@ -111,6 +112,9 @@ int main(void) {
     }
     
     /* Initialize filesystem */
+#if MCUJS_HAS_DVI
+    watchdog_hw->scratch[0] = 20;
+#endif
     fs_result_t fs_result = fs_init();
     if (fs_result != FS_OK) {
         /* Filesystem init failed - indicate with rapid blinks */
@@ -121,6 +125,9 @@ int main(void) {
         }
     }
     usb_msc_init();
+#if MCUJS_HAS_DVI
+    watchdog_hw->scratch[0] = 30;
+#endif
     
     /* Initialize JavaScript engine */
     if (js_engine_init() != JS_OK) {
@@ -133,10 +140,16 @@ int main(void) {
     }
     
     /* Initialize REPL */
+#if MCUJS_HAS_DVI
+    watchdog_hw->scratch[0] = 40;
+#endif
     repl_init();
     
     /* Attempt to boot from index.js */
     boot_run_index_js();
+#if MCUJS_HAS_DVI
+    watchdog_hw->scratch[0] = 50;
+#endif
 
     /* Export storage only after startup files have been read. */
     if (!usb_msc_expose()) {
@@ -194,6 +207,7 @@ static void main_loop(void) {
     while (1) {
 #if MCUJS_HAS_DVI
         watchdog_update();
+        watchdog_hw->scratch[0] = 60;
 #endif
         /* Process USB tasks */
         tud_task();

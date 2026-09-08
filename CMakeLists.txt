@@ -39,7 +39,7 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
     if(NOT CTX_HEADER_SHA256 STREQUAL "bf2b18bcea31bf191f7e82c9beef98bd717bd5ccd635908f07ab8a8cf1698bb3")
         message(FATAL_ERROR "Unexpected ctx header: use the pinned 0.1.18 dependency")
     endif()
-    add_compile_definitions(MCUJS_EXPERIMENTAL_CANVAS=1 PICO_STACK_SIZE=12288)
+    add_compile_definitions(MCUJS_EXPERIMENTAL_CANVAS=1 PICO_STACK_SIZE=12288 PICO_CORE1_STACK_SIZE=2048)
 endif()
 
 project(mcujs VERSION ${MCUJS_VERSION} LANGUAGES C CXX ASM)

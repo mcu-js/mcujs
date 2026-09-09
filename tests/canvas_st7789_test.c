@@ -334,7 +334,41 @@ static void test_panel_28(void) {
     data_commands[2]=12;expected_mode=0;
 }
 
+static void test_panel_169(void) {
+    canvas_display_t d={0};
+    canvas_lcd_config_t c=panel();
+    c.profile=CANVAS_PANEL_WAVESHARE_1_69;
+    c.spi=1;c.sck=10;c.mosi=11;c.cs=9;c.dc=8;c.reset=13;c.backlight=25;
+    c.horizontal=false;c.width=240;c.height=280;c.x_offset=0;c.y_offset=20;
+    clear_wire();delay_count=0;assert(canvas_display_st7789_init(&d,&c));
+    /* Waveshare C/lib/LCD/LCD_1in69.c register literals. */
+    const uint8_t init[]={0x36,0,0x3a,5,0xb2,0x0b,0x0b,0,0x33,0x35,
+        0xb7,0x11,0xbb,0x35,0xc0,0x2c,0xc2,1,0xc3,0x0d,0xc4,0x20,
+        0xc6,0x13,0xd0,0xa4,0xa1,0xd6,0xa1,
+        0xe0,0xf0,6,0x0b,0x0a,9,0x26,0x29,0x33,0x41,0x18,0x16,0x15,0x29,0x2d,
+        0xe1,0xf0,4,8,8,7,3,0x28,0x32,0x40,0x3b,0x19,0x18,0x2a,0x2e,
+        0xe4,0x25,0,0,0x21,0x11,0x29};
+    assert(wire_size==sizeof(init));
+    for(size_t i=0;i<sizeof(init);i++)assert(wire[i].value==init[i]);
+    assert(!pins[25]);
+    uint16_t *p=d.acquire(&d);p[0]=0xf800;p[1]=0x07e0;p[2]=0x001f;p[67199]=0xa55a;
+    clear_wire();assert(d.present(&d));
+    const uint8_t frame[]={0x2a,0,0,0,0xef,0x2b,0,20,1,0x2b,0x2c,0xf8,0,7,0xe0,0,0x1f};
+    assert(wire_size==134411 && pins[25]);
+    for(size_t i=0;i<sizeof(frame);i++)assert(wire[i].value==frame[i]);
+    assert(p[67199]==0xa55a && wire[wire_size-2].value==0xa5 && wire[wire_size-1].value==0x5a);
+    for(size_t i=0;i<wire_size;i++)assert(wire[i].bus==1 && wire[i].cs==9);
+    d.release(&d);
+    c.horizontal=true;c.width=280;c.height=240;c.x_offset=20;c.y_offset=0;
+    clear_wire();assert(canvas_display_st7789_init(&d,&c));assert(wire[1].value==0x70);
+    clear_wire();assert(d.present(&d));
+    const uint8_t landscape[]={0x2a,0,20,1,0x2b,0x2b,0,0,0,0xef,0x2c};
+    for(size_t i=0;i<sizeof(landscape);i++)assert(wire[i].value==landscape[i]);
+    d.release(&d);assert(!live_allocs);
+}
+
 int main(void) {
+    test_panel_169();
     test_initialization();
     test_frame();
     test_connections();

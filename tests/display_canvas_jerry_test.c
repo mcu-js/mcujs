@@ -43,6 +43,17 @@ int main(void){
  jerry_init(JERRY_INIT_EMPTY);native=js_create_canvas_native_module();jerry_value_t g=jerry_current_realm();
  set(g,"require",jerry_function_external(require_stub));api=js_create_canvas_module();assert(!jerry_value_is_exception(api));assert(opened==0);
  set(g,"Canvas",jerry_value_copy(api));set(g,"ST7789",js_create_st7789_module());assert(opened==0);
+#ifdef MCUJS_CANVAS_DEFAULT_ST7789_1_69
+ eval("var d=Canvas.display;if(d.canvas.width!==240||d.canvas.height!==280)throw Error('wrong V2 portrait default');var c=d.canvas.getContext('2d');c.fillStyle='red';c.fillRect(0,0,240,280);");
+ assert(last_config.profile==CANVAS_PANEL_WAVESHARE_1_69 && last_config.spi==1 && last_config.sck==10 && last_config.mosi==11 && last_config.cs==9 && last_config.dc==8 && last_config.reset==13 && last_config.backlight==25 && last_config.x_offset==0 && last_config.y_offset==20 && !last_config.horizontal);
+ js_canvas_present();assert(buffers[0][67199]==0xf800);
+ eval("d.close();var e=ST7789.connect();if(e.canvas.height!==280)throw Error('no-option V2');e.close();var f=ST7789.connect({});if(f.canvas.width!==240)throw Error('empty V2');f.close();var h=ST7789.connect({profile:'waveshare-1.69',horizontal:true});if(h.canvas.width!==280||h.canvas.height!==240)throw Error('V2 landscape');h.close();");
+ assert(last_config.x_offset==20 && last_config.y_offset==0 && last_config.horizontal);
+ eval("var no=false;try{ST7789.connect({profile:'waveshare-1.69',width:320});}catch(e){no=true;}if(!no)throw Error('V2 invalid geometry');var old=ST7789.connect({profile:'waveshare-1.47'});if(old.canvas.width!==320||old.canvas.height!==172)throw Error('old defaults changed');old.close();");
+ assert(opened==5 && released==5);
+ jerry_value_free(g);jerry_value_free(api);jerry_value_free(native);jerry_cleanup();
+ puts("PASS: real Jerry V2 board defaults, portrait pixels, explicit landscape offsets, geometry rejection, old profile defaults and close/reopen");return 0;
+#endif
 #ifdef MCUJS_CANVAS_DEFAULT_ST7789_2_8
  eval("var d=Canvas.display;if(d.canvas.width!==320||d.canvas.height!==240)throw Error('wrong default T3 geometry');var c=d.canvas.getContext('2d');c.fillStyle='red';c.fillRect(0,0,320,240);");
  assert(last_config.profile==CANVAS_PANEL_WAVESHARE_2_8 && last_config.spi==1 && last_config.sck==10 && last_config.mosi==11 && last_config.cs==13 && last_config.dc==14 && last_config.reset==15 && last_config.backlight==16 && last_config.x_offset==0 && last_config.y_offset==0);

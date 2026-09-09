@@ -1,4 +1,4 @@
-/* ST7789 profiles: Waveshare 1.47-A V3 and Touch LCD 2.8 T3.
+/* ST7789 profiles: Waveshare 1.47-A V3, Touch LCD 1.69 V2 and 2.8 T3.
  * One retained native-endian RGB565 surface per display; no DMA or scratch
  * full-frame copy. All entry points run on the serialized JS task thread.
  */
@@ -37,7 +37,8 @@ static bool connection_conflicts(const canvas_lcd_config_t *c) {
 
 static bool valid_config(const canvas_lcd_config_t *c) {
     if (!c || (c->profile != CANVAS_PANEL_WAVESHARE_1_47 &&
-               c->profile != CANVAS_PANEL_WAVESHARE_2_8) || c->width <= 0 || c->height <= 0 || c->x_offset < 0 || c->y_offset < 0)
+               c->profile != CANVAS_PANEL_WAVESHARE_2_8 &&
+               c->profile != CANVAS_PANEL_WAVESHARE_1_69) || c->width <= 0 || c->height <= 0 || c->x_offset < 0 || c->y_offset < 0)
         return false;
     /* MADCTL exchanges the controller's 240x320 address axes. */
     int max_x = c->horizontal ? 320 : 240;
@@ -111,7 +112,7 @@ static bool present(canvas_display_t *display) {
         for (size_t i = 0; i < count; ++i) {
             uint16_t pixel = lcd->pixels[pos + i];
             /* T3 factory RAMCTRL (B0 00 E8) uses little-endian RGB565;
-             * the 1.47 V3 uses high-byte first. Never mutate native pixels. */
+             * the 1.47 V3 and 1.69 V2 use high-byte first. Never mutate native pixels. */
             bool little = c->profile == CANVAS_PANEL_WAVESHARE_2_8;
             chunk[2 * i] = little ? (uint8_t)pixel : (uint8_t)(pixel >> 8);
             chunk[2 * i + 1] = little ? (uint8_t)(pixel >> 8) : (uint8_t)pixel;
@@ -179,6 +180,37 @@ static bool initialize_panel_28(st7789_t *lcd) {
     return true;
 }
 
+/* Vendor C/lib/LCD/LCD_1in69.c, ST7789V2. Rotation is applied once:
+ * vendor SetAttributes is accidentally overwritten by InitReg. Keep RGB (not
+ * vendor horizontal BGR bit) so native RGB565 has the same colors both ways. */
+static bool initialize_panel_169(st7789_t *lcd) {
+    const canvas_lcd_config_t *c=&lcd->config;
+    if(c->reset>=0) {
+        sleep_ms(100);gpio_put((uint)c->reset,false);sleep_ms(100);
+        gpio_put((uint)c->reset,true);sleep_ms(100);
+    } else {
+        if(!command(lcd,0x01,NULL,0))return false;
+        sleep_ms(150);
+    }
+    const uint8_t madctl=c->horizontal?0x70:0x00;
+    if(!command(lcd,0x36,&madctl,1))return false;
+    static const struct {uint8_t cmd,count,data[14];} init[]={
+        {0x3a,1,{0x05}}, {0xb2,5,{0x0b,0x0b,0x00,0x33,0x35}},
+        {0xb7,1,{0x11}}, {0xbb,1,{0x35}}, {0xc0,1,{0x2c}},
+        {0xc2,1,{0x01}}, {0xc3,1,{0x0d}}, {0xc4,1,{0x20}},
+        {0xc6,1,{0x13}}, {0xd0,2,{0xa4,0xa1}}, {0xd6,1,{0xa1}},
+        {0xe0,14,{0xf0,0x06,0x0b,0x0a,0x09,0x26,0x29,0x33,0x41,0x18,0x16,0x15,0x29,0x2d}},
+        {0xe1,14,{0xf0,0x04,0x08,0x08,0x07,0x03,0x28,0x32,0x40,0x3b,0x19,0x18,0x2a,0x2e}},
+        {0xe4,3,{0x25,0x00,0x00}}, {0x21,0,{0}}, {0x11,0,{0}}
+    };
+    for(size_t i=0;i<sizeof(init)/sizeof(init[0]);i++)
+        if(!command(lcd,init[i].cmd,init[i].data,init[i].count))return false;
+    sleep_ms(120);
+    if(!command(lcd,0x29,NULL,0))return false;
+    sleep_ms(20);
+    return true;
+}
+
 static bool initialize_panel(st7789_t *lcd) {
     const canvas_lcd_config_t *c = &lcd->config;
     output(c->cs, true);
@@ -186,6 +218,7 @@ static bool initialize_panel(st7789_t *lcd) {
     output(c->backlight, false);
     output(c->reset, true);
     if(c->profile == CANVAS_PANEL_WAVESHARE_2_8) return initialize_panel_28(lcd);
+    if(c->profile == CANVAS_PANEL_WAVESHARE_1_69) return initialize_panel_169(lcd);
     if (c->reset >= 0) {
         sleep_ms(100);
         gpio_put((uint)c->reset, false);

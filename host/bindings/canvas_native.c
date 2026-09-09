@@ -111,7 +111,10 @@ static bool known_options(jerry_value_t opts) {
 static bool lcd_options(jerry_value_t opts,canvas_lcd_config_t *c) {
     *c=(canvas_lcd_config_t){.spi=-1,.sck=-1,.mosi=-1,.cs=-1,.dc=-1,.reset=-1,.backlight=-1,
         .width=320,.height=172,.x_offset=0,.y_offset=34,.baudrate=37500000,.horizontal=true};
-#ifdef MCUJS_CANVAS_DEFAULT_ST7789_2_8
+#ifdef MCUJS_CANVAS_DEFAULT_ST7789_1_69
+    c->spi=1;c->sck=10;c->mosi=11;c->cs=9;c->dc=8;c->reset=13;c->backlight=25;
+    c->profile=CANVAS_PANEL_WAVESHARE_1_69;
+#elif defined(MCUJS_CANVAS_DEFAULT_ST7789_2_8)
     c->spi=1;c->sck=10;c->mosi=11;c->cs=13;c->dc=14;c->reset=15;c->backlight=16;
     c->profile=CANVAS_PANEL_WAVESHARE_2_8;
 #elif defined(MCUJS_CANVAS_DEFAULT_ST7789)
@@ -126,17 +129,22 @@ static bool lcd_options(jerry_value_t opts,canvas_lcd_config_t *c) {
         jerry_string_to_buffer(v,JERRY_ENCODING_UTF8,(jerry_char_t*)profile,n);
         if(strlen(profile)!=n){jerry_value_free(v);return false;}
         if(strcmp(profile,"waveshare-2.8")==0)c->profile=CANVAS_PANEL_WAVESHARE_2_8;
+        else if(strcmp(profile,"waveshare-1.69")==0)c->profile=CANVAS_PANEL_WAVESHARE_1_69;
         else if(strcmp(profile,"waveshare-1.47")==0)c->profile=CANVAS_PANEL_WAVESHARE_1_47;
         else {jerry_value_free(v);return false;}
     }
     jerry_value_free(v);
+    c->horizontal=c->profile!=CANVAS_PANEL_WAVESHARE_1_69;
     key=jerry_string_sz("horizontal");v=jerry_object_get(opts,key);jerry_value_free(key);
     if(!jerry_value_is_undefined(v)) {
         if(!jerry_value_is_boolean(v)){jerry_value_free(v);return false;}
         c->horizontal=jerry_value_is_true(v);
     }
     jerry_value_free(v);
-    if(c->profile==CANVAS_PANEL_WAVESHARE_2_8) {
+    if(c->profile==CANVAS_PANEL_WAVESHARE_1_69) {
+        c->width=c->horizontal?280:240;c->height=c->horizontal?240:280;
+        c->x_offset=c->horizontal?20:0;c->y_offset=c->horizontal?0:20;
+    } else if(c->profile==CANVAS_PANEL_WAVESHARE_2_8) {
         c->width=c->horizontal?320:240;c->height=c->horizontal?240:320;
         c->x_offset=c->y_offset=0;
     } else if(!c->horizontal){c->width=172;c->height=320;c->x_offset=34;c->y_offset=0;}

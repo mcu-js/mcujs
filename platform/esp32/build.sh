@@ -115,6 +115,9 @@ validate_runtime_config() {
         'CONFIG_FATFS_MAX_LFN=255' \
         'CONFIG_FATFS_API_ENCODING_UTF_8=y' \
         'CONFIG_FATFS_USE_LABEL=y'; do
+        if [[ "${MCUJS_BOARD:-}" == "seeed_reterminal_sticky" && "${required}" == CONFIG_TINYUSB_* ]]; then
+            continue
+        fi
         found=0
         while IFS= read -r line; do
             if [[ "${line}" == "${required}" ]]; then
@@ -128,6 +131,18 @@ validate_runtime_config() {
             return 1
         }
     done
+    if [[ "${MCUJS_BOARD:-}" == "seeed_reterminal_sticky" ]]; then
+        python - "${config}" <<'PYCONFIG'
+import sys
+from pathlib import Path
+lines = set(Path(sys.argv[1]).read_text().splitlines())
+required = {'CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y', 'CONFIG_SPIRAM=y',
+ 'CONFIG_SPIRAM_MODE_OCT=y', 'CONFIG_SPIRAM_BOOT_INIT=y', 'CONFIG_SPIRAM_USE_MALLOC=y',
+ '# CONFIG_TINYUSB_CDC_ENABLED is not set', '# CONFIG_TINYUSB_MSC_ENABLED is not set'}
+if not required <= lines:
+    raise SystemExit(f'Sticky config missing: {sorted(required - lines)}')
+PYCONFIG
+    fi
 }
 
 validate_app_flash_metadata() {
@@ -144,7 +159,12 @@ json_path = build_dir / "flasher_args.json"
 expected_image = "mcujs-esp32s3.bin"
 expected_offset = 0x10000
 import os
-ota_end = 0x400000 if os.environ.get("MCUJS_BOARD") == "waveshare_esp32s3_epaper_1.54_v2" else 0x410000
+sticky = os.environ.get("MCUJS_BOARD") == "seeed_reterminal_sticky"
+if sticky:
+    expected_offset = 0x690000
+    ota_end = 0xc90000
+else:
+    ota_end = 0x400000 if os.environ.get("MCUJS_BOARD") == "waveshare_esp32s3_epaper_1.54_v2" else 0x410000
 
 if not args_path.is_file() or not json_path.is_file():
     raise SystemExit("Generated app-flash metadata is missing")
@@ -153,7 +173,7 @@ tokens = shlex.split(args_path.read_text())
 expected_tokens = [
     "--flash_mode", "dio",
     "--flash_freq", "80m",
-    "--flash_size", "8MB",
+    "--flash_size", "32MB" if sticky else "8MB",
     hex(expected_offset), expected_image,
 ]
 if tokens != expected_tokens:

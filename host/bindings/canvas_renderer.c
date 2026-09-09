@@ -29,8 +29,8 @@
 #define CTX_ENABLE_RGB565 1
 /* General antialiased RGB565 paths use the RGBA8 compositor internally. */
 #define CTX_ENABLE_RGBA8 1
-#define CTX_MAX_SCANLINES 320
-#define CTX_MAX_SCANLINE_LENGTH 320
+#define CTX_MAX_SCANLINES MCUJS_CANVAS_MAX_HEIGHT
+#define CTX_MAX_SCANLINE_LENGTH MCUJS_CANVAS_MAX_WIDTH
 #define CTX_MIN_EDGE_LIST_SIZE 128
 #define CTX_MAX_EDGE_LIST_SIZE 512
 #define CTX_MIN_JOURNAL_SIZE 64
@@ -45,10 +45,10 @@
 
 bool canvas_render(uint16_t *pixels, int width, int height, const float *ops,
                    size_t count, bool stroke, const float rgba[4], float line_width) {
-    if (!pixels || width<1 || width>320 || height<1 || height>320 ||
+    if (!pixels || width<1 || width>MCUJS_CANVAS_MAX_WIDTH || height<1 || height>MCUJS_CANVAS_MAX_HEIGHT ||
         !ops || count>128 || !rgba || !isfinite(line_width) || line_width<=0 || line_width>640)
         return false;
-    for (size_t i=0;i<count;i++) if (!isfinite(ops[i]) || ops[i]<-512 || ops[i]>512) return false;
+    for (size_t i=0;i<count;i++) if (!isfinite(ops[i]) || ops[i]<-MCUJS_CANVAS_COORD_LIMIT || ops[i]>MCUJS_CANVAS_COORD_LIMIT) return false;
     for (int i=0;i<4;i++) if (!isfinite(rgba[i]) || rgba[i]<0 || rgba[i]>1) return false;
     for (size_t i=0;i<count;) {
         float op=ops[i++];

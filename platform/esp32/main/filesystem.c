@@ -2,6 +2,7 @@
 
 #include "fs.h"
 #include "filesystem.h"
+#include "board_config.h"
 
 #include "esp_err.h"
 #include "esp_partition.h"
@@ -24,7 +25,10 @@
 
 #define MCUJS_FS_BASE_PATH "/mcujs"
 #define MCUJS_FS_PARTITION_LABEL "ffat"
-#ifdef MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2
+#ifdef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
+#define MCUJS_FS_PARTITION_OFFSET 0x1c00000u
+#define MCUJS_FS_PARTITION_SIZE 0x400000u
+#elif defined(MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2)
 #define MCUJS_FS_PARTITION_OFFSET 0x400000u
 #define MCUJS_FS_PARTITION_SIZE 0x400000u
 #else
@@ -95,7 +99,7 @@ static const esp_partition_t *find_valid_partition(void) {
         ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, MCUJS_FS_PARTITION_LABEL);
     if (partition == NULL || partition->address != MCUJS_FS_PARTITION_OFFSET ||
         partition->size != MCUJS_FS_PARTITION_SIZE ||
-        partition->address + partition->size != 0x800000u) {
+        partition->address + partition->size != MCUJS_FLASH_SIZE) {
         return NULL;
     }
     return partition;

@@ -46,13 +46,17 @@ set(MCUJS_SOURCES
 )
 
 # Unqualified public buses are absent, not compiled with zero-sized buffers.
-if(MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2")
+if(MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2" OR MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
  list(REMOVE_ITEM MCUJS_SOURCES bindings/i2c.c bindings/spi.c)
 endif()
 
+if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
+ list(REMOVE_ITEM MCUJS_SOURCES usb_cdc.c usb_msc.c)
+ list(APPEND MCUJS_SOURCES serial_uart.c)
+endif()
 if(MCUJS_EXPERIMENTAL_CANVAS)
- if(NOT MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2")
-  message(FATAL_ERROR "ESP Canvas only supports ePaper V2 bring-up")
+ if(NOT MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2" AND NOT MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
+  message(FATAL_ERROR "ESP Canvas only supports qualified experimental ePaper targets")
  endif()
  file(SHA256 "$ENV{CTX_PATH}/ctx.h" CTX_HEADER_SHA256)
  if(NOT CTX_HEADER_SHA256 STREQUAL "bf2b18bcea31bf191f7e82c9beef98bd717bd5ccd635908f07ab8a8cf1698bb3")
@@ -65,7 +69,12 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
   file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}_source.h" "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
  endforeach()
  list(APPEND MCUJS_SOURCES ${MCUJS_ROOT}/host/bindings/canvas_native.c
-  ${MCUJS_ROOT}/host/bindings/canvas_renderer.c ${MCUJS_ROOT}/host/bindings/canvas_module.c canvas_display_epaper154.c)
+  ${MCUJS_ROOT}/host/bindings/canvas_renderer.c ${MCUJS_ROOT}/host/bindings/canvas_module.c)
+ if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
+  list(APPEND MCUJS_SOURCES canvas_display_sticky.c)
+ else()
+  list(APPEND MCUJS_SOURCES canvas_display_epaper154.c)
+ endif()
 endif()
 
 idf_component_register(
@@ -87,7 +96,12 @@ idf_component_register(
 
 if(MCUJS_EXPERIMENTAL_CANVAS AND CMAKE_CROSSCOMPILING)
  target_include_directories(${COMPONENT_LIB} PRIVATE "$ENV{CTX_PATH}" "${CMAKE_CURRENT_BINARY_DIR}")
- target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_EXPERIMENTAL_CANVAS=1 MCUJS_CANVAS_EPAPER154=1)
+ target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_EXPERIMENTAL_CANVAS=1)
+ if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_CANVAS_STICKY=1)
+ else()
+  target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_CANVAS_EPAPER154=1)
+ endif()
 endif()
 # IDF evaluates component files once on the host to discover requirements and
 # again with the target toolchain. Build/import Jerry only in the latter pass.

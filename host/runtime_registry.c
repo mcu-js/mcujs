@@ -9,7 +9,7 @@ static const char *const s_builtin_modules[] = {
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     "mcujs:canvas-native",
     "canvas",
-#ifndef MCUJS_CANVAS_EPAPER154
+#if !defined(MCUJS_CANVAS_EPAPER154) && !defined(MCUJS_CANVAS_STICKY)
     "displays/st7789",
 #endif
 #endif

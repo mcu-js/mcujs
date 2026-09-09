@@ -2,7 +2,26 @@
  * GPIO17 high holds battery power; GPIO18 is active-low PWR; GPIO42 high
  * disables the unimplemented audio rail. Not a public GPIO/PMIC API. */
 #include "board_power.h"
-#ifdef MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2
+#ifdef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
+#include "driver/gpio.h"
+bool mcujs_board_power_init(void) {
+ /* Seeed Sticky_dashboard_demo board.cpp: hold and lock high.
+  * Unused SD/touch/microphone/buzzer rails stay off; charger is untouched. */
+ const int pins[]={45,46,10,38,41,42,47,48};
+ uint64_t mask=0;
+ for(unsigned i=0;i<sizeof(pins)/sizeof(pins[0]);i++) {
+  int level=i<2?1:0;
+  if(gpio_set_level(pins[i],level)!=0)return false;
+#ifdef ESP_PLATFORM
+  (void)gpio_hold_dis(pins[i]);
+#endif
+  mask|=1ULL<<pins[i];
+ }
+ gpio_config_t outputs={.pin_bit_mask=mask,.mode=GPIO_MODE_OUTPUT};
+ return gpio_config(&outputs)==0;
+}
+void mcujs_board_power_task(void) {}
+#elif defined(MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2)
 #include "driver/gpio.h"
 #include "esp_timer.h"
 static bool armed,enabled;

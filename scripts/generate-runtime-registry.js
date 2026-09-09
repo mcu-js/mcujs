@@ -24,6 +24,7 @@ const boardMacros = Object.freeze({
   "waveshare_rp2350_touch_lcd_2.8": "MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_2_8",
   adafruit_feather_rp2040: "MCUJS_BOARD_ADAFRUIT_FEATHER_RP2040",
   seeed_xiao_esp32s3: "MCUJS_BOARD_SEEED_XIAO_ESP32S3",
+  seeed_reterminal_sticky: "MCUJS_BOARD_SEEED_RETERMINAL_STICKY",
   "waveshare_esp32s3_epaper_1.54_v2": "MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2",
 });
 

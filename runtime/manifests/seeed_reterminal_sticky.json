@@ -1,0 +1,32 @@
+{
+  "formatVersion": 1,
+  "apiVersion": "0.2",
+  "board": {
+    "name": "seeed_reterminal_sticky",
+    "chip": "ESP32-S3",
+    "firmwareVersion": "0.1.0",
+    "exposedPins": [],
+    "pins": {},
+    "devices": {
+      "display": {
+        "type": "epaper",
+        "controller": "SSD1677",
+        "width": 800,
+        "height": 480
+      }
+    }
+  },
+  "capabilities": {
+    "boot": {
+      "safeMode": true
+    },
+    "fs": {
+      "implementation": "fat",
+      "writable": true,
+      "hostTransfer": false
+    },
+    "usb": {
+      "classes": []
+    }
+  }
+}

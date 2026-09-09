@@ -10,6 +10,14 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Added
 
+- Experimental Seeed reTerminal Sticky target: 800×480 Canvas in 8MB PSRAM,
+  SSD1677 full monochrome refresh and native UART console through the onboard
+  USB bridge. No TinyUSB/MSC on microphone pins; no touch/audio/sensor APIs.
+  Board-gated renderer limits leave smaller-board memory profiles unchanged.
+- *The Night Ferry*, an original procedural Canvas ink scene with an optional
+  one-shot startup script. Sticky remains outside release packaging; see
+  `platform/esp32/STICKY.md` for recovery, build and qualification boundaries.
+
 - Opt-in, experimental `display.canvas` API with a shared Canvas 2D subset
   across RP2040/RP2350 and ESP32-S3. Applications use `getContext('2d')`;
   display adapters own the wiring, transport and presentation. The same

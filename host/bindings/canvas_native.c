@@ -39,7 +39,7 @@ static bool read_numbers(jerry_value_t array,float *out,size_t count) {
         bool valid=jerry_value_is_number(value);
         double number=valid?jerry_value_as_number(value):NAN;
         jerry_value_free(value);
-        if(!valid || !isfinite(number) || number < -512 || number > 512) return false;
+        if(!valid || !isfinite(number) || number < -MCUJS_CANVAS_COORD_LIMIT || number > MCUJS_CANVAS_COORD_LIMIT) return false;
         out[i]=(float)number;
     }
     return true;
@@ -171,7 +171,7 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
     jerry_string_to_buffer(args[0],JERRY_ENCODING_UTF8,(jerry_char_t*)kind,n);
     if(strlen(kind)!=n)return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display driver name");
     bool epaper=false;
-#ifdef MCUJS_CANVAS_EPAPER154
+#if defined(MCUJS_CANVAS_EPAPER154) || defined(MCUJS_CANVAS_STICKY)
     epaper=strcmp(kind,"default")==0;
 #endif
     bool dvi=false,lcd=strcmp(kind,"st7789")==0;
@@ -198,6 +198,8 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
 #endif
 #ifdef MCUJS_CANVAS_EPAPER154
     if(epaper)ok=canvas_display_epaper154_init(d);
+#elif defined(MCUJS_CANVAS_STICKY)
+    if(epaper)ok=canvas_display_sticky_init(d);
 #else
     if(lcd)ok=canvas_display_st7789_init(d,&cfg);
 #endif
@@ -213,7 +215,7 @@ void js_canvas_present(void) {
         next=d->next;
         if(!d->pending)continue;
         if(d->present(d)){d->pending=false;presentations++;}
-        else {presentation_failures++;close_display(d);printf("Canvas presentation failed; display closed\n");}
+        else {presentation_failures++;close_display(d);printf("Canvas presentation failed; display closed\r\n");}
     }
 }
 static jerry_value_t stats(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {

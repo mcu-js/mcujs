@@ -6,7 +6,7 @@ bool mcujs_pin_is_exposed(int pin) {
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)pin)) {
         return false;
     }
-#ifdef MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2
+#if defined(MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2) || defined(MCUJS_BOARD_SEEED_RETERMINAL_STICKY)
     return false; /* All pins reserved until qualified, including private display. */
 #else
     return (pin >= 1 && pin <= 9) || pin == 21;

@@ -1,0 +1,6 @@
+# Preserve original NVS/PHY and app0 bytes. MCU.js uses originally erased app1.
+# Name, Type, SubType, Offset, Size, Flags
+nvs, data, nvs, 0x9000, 0x7d000,
+phy_init, data, phy, 0x88000, 0x1000,
+factory, app, factory, 0x690000, 0x600000,
+ffat, data, fat, 0x1c00000, 0x400000,

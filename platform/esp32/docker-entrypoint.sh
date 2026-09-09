@@ -47,7 +47,7 @@ python3 "${ESP_DIR}/verify-component-lock.py" \
     --lock "${ESP_DIR}/dependencies.lock" \
     --components "${ESP_DIR}/managed_components"
 "${ESP_DIR}/build.sh" build
-if [[ "${MCUJS_BOARD}" == "waveshare_esp32s3_epaper_1.54_v2" ]]; then
+if [[ "${MCUJS_BOARD}" == "waveshare_esp32s3_epaper_1.54_v2" || "${MCUJS_BOARD}" == "seeed_reterminal_sticky" ]]; then
  install -m 0644 "${BUILD_DIR}/mcujs-esp32s3.bin" "${BUILD_DIR}/mcujs-esp32s3.elf" "${BUILD_DIR}/mcujs-esp32s3.map" "${BUILD_DIR}/bootloader/bootloader.bin" "${BUILD_DIR}/partition_table/partition-table.bin" "${BUILD_DIR}/flasher_args.json" "${OUTPUT_DIR}/"
  install -m 0644 "${ROOT}/runtime/manifests/${MCUJS_BOARD}.json" "${OUTPUT_DIR}/${CAPABILITY_NAME}"
  exit 0

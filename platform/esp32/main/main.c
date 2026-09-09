@@ -78,15 +78,19 @@ void app_main(void) {
         esp_task_wdt_reset();
     }
     mcujs_boot_execute_index();
+#ifndef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
     if (!mcujs_usb_msc_expose()) {
         ESP_LOGE(TAG, "USB MSC storage ownership transfer failed");
     }
+#endif
     usb_cdc_puts("MCU.js ready.\r\n");
     repl_init();
 
     while (true) {
         usb_cdc_task();
+#ifndef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
         mcujs_usb_msc_task();
+#endif
         repl_task();
         js_engine_process_timers();
         mcujs_boot_task();

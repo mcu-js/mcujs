@@ -12,7 +12,51 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if MCUJS_JS_HEAP_EXTERNAL
+#include "sdkconfig.h"
+#include "esp_heap_caps.h"
+#if !defined(CONFIG_SPIRAM) || !defined(CONFIG_SPIRAM_MODE_OCT) || !defined(CONFIG_SPIRAM_BOOT_INIT) || !defined(CONFIG_SPIRAM_USE_MALLOC)
+#error "External JS heap requires initialized octal PSRAM"
+#endif
+#if MCUJS_JS_HEAP_KIB < 1 || MCUJS_JS_HEAP_KIB > 512
+#error "JS heap must fit JerryScript's 16-bit compressed-pointer range"
+#endif
+#endif
+
 static const char *TAG = "jerryscript";
+
+#if MCUJS_JS_HEAP_EXTERNAL
+static struct jerry_context_t *s_context;
+
+size_t jerry_port_context_alloc(size_t context_size) {
+    /* Pinned JerryScript 3.0.0 aligns the context/heap boundary to 8 bytes.
+     * The declared budget is heap bytes, excluding the aligned context. */
+    const size_t heap_bytes = (size_t)MCUJS_JS_HEAP_KIB * 1024;
+    if (s_context || context_size > SIZE_MAX - 7 - heap_bytes) {
+        ESP_LOGE(TAG, "Invalid JS context allocation");
+        jerry_port_fatal(JERRY_FATAL_OUT_OF_MEMORY);
+    }
+    const size_t total = ((context_size + 7) & ~(size_t)7) + heap_bytes;
+    s_context = heap_caps_malloc(total, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_context) {
+        ESP_LOGE(TAG, "Cannot allocate %u KiB JS heap in PSRAM", MCUJS_JS_HEAP_KIB);
+        jerry_port_fatal(JERRY_FATAL_OUT_OF_MEMORY);
+    }
+    ESP_LOGI(TAG, "JS heap: %u KiB in PSRAM", MCUJS_JS_HEAP_KIB);
+    return total;
+}
+
+struct jerry_context_t *jerry_port_context_get(void) {
+    return s_context;
+}
+
+void jerry_port_context_free(void) {
+    if (s_context) {
+        heap_caps_free(s_context);
+        s_context = NULL;
+    }
+}
+#endif
 
 void jerry_port_init(void) {
 }

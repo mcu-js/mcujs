@@ -22,6 +22,59 @@ The helper scripts default to checkouts under `$HOME/toolchains`; the paths can
 be overridden with `IDF_PATH`, `JERRYSCRIPT_PATH`, and `TINYUF2_PATH`.
 Builds fail if the pinned Git revisions differ or the toolchain trees are dirty.
 
+## JavaScript memory policy
+
+Each supported ESP32-S3 board declares its build-time policy in
+`board/<board-id>/board_config.cmake`:
+
+```cmake
+set(MCUJS_JS_HEAP_KIB 256)
+set(MCUJS_JS_HEAP_REGION external)
+```
+
+XIAO ESP32-S3, Waveshare ePaper 1.54 V2 and reTerminal Sticky all use this
+256KiB PSRAM-backed heap. This is a firmware budget, **not** the board's physical
+RAM capacity, and not a promise that application source size grows proportionally.
+RP2040/RP2350 behavior is unchanged; their build does not consume these new fields.
+
+`js-memory.cmake` validates the declaration and maps it to the engine and ESP
+port. `internal` selects JerryScript's static internal heap; `external` selects
+its external context allocated explicitly from initialized octal PSRAM. The
+size is an integer in KiB, from 1 through 512, retaining 16-bit compressed
+pointers. That is an addressing limit, not a safe internal-SRAM allocation limit.
+Changing a board's policy requires a clean rebuild and qualification of that
+board's full runtime. There are no application-time overrides or resizing APIs.
+
+The declared budget excludes the aligned JerryScript context, which is allocated
+beside the heap in PSRAM. The engine reserves a small portion of its arena for
+bookkeeping, so reported usable capacity is slightly smaller. Native drivers,
+RTOS stacks and Canvas framebuffers remain separate allocations. CPU frequencies
+and display buffer/renderer limits are unchanged.
+
+The ESP port rejects an external configuration without initialized octal PSRAM
+at compile time and aborts with an explicit error if its PSRAM allocation fails.
+It never silently falls back into internal SRAM. PSRAM boot setup remains in
+the ESP-IDF board sdkconfig defaults, separate from the JavaScript budget.
+Runtime capability manifests are unchanged; there is no second editable budget
+in the runtime registry. Existing aggregate free-memory readings are not JS-heap
+or internal-SRAM headroom measurements.
+
+Host-only checks (no device access):
+
+```sh
+node --test tests/esp32-js-memory.test.js
+JERRYSCRIPT_PATH=/opt/jerryscript bash scripts/test-esp32-js-memory.sh
+```
+
+The native test requires the pinned JerryScript checkout, CMake, a C compiler
+and Python (available in the pinned builder after its tool environment is loaded).
+It links the real ESP port and engine, faking only ESP-IDF allocation/timer/logging.
+It checks PSRAM-only allocation, failure handling, object integrity, GC and
+cleanup/reinit, plus an identical workload that exhausts a 128KiB control heap.
+These tests and cross-builds do **not** qualify physical PSRAM, flash/cache
+interactions, USB/UART responsiveness or real storage access. Those need separate
+on-device acceptance before release; no hardware is flashed by these tests.
+
 ## Build
 
 Local build using the pinned toolchains under `$HOME/toolchains`:

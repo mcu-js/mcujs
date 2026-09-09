@@ -23,9 +23,17 @@ audio, SD, Wi-Fi or BLE implementation is advertised in this first slice.
 
 ## Memory and display
 
-Sticky uses a 128KiB JavaScript heap (the 64KiB bring-up heap exhausted on the
-full artwork with live runtime bindings) and a configured 240MHz CPU. Other
-boards keep their existing JS heap and CPU settings.
+Sticky declares a 256KiB PSRAM-backed JavaScript heap in
+`board/seeed_reterminal_sticky/board_config.cmake` and retains its configured
+240MHz CPU. XIAO ESP32-S3 and Waveshare ePaper V2 declare the same heap policy;
+RP2040/RP2350 heaps and all CPU settings are unchanged. See the backend
+[JS memory policy](README.md#javascript-memory-policy) for configuration and
+failure behavior.
+
+The earlier physical artwork/startup acceptance used a 128KiB internal heap
+(the initial 64KiB heap exhausted on the complete scene). The new PSRAM-backed
+JS heap is a separate qualification: host engine tests are not proof of live
+PSRAM/cache behavior, filesystem writes or on-device responsiveness.
 
 One 768000-byte RGB565 surface is explicitly allocated from PSRAM. No fallback
 into insufficient internal SRAM. PSRAM must initialize successfully. The ctx

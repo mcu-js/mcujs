@@ -84,9 +84,18 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Changed / breaking
 
-- Sticky alone uses a measured 128KiB JavaScript heap for the complete artwork
-  and an explicit 240MHz CPU setting. Other boards retain their existing heap
-  and CPU budgets.
+- ESP32-S3 JavaScript heaps are declared in each target's
+  `board/<board-id>/board_config.cmake`: 256KiB in PSRAM for XIAO ESP32-S3,
+  Waveshare ePaper 1.54 V2 and reTerminal Sticky. JerryScript's external context
+  keeps the managed heap out of internal SRAM without enabling 32-bit compressed
+  pointers. Missing PSRAM fails explicitly; there is no internal fallback.
+  Host tests exercise the real engine/ESP port with a simulated PSRAM allocator,
+  including a live object graph that exhausts the previous 128KiB heap, GC,
+  cleanup/reinitialization and allocation failure. This configuration still
+  needs on-device PSRAM, storage and responsiveness qualification on each board.
+  RP2040/RP2350 heap settings and all CPU budgets are unchanged.
+- Sticky retains its explicit 240MHz CPU setting. Its earlier on-device artwork
+  acceptance used a 128KiB internal JS heap, not the new PSRAM-backed heap.
 - Canvas presentation is batched after a JavaScript drawing task, rather than
   after individual drawing calls. Applications need no hardware-specific
   `show()` or `present()` call. Each display owns its surface and drawing state;

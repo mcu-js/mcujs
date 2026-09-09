@@ -251,7 +251,7 @@ check_release_artifacts() {
 
 check_platform_boundaries() {
     "${ROOT_DIR}/scripts/verify-platform-boundaries.sh"
-    "${ROOT_DIR}/tests/run-canvas-st7789-tests.sh"
+    bash "${ROOT_DIR}/tests/run-canvas-st7789-tests.sh"
     pass 'platform boundary checks passed'
 }
 

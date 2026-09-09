@@ -219,10 +219,12 @@ void js_canvas_present(void) {
 static jerry_value_t stats(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
     (void)info;(void)args;(void)argc;jerry_heap_gc(JERRY_GC_PRESSURE_HIGH);
     jerry_heap_stats_t memory;
-    if(!jerry_heap_stats(&memory))return jerry_throw_sz(JERRY_ERROR_COMMON,"Jerry heap statistics unavailable");
     jerry_value_t result=jerry_object();
-    put(result,"jsUsed",jerry_number(memory.allocated_bytes));put(result,"jsPeak",jerry_number(memory.peak_allocated_bytes));
-    put(result,"jsTotal",jerry_number(memory.size));
+    /* Presentation counters do not depend on optional allocator telemetry. */
+    if(jerry_heap_stats(&memory)) {
+        put(result,"jsUsed",jerry_number(memory.allocated_bytes));put(result,"jsPeak",jerry_number(memory.peak_allocated_bytes));
+        put(result,"jsTotal",jerry_number(memory.size));
+    }
 #ifdef MCUJS_PLATFORM_RP2
     put(result,"nativeAllocated",jerry_number(mallinfo().uordblks));
 #endif

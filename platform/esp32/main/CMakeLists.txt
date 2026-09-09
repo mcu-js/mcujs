@@ -81,7 +81,7 @@ idf_component_register(
         ${JERRY_ROOT}/jerry-core/include
     REQUIRES driver esp_adc esp_driver_gpio esp_driver_i2c esp_driver_ledc
         esp_driver_spi esp_driver_tsens esp_driver_uart esp_timer esp_system fatfs
-        wear_levelling nvs_flash heap log freertos vfs espressif__led_strip
+        wear_levelling nvs_flash heap log freertos vfs espressif__led_strip esp_psram
 )
 
 if(MCUJS_EXPERIMENTAL_CANVAS AND CMAKE_CROSSCOMPILING)

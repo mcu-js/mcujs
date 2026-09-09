@@ -24,6 +24,7 @@ bool canvas_display_st7789_init(canvas_display_t *d,const canvas_lcd_config_t *c
  d->width=c->width;d->height=c->height;d->state=buffers[i];d->acquire=acquire;d->present=present;d->release=release;return true;
 }
 #ifdef MCUJS_CANVAS_EPAPER154
+bool __wrap_jerry_heap_stats(jerry_heap_stats_t *s){(void)s;return false;}
 bool canvas_display_epaper154_init(canvas_display_t *d){
  canvas_lcd_config_t cfg={.width=200,.height=200};return canvas_display_st7789_init(d,&cfg);
 }
@@ -51,7 +52,7 @@ int main(void){
 #ifdef MCUJS_CANVAS_EPAPER154
  eval("var d=Canvas.display;if(d.canvas.width!==200||d.canvas.height!==200)throw Error('ePaper geometry');var c=d.canvas.getContext('2d');c.fillStyle='white';c.fillRect(0,0,200,200);c.fillStyle='black';c.fillRect(8,8,184,184);");
  assert(opened==1 && presented==0);js_canvas_present();assert(presented==1 && buffers[0][0]==0xffff && buffers[0][8*200+8]==0 && buffers[0][39999]==0xffff);
- js_canvas_present();assert(presented==1);eval("d.close();var rejected=false;try{c.fillRect(0,0,1,1);}catch(e){rejected=true;}if(!rejected)throw Error('closed ePaper');");assert(released==1);
+ js_canvas_present();assert(presented==1);eval("var t=require('mcujs:canvas-native').stats();if(t.presentations!==1||t.presentationFailures!==0||t.jsUsed!==undefined)throw Error('optional heap stats');");eval("d.close();var rejected=false;try{c.fillRect(0,0,1,1);}catch(e){rejected=true;}if(!rejected)throw Error('closed ePaper');");assert(released==1);
  jerry_value_free(g);jerry_value_free(api);jerry_value_free(native);jerry_cleanup();
  puts("PASS: Jerry ePaper default, 200x200 RGB565 pixels, one presentation per dirty task, clean-task suppression and close");return 0;
 #endif

@@ -1,5 +1,11 @@
 /* V2 vendor sequence: see ../EPAPER154.md. Private SPI, no JS transport API. */
 #include "canvas_display.h"
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#if !defined(CONFIG_SPIRAM) || !defined(CONFIG_SPIRAM_MODE_OCT) || !defined(CONFIG_SPIRAM_BOOT_INIT) || !defined(CONFIG_SPIRAM_USE_MALLOC)
+#error "ePaper V2 requires initialized octal PSRAM; include esp_psram in IDF dependencies"
+#endif
+#endif
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_heap_caps.h"

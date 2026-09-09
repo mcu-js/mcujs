@@ -2,11 +2,15 @@
 #include "fs.h"
 #include "runtime_features.h"
 #include "runtime_registry.h"
+#include "events_test_source.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Production console formatting; only the physical transport is stubbed. */
+size_t usb_cdc_write(const char *data, size_t length) { return fwrite(data, 1, length, stdout); }
 
 static jerry_value_t stub_module(void) {
     return jerry_object();
@@ -359,6 +363,8 @@ int main(void) {
     jerry_value_free(global);
 
     js_bind_require();
+    js_bind_console();
+    assert(eval_source("if (!require('mcujs:module').has('events')) throw new Error('events module missing');"));
 
     size_t baseline = heap_used();
     assert(eval_source("globalThis.__oneCapability = board.capability('usb');"));
@@ -370,10 +376,40 @@ int main(void) {
     printf("runtime Jerry binding heap for %s: base=%zu one=%zu all=%zu\n",
            registry->board_id, baseline, singular, complete);
 
+    assert(eval_source("require('events') === require('events') || (() => { throw new Error('events identity'); })();"));
+    size_t event_heap = heap_used();
+    assert(eval_source(events_test_source));
+    size_t after_events = heap_used();
+    assert(eval_source(events_test_source));
+    size_t repeated_events = heap_used();
+    printf("events shared contract: PASS (12 tests twice); heap=%zu/%zu/%zu\n", event_heap, after_events, repeated_events);
+    fflush(stdout);
+    assert(repeated_events <= after_events + 256);
+    for (unsigned repeat = 0; repeat < 8; repeat++) {
+        assert(eval_source(events_test_source));
+        assert(heap_used() <= after_events + 256);
+    }
+    puts("events repeated workload: PASS (10 runs, bounded retained heap)");
+    assert(eval_source("var cancelled; (function(){var E=require('events'), c=new E.AbortController(); new Promise(function(resolve,reject){c.signal.addEventListener('abort',function(){reject(c.signal.reason);},{once:true});}).catch(function(reason){cancelled=reason;}); c.abort('cancelled');})();"));
+    jerry_value_t jobs = jerry_run_jobs();
+    assert(!jerry_value_is_exception(jobs));
+    jerry_value_free(jobs);
+    assert(eval_source("if(cancelled !== 'cancelled') throw new Error('abort rejection not completed');"));
     assert(eval_source(s_test_source));
     s_fs_operation_result = FS_ERROR_BUSY;
     assert(eval_source(s_busy_test_source));
+    assert(eval_source("globalThis.eventsBeforeClear = require('events');"));
     js_require_clear_cache();
+    assert(eval_source("if (eventsBeforeClear !== require('events')) throw new Error('built-in identity changed during file cache clear');"));
+    assert(eval_source(events_test_source));
+    js_require_cleanup();
+    jerry_cleanup();
+    // A new VM must not inherit branded objects, budgets or cancellation state.
+    jerry_init(JERRY_INIT_EMPTY);
+    js_bind_require();
+    js_bind_console();
+    assert(eval_source(events_test_source));
+    js_require_cleanup();
     jerry_cleanup();
 
     printf("runtime Jerry binding test passed for %s\n", registry->board_id);

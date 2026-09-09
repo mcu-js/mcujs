@@ -14,7 +14,7 @@ const featureNames = Object.freeze([
 const moduleOrder = Object.freeze([
   "board", "fs", "process", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
   "image", "keyboard", "mouse", "graphics", "screen", "dvi",
-  "mcujs:module", "node:module",
+  "events", "mcujs:module", "node:module",
 ]);
 
 const boardPresentation = Object.freeze({
@@ -217,7 +217,7 @@ function usbCapability(classes) {
 function modulesFor(features) {
   return moduleOrder.filter((name) => {
     if (name === "board") return features.board;
-    if (name === "mcujs:module" || name === "node:module") return features.require;
+    if (name === "events" || name === "mcujs:module" || name === "node:module") return features.require;
     return features[featureModule[name]];
   });
 }

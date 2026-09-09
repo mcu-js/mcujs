@@ -641,6 +641,9 @@ void js_engine_cleanup(void) {
 #if MCUJS_FEATURE_MODULE_LOADER
     js_module_loader_cleanup();
 #endif
+#if MCUJS_FEATURE_REQUIRE
+    js_require_cleanup();
+#endif
 #if MCUJS_FEATURE_TIMERS
     js_timers_cleanup();
 #endif

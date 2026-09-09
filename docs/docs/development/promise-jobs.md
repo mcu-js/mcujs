@@ -109,6 +109,7 @@ recovery. Do not flash or change startup files without the device-specific
 approval and preservation plan. Existing safe-boot behavior is unchanged;
 completion of an asynchronous startup task is not a new healthy-boot signal.
 
-EventTarget, AbortSignal, queue backpressure, unhandled-rejection reporting,
-async fs, touch, sensors, audio and networking remain later slices of the
-backlog, not implied by this foundation.
+The next [bounded events slice](./bounded-events.md) supplies module-scoped
+EventTarget and AbortSignal subsets. Queue backpressure, unhandled-rejection
+reporting, asynchronous device I/O, touch, sensors, audio and networking remain
+later work, not implied by either foundation.

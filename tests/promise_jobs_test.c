@@ -15,6 +15,12 @@ STUB(js_bind_console) STUB(js_bind_board) STUB(js_bind_gpio) STUB(js_bind_pwm)
 STUB(js_bind_i2c) STUB(js_bind_spi) STUB(js_bind_adc) STUB(js_bind_neopixel)
 STUB(js_bind_process) STUB(js_bind_require) STUB(js_bind_graphics) STUB(js_bind_screen)
 STUB(js_bind_dvi) STUB(js_module_loader_init) STUB(js_module_loader_cleanup)
+static unsigned require_cleanup_calls;
+void js_require_cleanup(void) {
+    /* Teardown is called while the owning VM is still valid. */
+    jerry_value_free(jerry_object());
+    require_cleanup_calls++;
+}
 
 static void exec(const char *source) {
     js_result_t status = js_engine_exec(source, strlen(source), NULL, 0);
@@ -121,6 +127,7 @@ int main(void) {
     exec("setInterval(function(){throw new Error('stale timer')},1);"
          "Promise.resolve().then(function(){throw new Error('stale job')});");
     js_engine_cleanup();
+    assert(require_cleanup_calls == 1);
     assert(!js_engine_process_timers());
     assert(js_engine_init() == JS_OK);
     now_ms++;
@@ -129,6 +136,7 @@ int main(void) {
     js_engine_process_timers();
     expect("fresh", "99");
     js_engine_cleanup();
+    assert(require_cleanup_calls == 2);
     puts("Promise scheduling: PASS");
     return 0;
 }

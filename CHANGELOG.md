@@ -10,6 +10,16 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Added
 
+- Lazy `require('events')` with bounded, synchronous `Event`/`EventTarget` and
+  `AbortController`/`AbortSignal` subsets. Signal cancellation removes attached
+  listeners before abort notification; dispatch is safe under mutation and
+  reentrancy. Native 64KiB Jerry tests check limits, repeated-workload heap use,
+  Promise rejection, file-cache clearing and fresh-VM reuse. Engine teardown
+  now releases built-in and file-module cache handles. This is not Node's
+  EventEmitter, a DOM implementation, a device event queue or hardware I/O
+  cancellation. See `docs/docs/development/bounded-events.md`; hardware
+  acceptance is pending.
+
 - Cooperative Promise-job processing on RP and ESP: up to 16 jobs before and
   after each timer pass, preserving queued work while yielding between batches.
   Adds a pinned, build-local JerryScript bounded-job extension without changing

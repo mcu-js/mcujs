@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 node --test \
+    "${ROOT}/tests/events.test.js" \
     "${ROOT}/tests/runtime-registry.test.js" \
     "${ROOT}/tests/display-capability-honesty.test.js" \
     "${ROOT}/tests/portable-api-conformance.test.js" \

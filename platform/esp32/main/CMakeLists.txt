@@ -56,6 +56,7 @@ set(MCUJS_SOURCES
     ${MCUJS_ROOT}/host/bindings/console.c
     ${MCUJS_ROOT}/host/bindings/fs.c
     ${MCUJS_ROOT}/host/bindings/require.c
+    ${MCUJS_ROOT}/host/bindings/builtin_modules.c
 )
 
 # Unqualified public buses are absent, not compiled with zero-sized buffers.
@@ -75,14 +76,8 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
  if(NOT CTX_HEADER_SHA256 STREQUAL "bf2b18bcea31bf191f7e82c9beef98bd717bd5ccd635908f07ab8a8cf1698bb3")
   message(FATAL_ERROR "Canvas requires pinned ctx 0.1.18")
  endif()
- foreach(module canvas displays/st7789)
-  get_filename_component(name "${module}" NAME)
-  file(READ "${MCUJS_ROOT}/lib/${module}.js" source_hex HEX)
-  string(REGEX REPLACE "(..)" "0x\\1," source_bytes "${source_hex}")
-  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}_source.h" "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
- endforeach()
  list(APPEND MCUJS_SOURCES ${MCUJS_ROOT}/host/bindings/canvas_native.c
-  ${MCUJS_ROOT}/host/bindings/canvas_renderer.c ${MCUJS_ROOT}/host/bindings/canvas_module.c)
+  ${MCUJS_ROOT}/host/bindings/canvas_renderer.c)
  if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
   list(APPEND MCUJS_SOURCES canvas_display_sticky.c)
  else()
@@ -90,9 +85,22 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
  endif()
 endif()
 
+set(MCUJS_PACKAGED_MODULES events)
+if(MCUJS_EXPERIMENTAL_CANVAS)
+ list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
+endif()
+foreach(module ${MCUJS_PACKAGED_MODULES})
+ get_filename_component(name "${module}" NAME)
+ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${MCUJS_ROOT}/lib/${module}.js")
+ file(READ "${MCUJS_ROOT}/lib/${module}.js" source_hex HEX)
+ string(REGEX REPLACE "(..)" "0x\\1," source_bytes "${source_hex}")
+ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}_source.h" "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
+endforeach()
+
 idf_component_register(
     SRCS ${MCUJS_SOURCES}
     INCLUDE_DIRS
+        ${CMAKE_CURRENT_BINARY_DIR}
         .
         bindings
         ${MCUJS_ROOT}/host

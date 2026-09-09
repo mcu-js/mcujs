@@ -162,6 +162,9 @@ size_t js_get_string_arg(const jerry_value_t args[], jerry_length_t argc,
  */
 void js_require_clear_cache(void);
 
+/* Release file and built-in module handles before engine teardown. */
+void js_require_cleanup(void);
+
 /*
  * Register graphics bindings
  * graphics.createBuffer(), graphics.fill(), graphics.setPixel(), etc.

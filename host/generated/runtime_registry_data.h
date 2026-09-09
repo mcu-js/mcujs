@@ -94,6 +94,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -200,6 +201,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -306,6 +308,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -411,6 +414,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -516,6 +520,7 @@
     X("graphics") \
     X("screen") \
     X("dvi") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -620,6 +625,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -723,6 +729,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -826,6 +833,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -916,6 +924,7 @@
     X("board") \
     X("fs") \
     X("process") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -1012,6 +1021,7 @@
     X("mouse") \
     X("graphics") \
     X("screen") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -1112,6 +1122,7 @@
     X("spi") \
     X("adc") \
     X("neopixel") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -1200,6 +1211,7 @@
     X("board") \
     X("fs") \
     X("process") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
@@ -1282,6 +1294,7 @@
     X("board") \
     X("fs") \
     X("process") \
+    X("events") \
     X("mcujs:module") \
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \

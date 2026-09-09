@@ -32,7 +32,22 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 - Original procedural Canvas examples with source, software previews and run
   instructions: *Star Fisher*, *Somebody's Still Awake*, *The Moon Mender* and
   *The Wandering Library*. The newer compositions use uniform scaling;
-  the e-paper example draws in one task without animation or autorun.
+  the original e-paper example draws in one task without animation or autorun.
+- Opt-in V2 e-paper partial-refresh waveform using the vendor LUT, with a
+  monochrome previous-frame cache restored after panel power-down. The first
+  update is full; four partial updates are followed by a full cleaning refresh.
+  Canvas drawing calls are unchanged. Transfers still cover the full image;
+  this is not dirty-rectangle SPI or a production-qualified refresh policy.
+- Optional *Wandering Library* startup script with irregular snail blinks,
+  occasional longer pauses and cleaning after every two blinks. Copying its
+  `index.js` explicitly enables autorun; other demos are unchanged. See
+  `examples/waveshare-epaper-1.54-v2/AUTORUN.md`.
+- Private V2 battery-power latch initialization and long-press PWR shutdown,
+  guarded against treating the startup press as a shutdown request. The unused
+  audio rail stays disabled; no new public GPIO or power API is introduced.
+  Battery-only startup/blinking was operator-confirmed. A short partial-refresh
+  trial reported no visible ghosting; battery life, long-term panel endurance
+  and the least-frequent suitable cleaning interval remain unmeasured.
 
 - Seeed Studio XIAO ESP32-S3 support alongside the existing RP2040/RP2350
   targets: persistent script storage, boot-script recovery, native USB CDC/MSC,

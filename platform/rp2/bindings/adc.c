@@ -16,6 +16,10 @@
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
 
+#include "runtime_features.h"
+
+#if MCUJS_FEATURE_ADC
+
 /* External helpers from bindings.c */
 extern void js_set_function(jerry_value_t object, const char *name,
                             jerry_external_handler_t handler);
@@ -238,3 +242,5 @@ void js_bind_adc(void) {
     js_register_global("adc", adc);
     jerry_value_free(adc);
 }
+
+#endif /* MCUJS_FEATURE_ADC */

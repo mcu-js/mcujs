@@ -9,6 +9,7 @@ if(NOT EXISTS "${JERRY_ROOT}/tools/build.py")
 endif()
 
 set(MCUJS_SOURCES
+    board_power.c
     main.c
     boot.c
     jerry_port.c

@@ -2,6 +2,7 @@
 
 #include "engine.h"
 #include "board_config.h"
+#include "board_power.h"
 #include "boot.h"
 #include "repl.h"
 #include "usb_cdc.h"
@@ -37,6 +38,7 @@ static bool run_smoke(const char *name, const char *source, const char *expected
 }
 
 void app_main(void) {
+    if (!mcujs_board_power_init()) { ESP_LOGE(TAG, "Board power initialization failed"); return; }
     mcujs_usb_recovery_start();
     mcujs_boot_init();
     usb_cdc_init();
@@ -88,6 +90,7 @@ void app_main(void) {
         repl_task();
         js_engine_process_timers();
         mcujs_boot_task();
+        mcujs_board_power_task();
         if (runtime_task_watched) {
             esp_task_wdt_reset();
         }

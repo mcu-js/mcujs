@@ -14,6 +14,7 @@ function loadCanvas() {
       assert.equal(kind, 'default');
       assert.deepEqual(Object.keys(options), []);
       const backend = {
+        getState() { return 'open'; },
         draw(commands, mode, rgba, lineWidth) {
           assert.equal(this, backend);
           calls.push({ commands: Array.from(commands), mode, rgba: Array.from(rgba), lineWidth });

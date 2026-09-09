@@ -55,7 +55,13 @@ output, and DVI are independent capabilities; none implies another.
 
 The semantic aliases below omit numeric `D*` aliases for readability; the
 complete immutable map is available through `board.pins` and the adjacent
-release capability manifest. Optional onboard shortcuts are absent unless their
+release capability manifest. Experimental configured-display builds additionally
+report `capabilities.devices.display` from the selected firmware profile:
+`canvas-2d-subset`, at most
+1 open configured handle.
+Physical display inventory alone never enables that handle. See
+[configured display handles](./development/device-display-handles.md).
+Optional onboard shortcuts are absent unless their
 corresponding physical device is listed.
 
 | Target | Semantic aliases | Onboard devices | Optional shortcuts |

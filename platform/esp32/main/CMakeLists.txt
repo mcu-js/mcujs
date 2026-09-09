@@ -85,7 +85,18 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
  endif()
 endif()
 
-set(MCUJS_PACKAGED_MODULES events)
+# IDF requirement discovery has no target board/profile variables yet.
+if(CMAKE_CROSSCOMPILING)
+include("${MCUJS_ROOT}/cmake/capability-manifest.cmake")
+set(MCUJS_CONFIGURED_DISPLAY OFF)
+if(MCUJS_EXPERIMENTAL_CANVAS AND CMAKE_CROSSCOMPILING)
+ set(MCUJS_CONFIGURED_DISPLAY ON)
+endif()
+mcujs_write_capability_manifest("${MCUJS_ROOT}" "${MCUJS_BOARD}"
+ "${CMAKE_BINARY_DIR}/mcujs-${MCUJS_VERSION}-${MCUJS_BOARD}.capabilities.json" "${MCUJS_CONFIGURED_DISPLAY}")
+endif()
+
+set(MCUJS_PACKAGED_MODULES events devices)
 if(MCUJS_EXPERIMENTAL_CANVAS)
  list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
 endif()

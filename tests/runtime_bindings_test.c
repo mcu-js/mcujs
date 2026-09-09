@@ -365,6 +365,7 @@ int main(void) {
     js_bind_require();
     js_bind_console();
     assert(eval_source("if (!require('mcujs:module').has('events')) throw new Error('events module missing');"));
+    assert(eval_source("if (!require('mcujs:module').has('devices') || require('devices') !== require('devices') || !Object.isFrozen(require('devices')) || require('devices').display !== undefined) throw new Error('device discovery contract');"));
 
     size_t baseline = heap_used();
     assert(eval_source("globalThis.__oneCapability = board.capability('usb');"));
@@ -406,8 +407,13 @@ int main(void) {
     jerry_cleanup();
     // A new VM must not inherit branded objects, budgets or cancellation state.
     jerry_init(JERRY_INIT_EMPTY);
+    board = jerry_object();
+    assert(js_board_apply_registry(board, safe_mode, storage_ready));
+    js_register_global("board", board);
+    jerry_value_free(board);
     js_bind_require();
     js_bind_console();
+    assert(eval_source("if (!Object.isFrozen(require('devices')) || require('devices').display !== undefined) throw new Error('devices recreate');"));
     assert(eval_source(events_test_source));
     js_require_cleanup();
     jerry_cleanup();

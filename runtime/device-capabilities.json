@@ -1,0 +1,6 @@
+{
+  "display": {
+    "interface": "canvas-2d-subset",
+    "maxOpenHandles": 1
+  }
+}

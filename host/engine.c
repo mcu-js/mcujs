@@ -5,6 +5,9 @@
  */
 
 #include "engine.h"
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+extern void js_canvas_reset(void);
+#endif
 #if defined(MCUJS_PLATFORM_ESP32) && defined(MCUJS_EXPERIMENTAL_CANVAS)
 extern void js_canvas_present(void);
 #endif
@@ -646,6 +649,9 @@ void js_engine_cleanup(void) {
 #endif
 #if MCUJS_FEATURE_TIMERS
     js_timers_cleanup();
+#endif
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    js_canvas_reset();
 #endif
     jerry_cleanup();
     s_initialized = false;

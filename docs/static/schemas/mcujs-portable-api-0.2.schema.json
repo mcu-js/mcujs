@@ -253,6 +253,34 @@
         },
         "usb": {
           "$ref": "#/$defs/usbCapability"
+        },
+        "devices": {
+          "$ref": "#/$defs/devicesCapability"
+        }
+      }
+    },
+    "devicesCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "display"
+      ],
+      "properties": {
+        "display": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interface",
+            "maxOpenHandles"
+          ],
+          "properties": {
+            "interface": {
+              "const": "canvas-2d-subset"
+            },
+            "maxOpenHandles": {
+              "const": 1
+            }
+          }
         }
       }
     },
@@ -1764,6 +1792,11 @@
       "usb": {
         "schema": "#/$defs/usbCapability",
         "scope": "firmwareSubsystem",
+        "dynamic": false
+      },
+      "devices": {
+        "schema": "#/$defs/devicesCapability",
+        "scope": "configuredDevice",
         "dynamic": false
       }
     },

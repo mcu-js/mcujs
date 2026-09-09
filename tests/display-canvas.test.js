@@ -23,6 +23,7 @@ function loadCanvas() {
       assert.equal(this, native);
       const record = { kind, options, calls: [], closes: 0 };
       const backend = {
+        getState() { return record.closes ? 'closed' : 'open'; },
         draw(commands, mode, rgba, lineWidth) {
           assert.equal(this, backend);
           assert.equal(record.closes, 0, 'drawing must not reach a closed backend');
@@ -224,6 +225,8 @@ for (const first of ['canvas', 'display']) {
     assert.equal(opens.length, 1);
     assert.equal(opens[0].kind, 'st7789');
     assert.equal(opens[0].options, options);
+    const explicitContext = explicit.canvas.getContext('2d');
+    explicit.close(); // A configured default requires an exclusive native lease.
     const initial = api[first];
     const display = api.display;
     assert.equal(initial, first === 'canvas' ? display.canvas : display);
@@ -235,7 +238,7 @@ for (const first of ['canvas', 'display']) {
     assert.deepEqual(Object.keys(opens[1].options), []);
     assert.notEqual(explicit, display);
     assert.notEqual(explicit.canvas, display.canvas);
-    assert.notEqual(explicit.canvas.getContext('2d'), display.canvas.getContext('2d'));
+    assert.notEqual(explicitContext, display.canvas.getContext('2d'));
     assert.equal(explicit.canvas.width, 240);
     assert.equal(explicit.canvas.height, 320);
     assert.equal(display.canvas.width, 160);
@@ -246,7 +249,8 @@ for (const first of ['canvas', 'display']) {
     assert.throws(() => { api.canvas = explicit.canvas; }, TypeError);
     assert.throws(() => { api.display = explicit; }, TypeError);
     for (const object of [api, display, display.canvas, display.canvas.getContext('2d')]) {
-      for (const unsupported of ['stats', 'framebuffer', 'pointer', 'present', 'flush']) {
+      if (object !== display) assert.equal(object.present, undefined);
+      for (const unsupported of ['stats', 'framebuffer', 'pointer', 'flush']) {
         assert.equal(object[unsupported], undefined);
       }
     }

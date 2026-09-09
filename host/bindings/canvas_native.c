@@ -2,6 +2,7 @@
 #include "jerryscript.h"
 #include "canvas_renderer.h"
 #include "canvas_display.h"
+#include "validation.h"
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -12,6 +13,12 @@
 #define MAX_COMMANDS 128
 static canvas_display_t *displays;
 static unsigned presentations, presentation_failures;
+static bool default_unavailable;
+
+static jerry_value_t display_error(mcujs_operational_error_t code, const char *message) {
+    const mcujs_error_details_t details = {.resource="display"};
+    return mcujs_throw_operational_error(code, message, &details);
+}
 
 static void close_display(canvas_display_t *d) {
     if (!d || d->closed) return;
@@ -19,6 +26,7 @@ static void close_display(canvas_display_t *d) {
     while (*p && *p!=d) p=&(*p)->next;
     if (*p) *p=d->next;
     d->closed=true; d->pending=false;
+    if (d->is_default) default_unavailable=d->failed;
     if (d->release) d->release(d);
 }
 static void free_display(void *ptr, jerry_object_native_info_t *info) {
@@ -46,7 +54,8 @@ static bool read_numbers(jerry_value_t array,float *out,size_t count) {
 }
 static jerry_value_t draw(const jerry_call_info_t *info,const jerry_value_t args[],const jerry_length_t argc) {
     canvas_display_t *d=receiver(info->this_value);
-    if(!d || d->closed) return jerry_throw_sz(JERRY_ERROR_TYPE,"Display is closed or invalid");
+    if(!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
+    if(d->closed) return display_error(MCUJS_ERROR_NO_DEVICE,"Display is closed or unavailable");
     if(argc!=4 || !jerry_value_is_array(args[0]) || !jerry_value_is_string(args[1]) ||
        !jerry_value_is_array(args[2]) || !jerry_value_is_number(args[3]))
         return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid native Canvas draw arguments");
@@ -83,6 +92,38 @@ static jerry_value_t close_method(const jerry_call_info_t *info,const jerry_valu
     canvas_display_t *d=receiver(info->this_value);
     if(!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
     close_display(d);return jerry_undefined();
+}
+static bool present_display(canvas_display_t *d) {
+    if (!d->pending) return true;
+    if (d->present(d)) { d->pending=false; presentations++; return true; }
+    presentation_failures++;
+    d->failed=true;
+    close_display(d);
+    return false;
+}
+static jerry_value_t present_method(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)args; (void)argc;
+    canvas_display_t *d=receiver(info->this_value);
+    if (!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
+    if (d->closed) return display_error(MCUJS_ERROR_NO_DEVICE,"Display is closed or unavailable");
+    if (!present_display(d)) return display_error(MCUJS_ERROR_IO,"Display presentation failed; handle released");
+    return jerry_undefined();
+}
+static jerry_value_t get_state(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)args; (void)argc;
+    canvas_display_t *d=receiver(info->this_value);
+    if (!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
+    return jerry_string_sz(d->failed ? "error" : d->closed ? "closed" : "open");
+}
+static jerry_value_t default_state(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)info; (void)args; (void)argc;
+    return jerry_string_sz(displays ? "busy" : default_unavailable ? "unavailable" : "idle");
+}
+/* Engine teardown, before Jerry finalizers: invalidate handles, release leases. */
+void js_canvas_reset(void) {
+    while (displays) close_display(displays);
+    default_unavailable=false;
+    presentations=0; presentation_failures=0;
 }
 static bool integer_option(jerry_value_t opts,const char *name,int *out,int lo,int hi) {
     jerry_value_t key=jerry_string_sz(name),v=jerry_object_get(opts,key);jerry_value_free(key);
@@ -190,8 +231,19 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
         bool valid=!jerry_value_is_exception(keys) && jerry_array_length(keys)==0;jerry_value_free(keys);
         if(!valid)return jerry_throw_sz(JERRY_ERROR_TYPE,"Default display takes no options");
     }
+    bool is_default=strcmp(kind,"default")==0;
+    /* A configured default lease is exclusive across Canvas connections.
+     * External-only connections retain their existing driver-level arbitration. */
+    for (canvas_display_t *it=displays; it; it=it->next) {
+        if (is_default || it->is_default)
+            return display_error(MCUJS_ERROR_BUSY,"Configured display requires exclusive Canvas ownership");
+    }
     canvas_display_t *d=calloc(1,sizeof(*d));
-    if(!d)return jerry_throw_sz(JERRY_ERROR_COMMON,"Out of memory opening display");
+    if(!d) {
+        if (is_default) default_unavailable=true;
+        return display_error(MCUJS_ERROR_RESOURCE_EXHAUSTED,"Out of memory opening display");
+    }
+    d->is_default=is_default;
     bool ok=false;
 #ifdef MCUJS_CANVAS_DVI
     if(dvi)ok=canvas_display_dvi_init(d);
@@ -203,19 +255,24 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
 #else
     if(lcd)ok=canvas_display_st7789_init(d,&cfg);
 #endif
-    if(!ok){free(d);return jerry_throw_sz(JERRY_ERROR_COMMON,"Display unavailable, conflicting connection, or insufficient memory");}
+    if(!ok) {
+        if (is_default) default_unavailable=true;
+        free(d);
+        return display_error(MCUJS_ERROR_IO,"Display initialization failed: unavailable resource, bus conflict, or allocation failure");
+    }
+    if (is_default) default_unavailable=false;
     jerry_value_t result=jerry_object();jerry_object_set_native_ptr(result,&display_type,d);
     d->next=displays;displays=d;
     put(result,"width",jerry_number(d->width));put(result,"height",jerry_number(d->height));
     put(result,"draw",jerry_function_external(draw));put(result,"close",jerry_function_external(close_method));
+    put(result,"present",jerry_function_external(present_method));put(result,"getState",jerry_function_external(get_state));
     return result;
 }
 void js_canvas_present(void) {
     for(canvas_display_t *d=displays,*next;d;d=next) {
         next=d->next;
         if(!d->pending)continue;
-        if(d->present(d)){d->pending=false;presentations++;}
-        else {presentation_failures++;close_display(d);printf("Canvas presentation failed; display closed\r\n");}
+        if(!present_display(d)) printf("Canvas presentation failed; display closed\r\n");
     }
 }
 static jerry_value_t stats(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
@@ -235,5 +292,6 @@ static jerry_value_t stats(const jerry_call_info_t *info,const jerry_value_t arg
 }
 jerry_value_t js_create_canvas_native_module(void) {
     jerry_value_t module=jerry_object();put(module,"open",jerry_function_external(open_method));
-    put(module,"stats",jerry_function_external(stats));return module;
+    put(module,"stats",jerry_function_external(stats));
+    put(module,"defaultState",jerry_function_external(default_state));return module;
 }

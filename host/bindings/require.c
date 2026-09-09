@@ -25,6 +25,7 @@
 #include "../runtime_features.h"
 #include "../runtime_registry.h"
 jerry_value_t js_create_events_module(void);
+jerry_value_t js_create_devices_module(void);
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
 jerry_value_t js_create_canvas_native_module(void);
 jerry_value_t js_create_canvas_module(void);
@@ -713,6 +714,7 @@ static const builtin_module_t s_builtin_modules[] = {
 #endif
 #endif
     {"events", js_create_events_module},
+    {"devices", js_create_devices_module},
     {"mcujs:module", create_module_module},
     {NULL, NULL}
 };

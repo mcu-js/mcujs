@@ -10,6 +10,15 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Added
 
+- First configured-display device slice: lazy `require('devices')` discovery
+  backed by compiled capabilities, absent unsupported displays, stable frozen
+  descriptors, exclusive native ownership, live state and repeatable cleanup.
+  Owned Canvas handles gain explicit `present()` (show before close), native
+  failure state, and stable EBUSY/EIO/ENXIO errors. Profile-specific build
+  manifests report the same support as runtime discovery. No new peripherals,
+  device queue, generic pin/SD arbiter, compatibility aliases or physical
+  qualification; see `docs/docs/development/device-display-handles.md`.
+
 - Lazy `require('events')` with bounded, synchronous `Event`/`EventTarget` and
   `AbortController`/`AbortSignal` subsets. Signal cancellation removes attached
   listeners before abort notification; dispatch is safe under mutation and

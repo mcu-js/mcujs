@@ -49,8 +49,9 @@ python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 from pathlib import Path
 import sys
 root, out = map(Path, sys.argv[1:])
-source = (root/'lib/events.js').read_bytes()
-(out/'events_source.h').write_text('static const jerry_char_t events_source[] = {' + ','.join(str(b) for b in source) + '};\n')
+for name in ['events', 'devices']:
+ source = (root/('lib/'+name+'.js')).read_bytes()
+ (out/(name+'_source.h')).write_text('static const jerry_char_t '+name+'_source[] = {' + ','.join(str(b) for b in source) + '};\n')
 tests = (root/'tests/events.test.js').read_text()
 imports = "const test = require('node:test');\nconst assert = require('node:assert/strict');\n"
 assert tests.startswith(imports)
@@ -170,3 +171,6 @@ for factory in graphics screen; do
     fi
 done
 "${CONSTRAINED}"
+
+JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
+    bash "${ROOT}/tests/run-devices-display-tests.sh"

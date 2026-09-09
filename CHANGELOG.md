@@ -10,10 +10,29 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Added
 
-- Opt-in, experimental PiZero Canvas 2D subset, backed by the ISC-licensed
-  ctx 0.1.18 rasterizer supplied by the Docker environment. Not enabled in
-  standard firmware; not a complete Canvas/DOM implementation. See
-  `docs/docs/development/canvas-first-slice.md` for limits and verification.
+- Opt-in, experimental `display.canvas` API with a shared Canvas 2D subset
+  across RP2040/RP2350 and ESP32-S3. Applications use `getContext('2d')`;
+  display adapters own the wiring, transport and presentation. The same
+  ISC-licensed ctx 0.1.18 rasterizer serves HDMI, RGB565 LCD and monochrome
+  e-paper backends. Not enabled in standard firmware or a complete Canvas/DOM
+  implementation. See `docs/docs/development/display-canvas.md` and
+  `docs/docs/development/canvas-first-slice.md` for the supported subset.
+- ST7789-family Canvas profiles for Waveshare RP2350-LCD-1.47-A,
+  RP2350-Touch-LCD-2.8 and RP2350-Touch-LCD-1.69, alongside PiZero HDMI.
+  The 2.8 board gains an initial runtime/USB/filesystem port; its touch, audio,
+  SD and sensors remain unsupported. The 1.69 Canvas slice likewise does not
+  add touch, audio, SD or IMU support.
+- Initial Waveshare ESP32-S3-ePaper-1.54 **V2** port: native USB CDC/MSC,
+  persistent script storage and a 200×200 Canvas surface. Its private backend
+  converts RGB565 drawing to monochrome, performs a full update with bounded
+  BUSY waits, then sleeps and powers down the panel. V1 is not interchangeable.
+  Public GPIO/peripheral APIs, audio, RTC, sensors and SD are not qualified or
+  exposed by this conservative image. The board remains outside shipping
+  release packaging and uses ROM/esptool recovery, not a XIAO TinyUF2 image.
+- Original procedural Canvas examples with source, software previews and run
+  instructions: *Star Fisher*, *Somebody's Still Awake*, *The Moon Mender* and
+  *The Wandering Library*. The newer compositions use uniform scaling;
+  the e-paper example draws in one task without animation or autorun.
 
 - Seeed Studio XIAO ESP32-S3 support alongside the existing RP2040/RP2350
   targets: persistent script storage, boot-script recovery, native USB CDC/MSC,
@@ -36,6 +55,10 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Changed / breaking
 
+- Canvas presentation is batched after a JavaScript drawing task, rather than
+  after individual drawing calls. Applications need no hardware-specific
+  `show()` or `present()` call. Each display owns its surface and drawing state;
+  closing a display invalidates its drawing context.
 - Firmware selects an explicit feature map. Unsupported modules, optional
   methods, and onboard shortcuts are absent rather than stubs or no-ops.
   An external peripheral driver does not imply an onboard device exists.
@@ -77,7 +100,35 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 - Pushes and PRs targeting `development` run source checks and docs builds.
   Development does not upload/deploy Pages or automatically publish releases.
 
+### Fixed
+
+- Isolated PiZero Canvas stack storage from Core 1 and TMDS memory, kept the
+  Core 1 stack independently sized, and distinguished requested USB resets
+  from Canvas watchdog recovery.
+- Omitted disabled ADC and image-decoder implementations from the initial
+  LCD 2.8 image instead of compiling unsupported facilities.
+- Included ESP-IDF's PSRAM component for e-paper and added a compile-time guard
+  against missing octal PSRAM configuration. Unknown Kconfig settings must not
+  silently leave a bootable image without its required display memory.
+- Kept Canvas presentation/failure counters available when a JerryScript build
+  lacks optional heap telemetry; unavailable heap measurements are omitted.
+
 ### Verification and remaining limitations
+
+- Physical Canvas output has been checked on PiZero HDMI, LCD 1.47, Touch LCD
+  2.8, Touch LCD 1.69 (portrait), and ESP32-S3 e-paper 1.54 V2. The unchanged
+  *Somebody's Still Awake* JavaScript ran on both the 2.8 LCD and PiZero HDMI.
+- E-paper firmware `0.1.0+3a53622` ran *The Wandering Library* with one completed
+  full presentation and zero reported presentation failures; a physical photo
+  confirmed orientation and the complete composition. The factory flash was
+  backed up twice with matching hashes, and application updates preserved the
+  bootloader, partition table, NVS and calibration area. USB reset can leave
+  this board in ROM download mode: release BOOT and perform a normal PWR cycle.
+- Focused regression tests and native checks cover Canvas behavior, registry
+  honesty, SPI transfers, monochrome bit order, BUSY timeout, failure cleanup,
+  sleep and release. These are not full-board electrical qualification or
+  evidence of long-term e-paper endurance. The 1.69 landscape profile remains
+  physically unqualified; RGB565/monochrome output is not browser-identical.
 
 - The same button example ran on Pico and XIAO firmware `0.1.0+5fc1294`:
   press/release events were recorded, the demos completed, final LED readings
@@ -103,8 +154,8 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
   published; final 0.2.0 candidate qualification remains open.
 - The PWM fade example exists, but XIAO's onboard LED pin (GPIO21) is not in its
   current PWM capability; do not assume a no-wiring fade works on both boards.
-- Portable graphics/display normalization and resource-handle API redesign are
-  outside the 0.2.0 scope.
+- Full Canvas/DOM conformance, unimplemented drawing features and a broader
+  resource-handle redesign remain outside this experimental display slice.
 
 See the [0.1 → 0.2 migration guide](docs/docs/migration/0.2.md) for code changes
 and the [release checklist](docs/docs/development/mcujs-0.2-portable-api.md#020-release-checklist)

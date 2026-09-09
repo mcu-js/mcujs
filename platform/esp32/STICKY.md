@@ -23,6 +23,10 @@ audio, SD, Wi-Fi or BLE implementation is advertised in this first slice.
 
 ## Memory and display
 
+Sticky uses a 128KiB JavaScript heap (the 64KiB bring-up heap exhausted on the
+full artwork with live runtime bindings) and a configured 240MHz CPU. Other
+boards keep their existing JS heap and CPU settings.
+
 One 768000-byte RGB565 surface is explicitly allocated from PSRAM. No fallback
 into insufficient internal SRAM. PSRAM must initialize successfully. The ctx
 0.1.18 profile permits 800x480/coordinates +/-1024 only for Sticky; smaller-board

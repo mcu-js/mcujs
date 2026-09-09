@@ -121,6 +121,12 @@ set(JERRY_REPRO_COMPILE_FLAGS
 )
 string(REPLACE ";" " " JERRY_COMPILE_FLAGS
        "${COMPILE_OPTIONS};${C_COMPILE_OPTIONS};${JERRY_REPRO_COMPILE_FLAGS}")
+# Sticky's larger artwork exhausted the initial 64KiB JS heap on hardware.
+# Keep the other boards' budget unchanged; the pixel surface stays in PSRAM.
+set(MCUJS_JERRY_HEAP_KB 64)
+if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
+ set(MCUJS_JERRY_HEAP_KB 128)
+endif()
 execute_process(
     COMMAND ${PYTHON} ${JERRY_ROOT}/tools/build.py
         --clean
@@ -132,7 +138,7 @@ execute_process(
         --jerry-math=OFF
         --jerry-port=OFF
         --amalgam=ON
-        --mem-heap=64
+        --mem-heap=${MCUJS_JERRY_HEAP_KB}
         --profile=es.next
         --error-messages=ON
         --line-info=ON

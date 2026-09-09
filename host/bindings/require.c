@@ -27,6 +27,7 @@
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
 jerry_value_t js_create_canvas_native_module(void);
 jerry_value_t js_create_canvas_module(void);
+jerry_value_t js_create_st7789_module(void);
 #endif
 #include "jerryscript.h"
 #include "fs.h"
@@ -706,6 +707,7 @@ static const builtin_module_t s_builtin_modules[] = {
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     {"mcujs:canvas-native", js_create_canvas_native_module},
     {"canvas", js_create_canvas_module},
+    {"displays/st7789", js_create_st7789_module},
 #endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}

@@ -1,22 +1,38 @@
-/* Private experimental Canvas backend. Applications use lib/canvas.js. */
+/* Private native Canvas instances. No screen-controller logic in this binding. */
 #include "jerryscript.h"
 #include "canvas_renderer.h"
-#include "mcujs_dvi.h"
+#include "canvas_display.h"
 #include <math.h>
-#ifdef MCUJS_EXPERIMENTAL_CANVAS
-#include "hardware/watchdog.h"
-#include <malloc.h>
-#define CANVAS_STAGE(n) (watchdog_hw->scratch[0] = (n))
-#else
-#define CANVAS_STAGE(n) ((void)0)
-#endif
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#define WIDTH 160
-#define HEIGHT 120
+#ifdef MCUJS_PLATFORM_RP2
+#include <malloc.h>
+#endif
 #define MAX_COMMANDS 128
-static const uint16_t *last_presented;
-static uint16_t *pending_pixels;
+static canvas_display_t *displays;
+static unsigned presentations, presentation_failures;
 
+static void close_display(canvas_display_t *d) {
+    if (!d || d->closed) return;
+    canvas_display_t **p=&displays;
+    while (*p && *p!=d) p=&(*p)->next;
+    if (*p) *p=d->next;
+    d->closed=true; d->pending=false;
+    if (d->release) d->release(d);
+}
+static void free_display(void *ptr, jerry_object_native_info_t *info) {
+    (void)info; close_display(ptr); free(ptr);
+}
+static const jerry_object_native_info_t display_type={ .free_cb=free_display };
+static canvas_display_t *receiver(jerry_value_t value) {
+    return jerry_value_is_object(value)?jerry_object_get_native_ptr(value,&display_type):NULL;
+}
+static void put(jerry_value_t object,const char *name,jerry_value_t value) {
+    jerry_value_t key=jerry_string_sz(name);
+    jerry_value_t result=jerry_object_set(object,key,value);
+    jerry_value_free(result);jerry_value_free(key);jerry_value_free(value);
+}
 static bool read_numbers(jerry_value_t array,float *out,size_t count) {
     for(size_t i=0;i<count;i++) {
         jerry_value_t value=jerry_object_get_index(array,(uint32_t)i);
@@ -29,7 +45,8 @@ static bool read_numbers(jerry_value_t array,float *out,size_t count) {
     return true;
 }
 static jerry_value_t draw(const jerry_call_info_t *info,const jerry_value_t args[],const jerry_length_t argc) {
-    (void)info;
+    canvas_display_t *d=receiver(info->this_value);
+    if(!d || d->closed) return jerry_throw_sz(JERRY_ERROR_TYPE,"Display is closed or invalid");
     if(argc!=4 || !jerry_value_is_array(args[0]) || !jerry_value_is_string(args[1]) ||
        !jerry_value_is_array(args[2]) || !jerry_value_is_number(args[3]))
         return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid native Canvas draw arguments");
@@ -54,72 +71,131 @@ static jerry_value_t draw(const jerry_call_info_t *info,const jerry_value_t args
     jerry_string_to_buffer(args[1],JERRY_ENCODING_UTF8,(jerry_char_t*)mode,len);
     bool stroke=strcmp(mode,"stroke")==0;
     if(!stroke && strcmp(mode,"fill")!=0) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid Canvas draw mode");
-    const mcujs_dvi_state_t *state=mcujs_dvi_get_state();
-    if(state->initialized && (state->width!=WIDTH || state->height!=HEIGHT))
-        return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas display already configured incompatibly");
-    CANVAS_STAGE(201);
-    if(!mcujs_dvi_is_running()) {
-        last_presented=NULL;
-        pending_pixels=NULL;
-        if(!mcujs_dvi_init(WIDTH,HEIGHT) || !mcujs_dvi_start())
-            return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas display unavailable");
-    }
-    CANVAS_STAGE(202);
-    uint16_t *pixels=mcujs_dvi_get_draw_buffer();
-    if(!pixels) return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas draw surface unavailable");
-    /* DVI is double buffered; retain earlier Canvas drawing without a third allocation. */
-    if(pixels!=pending_pixels && last_presented && pixels!=last_presented) memcpy(pixels,last_presented,WIDTH*HEIGHT*sizeof(uint16_t));
-    if(!canvas_render(pixels,WIDTH,HEIGHT,ops,count,stroke,rgba,width))
+    uint16_t *pixels=d->acquire(d);
+    if(!pixels) return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas surface unavailable");
+    if(!canvas_render(pixels,d->width,d->height,ops,count,stroke,rgba,width))
         return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas renderer rejected draw");
-    pending_pixels=pixels;
+    d->pending=true;
     return jerry_undefined();
 }
-/* Present once after the JS task/timer callbacks finish, like browser painting.
- * Reuse the same back buffer throughout the callback; no third framebuffer. */
-void js_canvas_present(void) {
-    if (!pending_pixels) return;
-    if (!mcujs_dvi_is_running()) {
-        pending_pixels=NULL;
-        last_presented=NULL;
-        return;
-    }
-    CANVAS_STAGE(204);
-    if (mcujs_dvi_swap_and_show()) {
-        last_presented=pending_pixels;
-        pending_pixels=NULL;
-        CANVAS_STAGE(205);
-    }
+static jerry_value_t close_method(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)args; (void)argc;
+    canvas_display_t *d=receiver(info->this_value);
+    if(!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
+    close_display(d);return jerry_undefined();
 }
-static void put(jerry_value_t object,const char *name,jerry_value_t value) {
-    jerry_value_t key=jerry_string_sz(name);
-    jerry_value_t result=jerry_object_set(object,key,value);
-    jerry_value_free(result);jerry_value_free(key);jerry_value_free(value);
+static bool integer_option(jerry_value_t opts,const char *name,int *out,int lo,int hi) {
+    jerry_value_t key=jerry_string_sz(name),v=jerry_object_get(opts,key);jerry_value_free(key);
+    if(jerry_value_is_undefined(v)){jerry_value_free(v);return true;}
+    double n=jerry_value_is_number(v)?jerry_value_as_number(v):NAN;
+    jerry_value_free(v);
+    if(!isfinite(n)||n!=floor(n)||n<lo||n>hi)return false;
+    *out=(int)n;return true;
 }
-#ifdef MCUJS_EXPERIMENTAL_CANVAS
-/* Test instrumentation, deliberately not part of the public Canvas API.
- * Compare after collection; mallinfo measures native allocations, not total RAM. */
-static jerry_value_t stats(const jerry_call_info_t *info, const jerry_value_t args[],
-                           jerry_length_t argc) {
-    (void)info; (void)args; (void)argc;
-    jerry_heap_gc(JERRY_GC_PRESSURE_HIGH);
-    jerry_heap_stats_t memory;
-    if (!jerry_heap_stats(&memory))
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "Jerry heap statistics unavailable");
-    struct mallinfo native = mallinfo();
-    jerry_value_t result = jerry_object();
-    put(result, "jsUsed", jerry_number(memory.allocated_bytes));
-    put(result, "jsPeak", jerry_number(memory.peak_allocated_bytes));
-    put(result, "jsTotal", jerry_number(memory.size));
-    put(result, "nativeAllocated", jerry_number(native.uordblks));
+static bool known_options(jerry_value_t opts) {
+    jerry_value_t keys=jerry_object_keys(opts);
+    if(jerry_value_is_exception(keys)){jerry_value_free(keys);return false;}
+    bool valid=true;
+    const char *allowed[]={"spi","sck","mosi","cs","dc","reset","backlight","width","height","baudrate","horizontal"};
+    for(uint32_t i=0;i<jerry_array_length(keys);i++) {
+        jerry_value_t key=jerry_object_get_index(keys,i);char text[32]={0};
+        jerry_size_t n=jerry_string_size(key,JERRY_ENCODING_UTF8);bool found=false;
+        if(n<sizeof(text)) {
+            jerry_string_to_buffer(key,JERRY_ENCODING_UTF8,(jerry_char_t*)text,n);
+            for(size_t j=0;j<sizeof(allowed)/sizeof(*allowed);j++) if(strlen(text)==n && strcmp(text,allowed[j])==0)found=true;
+        }
+        jerry_value_free(key);if(!found){valid=false;break;}
+    }
+    jerry_value_free(keys);return valid;
+}
+static bool lcd_options(jerry_value_t opts,canvas_lcd_config_t *c) {
+    *c=(canvas_lcd_config_t){.spi=-1,.sck=-1,.mosi=-1,.cs=-1,.dc=-1,.reset=-1,.backlight=-1,
+        .width=320,.height=172,.x_offset=0,.y_offset=34,.baudrate=37500000,.horizontal=true};
+#ifdef MCUJS_CANVAS_DEFAULT_ST7789
+    c->spi=0;c->sck=18;c->mosi=19;c->cs=17;c->dc=16;c->reset=20;c->backlight=21;
+#endif
+    if(!known_options(opts))return false;
+    jerry_value_t key=jerry_string_sz("horizontal"),v=jerry_object_get(opts,key);jerry_value_free(key);
+    if(!jerry_value_is_undefined(v)) {
+        if(!jerry_value_is_boolean(v)){jerry_value_free(v);return false;}
+        c->horizontal=jerry_value_is_true(v);
+    }
+    jerry_value_free(v);
+    if(!c->horizontal){c->width=172;c->height=320;c->x_offset=34;c->y_offset=0;}
+    int width=c->width,height=c->height;
+    if(!integer_option(opts,"spi",&c->spi,0,1) ||
+       !integer_option(opts,"sck",&c->sck,0,29) || !integer_option(opts,"mosi",&c->mosi,0,29) ||
+       !integer_option(opts,"cs",&c->cs,0,29) || !integer_option(opts,"dc",&c->dc,0,29) ||
+       !integer_option(opts,"reset",&c->reset,0,29) || !integer_option(opts,"backlight",&c->backlight,0,29) ||
+       !integer_option(opts,"width",&width,1,320) || !integer_option(opts,"height",&height,1,320) ||
+       !integer_option(opts,"baudrate",&c->baudrate,100000,37500000))return false;
+    if(width!=c->width || height!=c->height || c->spi<0 || c->sck<0 || c->mosi<0 ||
+       c->cs<0 || c->dc<0 || c->reset<0 || c->backlight<0)return false;
+    if(c->sck%4!=2 || c->mosi%4!=3 || (c->sck/8)%2!=c->spi || (c->mosi/8)%2!=c->spi)return false;
+    int pins[]={c->sck,c->mosi,c->cs,c->dc,c->reset,c->backlight};
+    for(int i=0;i<6;i++)for(int j=i+1;j<6;j++)if(pins[i]==pins[j])return false;
+    return true;
+}
+static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)info;
+    if(argc!=2 || !jerry_value_is_string(args[0]) || !jerry_value_is_object(args[1]) || jerry_value_is_array(args[1]))
+        return jerry_throw_sz(JERRY_ERROR_TYPE,"Expected display kind and options object");
+    char kind[16]={0};jerry_size_t n=jerry_string_size(args[0],JERRY_ENCODING_UTF8);
+    if(n>=sizeof(kind))return jerry_throw_sz(JERRY_ERROR_TYPE,"Unsupported display driver");
+    jerry_string_to_buffer(args[0],JERRY_ENCODING_UTF8,(jerry_char_t*)kind,n);
+    if(strlen(kind)!=n)return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display driver name");
+    bool dvi=false,lcd=strcmp(kind,"st7789")==0;
+    if(strcmp(kind,"default")==0) {
+#ifdef MCUJS_CANVAS_DVI
+        dvi=true;
+#elif defined(MCUJS_CANVAS_DEFAULT_ST7789)
+        lcd=true;
+#endif
+    }
+    if(!dvi && !lcd)return jerry_throw_sz(JERRY_ERROR_TYPE,"Unsupported display driver");
+    canvas_lcd_config_t cfg;
+    if(lcd && !lcd_options(args[1],&cfg))return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid ST7789V3 panel or SPI connection options");
+    if(dvi) {
+        jerry_value_t keys=jerry_object_keys(args[1]);
+        bool valid=!jerry_value_is_exception(keys) && jerry_array_length(keys)==0;jerry_value_free(keys);
+        if(!valid)return jerry_throw_sz(JERRY_ERROR_TYPE,"Default DVI display takes no options");
+    }
+    canvas_display_t *d=calloc(1,sizeof(*d));
+    if(!d)return jerry_throw_sz(JERRY_ERROR_COMMON,"Out of memory opening display");
+    bool ok=false;
+#ifdef MCUJS_CANVAS_DVI
+    if(dvi)ok=canvas_display_dvi_init(d);
+#endif
+    if(lcd)ok=canvas_display_st7789_init(d,&cfg);
+    if(!ok){free(d);return jerry_throw_sz(JERRY_ERROR_COMMON,"Display unavailable, conflicting connection, or insufficient memory");}
+    jerry_value_t result=jerry_object();jerry_object_set_native_ptr(result,&display_type,d);
+    d->next=displays;displays=d;
+    put(result,"width",jerry_number(d->width));put(result,"height",jerry_number(d->height));
+    put(result,"draw",jerry_function_external(draw));put(result,"close",jerry_function_external(close_method));
     return result;
 }
+void js_canvas_present(void) {
+    for(canvas_display_t *d=displays,*next;d;d=next) {
+        next=d->next;
+        if(!d->pending)continue;
+        if(d->present(d)){d->pending=false;presentations++;}
+        else {presentation_failures++;close_display(d);printf("Canvas presentation failed; display closed\n");}
+    }
+}
+static jerry_value_t stats(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)info;(void)args;(void)argc;jerry_heap_gc(JERRY_GC_PRESSURE_HIGH);
+    jerry_heap_stats_t memory;
+    if(!jerry_heap_stats(&memory))return jerry_throw_sz(JERRY_ERROR_COMMON,"Jerry heap statistics unavailable");
+    jerry_value_t result=jerry_object();
+    put(result,"jsUsed",jerry_number(memory.allocated_bytes));put(result,"jsPeak",jerry_number(memory.peak_allocated_bytes));
+    put(result,"jsTotal",jerry_number(memory.size));
+#ifdef MCUJS_PLATFORM_RP2
+    put(result,"nativeAllocated",jerry_number(mallinfo().uordblks));
 #endif
+    put(result,"presentations",jerry_number(presentations));put(result,"presentationFailures",jerry_number(presentation_failures));
+    return result;
+}
 jerry_value_t js_create_canvas_native_module(void) {
-    jerry_value_t module=jerry_object();
-    put(module,"width",jerry_number(WIDTH));put(module,"height",jerry_number(HEIGHT));
-    put(module,"draw",jerry_function_external(draw));
-#ifdef MCUJS_EXPERIMENTAL_CANVAS
-    put(module,"stats",jerry_function_external(stats));
-#endif
-    return module;
+    jerry_value_t module=jerry_object();put(module,"open",jerry_function_external(open_method));
+    put(module,"stats",jerry_function_external(stats));return module;
 }

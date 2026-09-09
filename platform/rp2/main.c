@@ -31,6 +31,8 @@
 #include "hardware/vreg.h"
 #include "hardware/clocks.h"
 #include "mcujs_dvi.h"
+#endif
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
 #include "hardware/watchdog.h"
 #include "pico/bootrom.h"
 #endif
@@ -58,7 +60,6 @@ volatile uint32_t mcujs_canvas_failure_stage __attribute__((section(".uninitiali
 #endif
 
 int main(void) {
-#if MCUJS_HAS_DVI
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     /* Diagnostic candidate only: a stalled experiment returns to ROM USB
      * recovery instead of requiring another physical power/BOOTSEL cycle. */
@@ -71,6 +72,7 @@ int main(void) {
     watchdog_enable(8000, true);
     watchdog_hw->scratch[0] = 10;
 #endif
+#if MCUJS_HAS_DVI
     /* DVI requires 252 MHz system clock - set this BEFORE USB init
      * This must happen early to ensure USB is configured for the correct clock
      */

@@ -9,10 +9,22 @@ const vm = require('node:vm');
 function loadCanvas() {
   const calls = [];
   const native = {
-    width: 160,
-    height: 120,
-    draw(commands, mode, rgba, lineWidth) {
-      calls.push({ commands: Array.from(commands), mode, rgba: Array.from(rgba), lineWidth });
+    open(kind, options) {
+      assert.equal(this, native);
+      assert.equal(kind, 'default');
+      assert.deepEqual(Object.keys(options), []);
+      const backend = {
+        draw(commands, mode, rgba, lineWidth) {
+          assert.equal(this, backend);
+          calls.push({ commands: Array.from(commands), mode, rgba: Array.from(rgba), lineWidth });
+        },
+        close() { assert.equal(this, backend); },
+      };
+      Object.defineProperties(backend, {
+        width: { value: 160 },
+        height: { value: 120 },
+      });
+      return backend;
     },
   };
   const module = { exports: {} };
@@ -29,7 +41,7 @@ function loadCanvas() {
 
 test('exports a fixed hardware canvas and one opaque 2D context', () => {
   const { canvas, calls, exported } = loadCanvas();
-  assert.deepEqual(exported, ['canvas']);
+  assert.deepEqual(exported.sort(), ['canvas', 'connect', 'display']);
   assert.equal(canvas.width, 160);
   assert.equal(canvas.height, 120);
   assert.throws(() => { canvas.width = 320; }, TypeError);

@@ -1,6 +1,8 @@
 /* Real JerryScript + production Canvas bindings/ctx, with a host display surface. */
 #include "jerryscript.h"
 #include "mcujs_dvi.h"
+#include "canvas_display.h"
+bool canvas_display_st7789_init(canvas_display_t *d,const canvas_lcd_config_t *c){(void)d;(void)c;return false;}
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

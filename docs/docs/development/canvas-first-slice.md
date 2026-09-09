@@ -1,5 +1,8 @@
 # Canvas 2D: first JavaScript slice
 
+For the current per-display connection and lifetime API, see [display.canvas](display-canvas.md).
+The native-contract and qualification sections below record the original HDMI slice.
+
 This is a small, standards-aligned **subset**, not a complete implementation of
 HTML Canvas, `HTMLCanvasElement`, or `OffscreenCanvas`. It exposes ordinary Canvas
 2D drawing calls and delegates rendering to the native integration of the external

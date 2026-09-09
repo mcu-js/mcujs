@@ -707,7 +707,9 @@ static const builtin_module_t s_builtin_modules[] = {
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     {"mcujs:canvas-native", js_create_canvas_native_module},
     {"canvas", js_create_canvas_module},
+#ifndef MCUJS_CANVAS_EPAPER154
     {"displays/st7789", js_create_st7789_module},
+#endif
 #endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}

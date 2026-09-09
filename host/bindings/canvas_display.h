@@ -19,6 +19,7 @@ typedef struct {
     bool horizontal;
     enum { CANVAS_PANEL_WAVESHARE_1_47=0, CANVAS_PANEL_WAVESHARE_2_8=1, CANVAS_PANEL_WAVESHARE_1_69=2 } profile;
 } canvas_lcd_config_t;
+bool canvas_display_epaper154_init(canvas_display_t *display);
 bool canvas_display_dvi_init(canvas_display_t *display);
 bool canvas_display_st7789_init(canvas_display_t *display, const canvas_lcd_config_t *config);
 #endif

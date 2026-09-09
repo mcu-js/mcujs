@@ -131,7 +131,7 @@ test("all shipping boards have explicit, closed feature maps", () => {
     "dynamic storageReady() availability must derive from the static fs capability",
   );
   assert.deepEqual(shippingBoardIds, expectedBoards);
-  assert.deepEqual(Object.keys(boardDescriptors), expectedBoards);
+  assert.deepEqual(Object.keys(boardDescriptors), [...expectedBoards, "waveshare_esp32s3_epaper_1.54_v2"]);
 
   for (const boardId of shippingBoardIds) {
     const descriptor = boardDescriptors[boardId];

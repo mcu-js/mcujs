@@ -31,6 +31,9 @@ void board_delay_ms(uint32_t delay_ms) {
 }
 
 bool board_enter_uf2(void) {
+#if !MCUJS_HAS_TINYUF2
+    return false;
+#else
     enum { APP_REQUEST_UF2_RESET_HINT = 0x11F2 };
     /* TinyUF2 requires this reference so IDF links the hint implementation. */
     (void)esp_reset_reason();
@@ -38,4 +41,5 @@ bool board_enter_uf2(void) {
     vTaskDelay(1);
     esp_restart();
     return true;
+#endif
 }

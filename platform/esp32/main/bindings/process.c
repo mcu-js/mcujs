@@ -20,6 +20,9 @@ void js_bind_process(void) {
     js_set_string(versions, "mcujs", MCUJS_VERSION);
     js_set_string(versions, "jerryscript", JERRYSCRIPT_VERSION);
     js_set_string(versions, "esp-idf", IDF_VER);
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    js_set_string(versions, "ctx", "0.1.18");
+#endif
     js_set_property(process, "versions", versions);
     jerry_value_free(versions);
 

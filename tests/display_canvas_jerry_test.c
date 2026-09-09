@@ -23,6 +23,11 @@ bool canvas_display_st7789_init(canvas_display_t *d,const canvas_lcd_config_t *c
  occupied[i]=true;opened++;memset(buffers[i],0,sizeof(buffers[i]));
  d->width=c->width;d->height=c->height;d->state=buffers[i];d->acquire=acquire;d->present=present;d->release=release;return true;
 }
+#ifdef MCUJS_CANVAS_EPAPER154
+bool canvas_display_epaper154_init(canvas_display_t *d){
+ canvas_lcd_config_t cfg={.width=200,.height=200};return canvas_display_st7789_init(d,&cfg);
+}
+#endif
 static jerry_value_t require_stub(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc){
  (void)info;assert(argc==1);char name[64]={0};jerry_string_to_buffer(args[0],JERRY_ENCODING_UTF8,(jerry_char_t*)name,sizeof(name)-1);
  if(strcmp(name,"mcujs:canvas-native")==0)return jerry_value_copy(native);
@@ -43,6 +48,13 @@ int main(void){
  jerry_init(JERRY_INIT_EMPTY);native=js_create_canvas_native_module();jerry_value_t g=jerry_current_realm();
  set(g,"require",jerry_function_external(require_stub));api=js_create_canvas_module();assert(!jerry_value_is_exception(api));assert(opened==0);
  set(g,"Canvas",jerry_value_copy(api));set(g,"ST7789",js_create_st7789_module());assert(opened==0);
+#ifdef MCUJS_CANVAS_EPAPER154
+ eval("var d=Canvas.display;if(d.canvas.width!==200||d.canvas.height!==200)throw Error('ePaper geometry');var c=d.canvas.getContext('2d');c.fillStyle='white';c.fillRect(0,0,200,200);c.fillStyle='black';c.fillRect(8,8,184,184);");
+ assert(opened==1 && presented==0);js_canvas_present();assert(presented==1 && buffers[0][0]==0xffff && buffers[0][8*200+8]==0 && buffers[0][39999]==0xffff);
+ js_canvas_present();assert(presented==1);eval("d.close();var rejected=false;try{c.fillRect(0,0,1,1);}catch(e){rejected=true;}if(!rejected)throw Error('closed ePaper');");assert(released==1);
+ jerry_value_free(g);jerry_value_free(api);jerry_value_free(native);jerry_cleanup();
+ puts("PASS: Jerry ePaper default, 200x200 RGB565 pixels, one presentation per dirty task, clean-task suppression and close");return 0;
+#endif
 #ifdef MCUJS_CANVAS_DEFAULT_ST7789_1_69
  eval("var d=Canvas.display;if(d.canvas.width!==240||d.canvas.height!==280)throw Error('wrong V2 portrait default');var c=d.canvas.getContext('2d');c.fillStyle='red';c.fillRect(0,0,240,280);");
  assert(last_config.profile==CANVAS_PANEL_WAVESHARE_1_69 && last_config.spi==1 && last_config.sck==10 && last_config.mosi==11 && last_config.cs==9 && last_config.dc==8 && last_config.reset==13 && last_config.backlight==25 && last_config.x_offset==0 && last_config.y_offset==20 && !last_config.horizontal);

@@ -1,0 +1,35 @@
+{
+  "formatVersion": 1,
+  "apiVersion": "0.2",
+  "board": {
+    "name": "waveshare_esp32s3_epaper_1.54_v2",
+    "chip": "ESP32-S3",
+    "firmwareVersion": "0.1.0",
+    "exposedPins": [],
+    "pins": {},
+    "devices": {
+      "display": {
+        "type": "epaper",
+        "controller": "Waveshare-1.54-V2",
+        "width": 200,
+        "height": 200
+      }
+    }
+  },
+  "capabilities": {
+    "boot": {
+      "safeMode": true
+    },
+    "fs": {
+      "implementation": "fat",
+      "writable": true,
+      "hostTransfer": true
+    },
+    "usb": {
+      "classes": [
+        "cdc",
+        "msc"
+      ]
+    }
+  }
+}

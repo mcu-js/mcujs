@@ -1,6 +1,7 @@
 /* MCU.js headless ESP32-S3 bring-up runtime. */
 
 #include "engine.h"
+#include "board_config.h"
 #include "boot.h"
 #include "repl.h"
 #include "usb_cdc.h"
@@ -54,13 +55,15 @@ void app_main(void) {
     ok &= run_smoke("ARITHMETIC", "2 + 2", "4");
     ok &= run_smoke("CONSOLE", "console.log('MCUJS_SMOKE_CONSOLE_OK')", "undefined");
     ok &= run_smoke("IDENTITY", "board.name + ':' + board.chip",
-                    "'seeed_xiao_esp32s3:ESP32-S3'");
+                    "'" MCUJS_BOARD_NAME ":ESP32-S3'");
+#ifdef MCUJS_BOARD_SEEED_XIAO_ESP32S3
     ok &= run_smoke("GPIO", "GPIO.init(21, GPIO.OUTPUT); GPIO.set(21, false); GPIO.get(21)",
                     "false");
     ok &= run_smoke("TIMER_SCHEDULE",
                     "setTimeout(function(){ GPIO.set(21, true); console.log('MCUJS_SMOKE_TIMER_OK'); }, 100)",
                     NULL);
 
+#endif
     ESP_LOGI(TAG, "%s", ok ? "MCUJS_SMOKE_SYNC_OK" : "MCUJS_SMOKE_SYNC_FAIL");
     bool runtime_task_watched = esp_task_wdt_status(NULL) == ESP_OK;
     if (!runtime_task_watched) {

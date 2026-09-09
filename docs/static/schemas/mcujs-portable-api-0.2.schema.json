@@ -189,14 +189,15 @@
       ],
       "properties": {
         "type": {
-          "const": "lcd"
+          "enum": ["lcd", "epaper"]
         },
         "controller": {
           "enum": [
             "GC9A01A",
             "ST7789V2",
             "ST7789V3",
-            "ST7789T3"
+            "ST7789T3",
+            "Waveshare-1.54-V2"
           ]
         },
         "width": {

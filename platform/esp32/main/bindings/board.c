@@ -19,6 +19,7 @@
 
 #include <stdio.h>
 
+#if MCUJS_REGISTRY_ONBOARD_LED
 static bool s_led_initialized;
 
 static void board_led_init(void) {
@@ -29,6 +30,8 @@ static void board_led_init(void) {
         s_led_initialized = true;
     }
 }
+
+#endif
 
 static jerry_value_t board_free_memory(const jerry_call_info_t *info,
                                        const jerry_value_t args[], jerry_length_t argc) {
@@ -78,6 +81,9 @@ static jerry_value_t board_delay(const jerry_call_info_t *info,
 static jerry_value_t board_enter_uf2(const jerry_call_info_t *info,
                                      const jerry_value_t args[], jerry_length_t argc) {
     (void)info; (void)args; (void)argc;
+#if !MCUJS_HAS_TINYUF2
+    return jerry_throw_sz(JERRY_ERROR_COMMON, "UF2 unavailable; use BOOT/reset ROM esptool recovery");
+#else
     enum { APP_REQUEST_UF2_RESET_HINT = 0x11F2 };
     /* TinyUF2 requires this reference so IDF links the hint implementation. */
     (void)esp_reset_reason();
@@ -85,6 +91,7 @@ static jerry_value_t board_enter_uf2(const jerry_call_info_t *info,
     vTaskDelay(pdMS_TO_TICKS(20));
     esp_restart();
     return jerry_undefined();
+#endif
 }
 
 static jerry_value_t board_safe_mode(const jerry_call_info_t *info,
@@ -108,6 +115,7 @@ static jerry_value_t board_storage_ready(const jerry_call_info_t *info,
     return jerry_boolean(fs_storage_ready());
 }
 
+#if MCUJS_REGISTRY_ONBOARD_LED
 static jerry_value_t board_led(const jerry_call_info_t *info,
                                const jerry_value_t args[], jerry_length_t argc) {
     (void)info;
@@ -126,6 +134,8 @@ static jerry_value_t board_led(const jerry_call_info_t *info,
     }
     return jerry_boolean(gpio_get_level(MCUJS_LED_PIN) == 0);
 }
+
+#endif
 
 #if MCUJS_REGISTRY_ONBOARD_BUTTON
 static jerry_value_t board_button_pressed(const jerry_call_info_t *info,
@@ -164,7 +174,9 @@ void js_bind_board(void) {
     js_set_number(board, "flashSize", (double)MCUJS_FLASH_SIZE);
     js_set_number(board, "ramSize", (double)MCUJS_RAM_SIZE);
     js_set_number(board, "cpuFreq", (double)MCUJS_CPU_FREQ_HZ);
+#if MCUJS_REGISTRY_ONBOARD_LED
     js_set_number(board, "ledPin", MCUJS_LED_PIN);
+#endif
     js_set_function(board, "freeMemory", board_free_memory);
     js_set_function(board, "uniqueId", board_unique_id);
     js_set_function(board, "reset", board_reset);

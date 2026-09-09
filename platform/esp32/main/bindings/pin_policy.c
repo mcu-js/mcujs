@@ -6,7 +6,11 @@ bool mcujs_pin_is_exposed(int pin) {
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)pin)) {
         return false;
     }
+#ifdef MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2
+    return false; /* All pins reserved until qualified, including private display. */
+#else
     return (pin >= 1 && pin <= 9) || pin == 21;
+#endif
 }
 
 bool mcujs_pin_is_exposed_output(int pin) {
@@ -14,7 +18,7 @@ bool mcujs_pin_is_exposed_output(int pin) {
 }
 
 bool mcujs_pin_is_peripheral(int pin) {
-    return pin >= 1 && pin <= 9 && GPIO_IS_VALID_GPIO((gpio_num_t)pin);
+    return mcujs_pin_is_exposed(pin) && pin >= 1 && pin <= 9;
 }
 
 bool mcujs_pin_is_peripheral_output(int pin) {

@@ -7,8 +7,9 @@ ESP_DIR="${ROOT}/platform/esp32"
 BUILD_DIR=/tmp/mcujs-build
 OUTPUT_DIR=/output
 VERSION="$(tr -d '[:space:]' < "${SOURCE_ROOT}/version.txt")"
-UF2_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.uf2"
-CAPABILITY_NAME="mcujs-${VERSION}-seeed_xiao_esp32s3.capabilities.json"
+export MCUJS_BOARD="${MCUJS_BOARD:-seeed_xiao_esp32s3}"
+UF2_NAME="mcujs-${VERSION}-${MCUJS_BOARD}.uf2"
+CAPABILITY_NAME="mcujs-${VERSION}-${MCUJS_BOARD}.capabilities.json"
 
 if [[ "${1:-build}" != "build" || $# -gt 1 ]]; then
     printf 'The ESP32 Docker lane supports only a non-flashing build action.\n' >&2
@@ -46,6 +47,11 @@ python3 "${ESP_DIR}/verify-component-lock.py" \
     --lock "${ESP_DIR}/dependencies.lock" \
     --components "${ESP_DIR}/managed_components"
 "${ESP_DIR}/build.sh" build
+if [[ "${MCUJS_BOARD}" == "waveshare_esp32s3_epaper_1.54_v2" ]]; then
+ install -m 0644 "${BUILD_DIR}/mcujs-esp32s3.bin" "${BUILD_DIR}/mcujs-esp32s3.elf" "${BUILD_DIR}/mcujs-esp32s3.map" "${BUILD_DIR}/bootloader/bootloader.bin" "${BUILD_DIR}/partition_table/partition-table.bin" "${BUILD_DIR}/flasher_args.json" "${OUTPUT_DIR}/"
+ install -m 0644 "${ROOT}/runtime/manifests/${MCUJS_BOARD}.json" "${OUTPUT_DIR}/${CAPABILITY_NAME}"
+ exit 0
+fi
 python3 "${ESP_DIR}/make-uf2.py" \
     --input "${BUILD_DIR}/mcujs-esp32s3.bin" \
     --output "${BUILD_DIR}/${UF2_NAME}"

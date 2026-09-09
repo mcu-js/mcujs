@@ -143,7 +143,8 @@ args_path = build_dir / "app-flash_args"
 json_path = build_dir / "flasher_args.json"
 expected_image = "mcujs-esp32s3.bin"
 expected_offset = 0x10000
-ota_end = 0x410000
+import os
+ota_end = 0x400000 if os.environ.get("MCUJS_BOARD") == "waveshare_esp32s3_epaper_1.54_v2" else 0x410000
 
 if not args_path.is_file() or not json_path.is_file():
     raise SystemExit("Generated app-flash metadata is missing")

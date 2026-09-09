@@ -5,6 +5,9 @@
  */
 
 #include "engine.h"
+#if defined(MCUJS_PLATFORM_ESP32) && defined(MCUJS_EXPERIMENTAL_CANVAS)
+extern void js_canvas_present(void);
+#endif
 #include "runtime_features.h"
 #if MCUJS_FEATURE_MODULE_LOADER
 #include "module_loader.h"
@@ -678,6 +681,9 @@ js_result_t js_engine_exec_named(const char *code, size_t code_len,
     
     jerry_value_t result = jerry_run(parsed);
     jerry_value_free(parsed);
+#if defined(MCUJS_PLATFORM_ESP32) && defined(MCUJS_EXPERIMENTAL_CANVAS)
+    js_canvas_present();
+#endif
     
     if (jerry_value_is_exception(result)) {
         store_error(result);
@@ -817,7 +823,11 @@ void js_register_bindings(void) {
 
 bool js_engine_process_timers(void) {
 #if MCUJS_FEATURE_TIMERS
-    return js_timers_process();
+    bool worked = js_timers_process();
+#if defined(MCUJS_PLATFORM_ESP32) && defined(MCUJS_EXPERIMENTAL_CANVAS)
+    js_canvas_present();
+#endif
+    return worked;
 #else
     return false;
 #endif

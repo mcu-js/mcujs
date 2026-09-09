@@ -28,6 +28,7 @@ const boardPresentation = Object.freeze({
   "waveshare_rp2350_touch_lcd_1.69": { label: "Waveshare RP2350-Touch-LCD-1.69", flash: "16MB", notes: "LCD, touch, IMU, buzzer" },
   "waveshare_rp2350_touch_lcd_2.8": { label: "Waveshare RP2350-Touch-LCD-2.8", flash: "16MB", notes: "Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; touch/audio/SD/sensors unsupported" },
   adafruit_feather_rp2040: { label: "Adafruit Feather RP2040", flash: "8MB", notes: "NeoPixel, STEMMA QT" },
+  "waveshare_esp32s3_epaper_1.54_v2": { label: "Waveshare ESP32-S3-ePaper-1.54 V2", flash: "8MB", notes: "Experimental Canvas opt-in; ROM recovery only; peripherals unqualified" },
   seeed_xiao_esp32s3: { label: "Seeed Studio XIAO ESP32-S3", flash: "8MB", notes: "Native USB, onboard LED" },
 });
 
@@ -475,6 +476,13 @@ boardDescriptors.seeed_xiao_esp32s3 = {
   },
 };
 
+const epaperFeatures = featureMap("moduleLoader", "console", "timers", "board", "process", "require", "fs", "safeMode");
+boardDescriptors["waveshare_esp32s3_epaper_1.54_v2"] = {
+ board: {name:"waveshare_esp32s3_epaper_1.54_v2", chip:"ESP32-S3", firmwareVersion,
+ exposedPins:[], pins:{}, devices:{display:{type:"epaper",controller:"Waveshare-1.54-V2",width:200,height:200}}},
+ features:epaperFeatures, modules:modulesFor(epaperFeatures),
+ capabilities:{boot:{safeMode:true}, fs:{implementation:"fat",writable:true,hostTransfer:true},usb:usbCapability(espUsbClasses)}
+};
 for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];
   if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
@@ -484,7 +492,10 @@ for (const boardId of Object.keys(boardPresentation)) {
   if (!boardDescriptors[boardId]) throw new Error(`Presentation metadata names unknown MCU.js board: ${boardId}`);
 }
 
-const shippingBoardIds = Object.freeze(Object.keys(boardDescriptors));
+// First e-paper bring-up has no qualified release/UF2 packaging yet.
+const shippingBoardIds = Object.freeze(Object.keys(boardDescriptors).filter(
+  (id) => id !== "waveshare_esp32s3_epaper_1.54_v2",
+));
 
 function manifestFor(boardId) {
   const descriptor = boardDescriptors[boardId];

@@ -170,6 +170,10 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
     if(n>=sizeof(kind))return jerry_throw_sz(JERRY_ERROR_TYPE,"Unsupported display driver");
     jerry_string_to_buffer(args[0],JERRY_ENCODING_UTF8,(jerry_char_t*)kind,n);
     if(strlen(kind)!=n)return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display driver name");
+    bool epaper=false;
+#ifdef MCUJS_CANVAS_EPAPER154
+    epaper=strcmp(kind,"default")==0;
+#endif
     bool dvi=false,lcd=strcmp(kind,"st7789")==0;
     if(strcmp(kind,"default")==0) {
 #ifdef MCUJS_CANVAS_DVI
@@ -178,13 +182,13 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
         lcd=true;
 #endif
     }
-    if(!dvi && !lcd)return jerry_throw_sz(JERRY_ERROR_TYPE,"Unsupported display driver");
+    if(!dvi && !lcd && !epaper)return jerry_throw_sz(JERRY_ERROR_TYPE,"Unsupported display driver");
     canvas_lcd_config_t cfg;
     if(lcd && !lcd_options(args[1],&cfg))return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid ST7789 panel profile or SPI connection options");
-    if(dvi) {
+    if(dvi || epaper) {
         jerry_value_t keys=jerry_object_keys(args[1]);
         bool valid=!jerry_value_is_exception(keys) && jerry_array_length(keys)==0;jerry_value_free(keys);
-        if(!valid)return jerry_throw_sz(JERRY_ERROR_TYPE,"Default DVI display takes no options");
+        if(!valid)return jerry_throw_sz(JERRY_ERROR_TYPE,"Default display takes no options");
     }
     canvas_display_t *d=calloc(1,sizeof(*d));
     if(!d)return jerry_throw_sz(JERRY_ERROR_COMMON,"Out of memory opening display");
@@ -192,7 +196,11 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
 #ifdef MCUJS_CANVAS_DVI
     if(dvi)ok=canvas_display_dvi_init(d);
 #endif
+#ifdef MCUJS_CANVAS_EPAPER154
+    if(epaper)ok=canvas_display_epaper154_init(d);
+#else
     if(lcd)ok=canvas_display_st7789_init(d,&cfg);
+#endif
     if(!ok){free(d);return jerry_throw_sz(JERRY_ERROR_COMMON,"Display unavailable, conflicting connection, or insufficient memory");}
     jerry_value_t result=jerry_object();jerry_object_set_native_ptr(result,&display_type,d);
     d->next=displays;displays=d;

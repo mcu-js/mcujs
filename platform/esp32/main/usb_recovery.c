@@ -1,6 +1,8 @@
 /* Persistent TinyUSB startup crash-loop recovery without requiring buttons. */
 
 #include "usb_recovery.h"
+#include "board_config.h"
+#if MCUJS_HAS_TINYUF2
 
 #include "esp_log.h"
 #include "esp_private/system_internal.h"
@@ -107,3 +109,7 @@ void mcujs_usb_recovery_mark_healthy(void) {
     }
     ESP_LOGI(TAG, "TinyUSB startup marked healthy");
 }
+#else
+void mcujs_usb_recovery_start(void) {}
+void mcujs_usb_recovery_mark_healthy(void) {}
+#endif

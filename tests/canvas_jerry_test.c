@@ -16,6 +16,7 @@ uint16_t *mcujs_dvi_get_draw_buffer(void){return back;}
 bool mcujs_dvi_swap_and_show(void){uint16_t *p=display;display=back;back=p;presents++;return true;}
 extern jerry_value_t js_create_canvas_native_module(void);
 extern jerry_value_t js_create_canvas_module(void);
+extern void js_canvas_present(void);
 static jerry_value_t require_native(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc){(void)info;(void)args;assert(argc==1);return js_create_canvas_native_module();}
 static void evaluate(const char *text,size_t size){
  jerry_value_t result=jerry_eval((const jerry_char_t*)text,size,JERRY_PARSE_NO_OPTS);
@@ -37,9 +38,10 @@ int main(int argc,char **argv){
  jerry_value_free(result);jerry_value_free(key);jerry_value_free(global);jerry_value_free(packaged);
  const char *save="var canvasUnderTest=packagedCanvas.canvas;";evaluate(save,strlen(save));
  source(argv[2]);const char *run="module.exports(canvasUnderTest);";evaluate(run,strlen(run));
- assert(presents==6);
+ assert(presents==0);js_canvas_present();assert(presents==1);
+ js_canvas_present();assert(presents==1); /* no pending work */
  FILE *f=fopen(argv[3],"wb");assert(f);fprintf(f,"P6\n160 120\n255\n");
  for(int i=0;i<160*120;i++){uint16_t p=display[i];unsigned char rgb[3]={(unsigned char)(((p>>11)&31)*255/31),(unsigned char)(((p>>5)&63)*255/63),(unsigned char)((p&31)*255/31)};fwrite(rgb,1,3,f);}fclose(f);
- printf("Real JerryScript Canvas demo: %u draws, saved host RGB565 image\n",presents);
+ printf("Real JerryScript Canvas demo: %u complete frame presentations, saved host RGB565 image\n",presents);
  jerry_cleanup();return 0;
 }

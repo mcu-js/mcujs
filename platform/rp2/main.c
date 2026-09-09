@@ -53,6 +53,7 @@ static void boot_status_on(void);
 static void boot_status_off(void);
 
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
+void js_canvas_present(void);
 volatile uint32_t mcujs_canvas_failure_stage __attribute__((section(".uninitialized_data")));
 #endif
 
@@ -230,6 +231,9 @@ static void main_loop(void) {
         
         /* Process JS timers */
         js_engine_process_timers();
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+        js_canvas_present();
+#endif
         
 #if MCUJS_HAS_DVI
         /* Feed scanlines to DVI encoder (backup to timer) */

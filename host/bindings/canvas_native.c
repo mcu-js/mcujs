@@ -15,6 +15,7 @@
 #define HEIGHT 120
 #define MAX_COMMANDS 128
 static const uint16_t *last_presented;
+static uint16_t *pending_pixels;
 
 static bool read_numbers(jerry_value_t array,float *out,size_t count) {
     for(size_t i=0;i<count;i++) {
@@ -59,6 +60,7 @@ static jerry_value_t draw(const jerry_call_info_t *info,const jerry_value_t args
     CANVAS_STAGE(201);
     if(!mcujs_dvi_is_running()) {
         last_presented=NULL;
+        pending_pixels=NULL;
         if(!mcujs_dvi_init(WIDTH,HEIGHT) || !mcujs_dvi_start())
             return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas display unavailable");
     }
@@ -66,14 +68,27 @@ static jerry_value_t draw(const jerry_call_info_t *info,const jerry_value_t args
     uint16_t *pixels=mcujs_dvi_get_draw_buffer();
     if(!pixels) return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas draw surface unavailable");
     /* DVI is double buffered; retain earlier Canvas drawing without a third allocation. */
-    if(last_presented && pixels!=last_presented) memcpy(pixels,last_presented,WIDTH*HEIGHT*sizeof(uint16_t));
+    if(pixels!=pending_pixels && last_presented && pixels!=last_presented) memcpy(pixels,last_presented,WIDTH*HEIGHT*sizeof(uint16_t));
     if(!canvas_render(pixels,WIDTH,HEIGHT,ops,count,stroke,rgba,width))
         return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas renderer rejected draw");
-    CANVAS_STAGE(204);
-    if(!mcujs_dvi_swap_and_show()) return jerry_throw_sz(JERRY_ERROR_COMMON,"Canvas presentation failed");
-    CANVAS_STAGE(205);
-    last_presented=pixels;
+    pending_pixels=pixels;
     return jerry_undefined();
+}
+/* Present once after the JS task/timer callbacks finish, like browser painting.
+ * Reuse the same back buffer throughout the callback; no third framebuffer. */
+void js_canvas_present(void) {
+    if (!pending_pixels) return;
+    if (!mcujs_dvi_is_running()) {
+        pending_pixels=NULL;
+        last_presented=NULL;
+        return;
+    }
+    CANVAS_STAGE(204);
+    if (mcujs_dvi_swap_and_show()) {
+        last_presented=pending_pixels;
+        pending_pixels=NULL;
+        CANVAS_STAGE(205);
+    }
 }
 static void put(jerry_value_t object,const char *name,jerry_value_t value) {
     jerry_value_t key=jerry_string_sz(name);

@@ -106,7 +106,8 @@ void usb_cdc_flush(void) {
 void usb_cdc_reset_usb(uint32_t delay_ms) {
     tud_disconnect();
     sleep_ms(delay_ms);
-    watchdog_enable(1, false);
+    /* An intentional reset must not look like a Canvas watchdog failure. */
+    watchdog_reboot(0, 0, 1);
     while (1) {
         tight_loop_contents();
     }

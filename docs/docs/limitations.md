@@ -14,7 +14,9 @@ These are normal constraints for tiny boards. Keep them in mind as you build.
 
 ## JavaScript
 
-- No `async`/`await`
+- Development firmware supports Promises and `async`/`await` inside functions via
+  [cooperative job processing](./development/promise-jobs.md), not browser/Node
+  microtask ordering. No top-level await, callback preemption or implicit async I/O.
 - No `Proxy` or `Reflect`
 - Limited `RegExp` support
 - No `BigInt`

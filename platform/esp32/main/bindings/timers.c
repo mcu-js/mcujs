@@ -104,6 +104,18 @@ static jerry_value_t clear_timer_handler(const jerry_call_info_t *info,
     return jerry_undefined();
 }
 
+/* Release retained callbacks while their JerryScript context is still alive. */
+void js_timers_cleanup(void) {
+    for (size_t i = 0; i < MAX_TIMERS; i++) {
+        if (s_timers[i].active) {
+            jerry_value_free(s_timers[i].callback);
+        }
+    }
+    memset(s_timers, 0, sizeof(s_timers));
+    s_initialized = false;
+    s_next_timer_id = 1;
+}
+
 void js_bind_timers(void) {
     timers_init();
     jerry_value_t global = jerry_current_realm();

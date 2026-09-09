@@ -111,7 +111,10 @@ void js_register_bindings(void);
  * Process pending timers
  * Should be called from main loop
  * 
- * Returns: true if there are more pending timers
+ * Runs up to 16 Promise jobs, one platform timer pass, then up to 16 jobs.
+ * Remaining jobs stay queued for the next platform loop; this is cooperative,
+ * not a time limit on individual callbacks or a Web/Node microtask checkpoint.
+ * Returns: true if there are active timers or pending Promise jobs
  */
 bool js_engine_process_timers(void);
 

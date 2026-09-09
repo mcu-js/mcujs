@@ -11,6 +11,7 @@ node --test \
     "${ROOT}/tests/examples-i2c-contract.test.js"
 "${ROOT}/scripts/test-runtime-registry.sh"
 "${ROOT}/scripts/test-runtime-bindings.sh"
+bash "${ROOT}/scripts/test-promise-jobs.sh"
 "${ROOT}/scripts/test-runtime-validation.sh"
 "${ROOT}/scripts/test-repl.sh"
 

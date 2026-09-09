@@ -187,20 +187,18 @@ bool js_timers_process(void) {
         
         /* Check if timer should fire */
         if ((int32_t)(now - timer->trigger_time_ms) >= 0) {
-            /* Call the callback */
-            jerry_value_t result = jerry_call(timer->callback, 
-                                              jerry_undefined(), 
-                                              NULL, 0);
-            jerry_value_free(result);
-            
+            /* Transition before calling JS: a callback can clear itself and
+             * reuse this slot. Keep its value alive independently of the slot. */
+            jerry_value_t callback = jerry_value_copy(timer->callback);
             if (timer->interval_ms > 0) {
-                /* Reschedule interval timer */
                 timer->trigger_time_ms = now + timer->interval_ms;
             } else {
-                /* One-shot timer - clean up */
                 jerry_value_free(timer->callback);
                 timer->active = false;
             }
+            jerry_value_t result = jerry_call(callback, jerry_undefined(), NULL, 0);
+            jerry_value_free(result);
+            jerry_value_free(callback);
         }
     }
     
@@ -210,6 +208,18 @@ bool js_timers_process(void) {
 /*
  * Register timer bindings
  */
+/* Release retained callbacks while their JerryScript context is still alive. */
+void js_timers_cleanup(void) {
+    for (size_t i = 0; i < MAX_TIMERS; i++) {
+        if (s_timers[i].active) {
+            jerry_value_free(s_timers[i].callback);
+        }
+    }
+    memset(s_timers, 0, sizeof(s_timers));
+    s_initialized = false;
+    s_next_timer_id = 1;
+}
+
 void js_bind_timers(void) {
     timers_init();
     

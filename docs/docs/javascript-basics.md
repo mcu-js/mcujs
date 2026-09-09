@@ -99,6 +99,14 @@ setTimeout(() => {
 
 Timers are how you keep doing work without blocking the runtime.
 
+## Promises and async functions (development)
+
+Development firmware pumps Promise continuations in bounded batches between
+platform-loop services. Use `async` functions, not top-level `await`, and handle
+rejections explicitly. See [Promise scheduling](./development/promise-jobs.md)
+for examples, ordering differences and limitations. This does not make existing
+synchronous filesystem or hardware methods nonblocking.
+
 ## Modules with require()
 
 Modules help you split code into smaller files.

@@ -10,6 +10,16 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Added
 
+- Cooperative Promise-job processing on RP and ESP: up to 16 jobs before and
+  after each timer pass, preserving queued work while yielding between batches.
+  Adds a pinned, build-local JerryScript bounded-job extension without changing
+  upstream `jerry_run_jobs()` or the SDK cache. Native tests cover completion,
+  rejection handlers, async/await, ordering, sustained chains and lifecycle.
+  Fixes RP callback timer-slot reuse and releases timer refs before engine
+  teardown on both backends. This is not browser/Node microtask ordering,
+  callback preemption, queue backpressure or unhandled-rejection reporting.
+  See `docs/docs/development/promise-jobs.md`; hardware acceptance is pending.
+
 - Experimental Seeed reTerminal Sticky target: 800×480 Canvas in 8MB PSRAM,
   SSD1677 full monochrome refresh and native UART console through the onboard
   USB bridge. No TinyUSB/MSC on microphone pins; no touch/audio/sensor APIs.

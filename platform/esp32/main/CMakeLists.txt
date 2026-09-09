@@ -8,6 +8,19 @@ if(NOT EXISTS "${JERRY_ROOT}/tools/build.py")
     message(FATAL_ERROR "Set JERRYSCRIPT_PATH to the pinned JerryScript v3.0.0 checkout")
 endif()
 
+# Requirement discovery runs on the host first; only stage for the target pass.
+if(CMAKE_CROSSCOMPILING)
+    execute_process(
+        COMMAND ${PYTHON} ${MCUJS_ROOT}/scripts/prepare-jerry-jobs.py
+            ${JERRY_ROOT} ${CMAKE_BINARY_DIR}/jerry-source
+        RESULT_VARIABLE MCUJS_JERRY_PREPARE_RESULT
+    )
+    if(NOT MCUJS_JERRY_PREPARE_RESULT EQUAL 0)
+        message(FATAL_ERROR "Unable to stage the pinned JerryScript job-queue extension")
+    endif()
+    set(JERRY_ROOT "${CMAKE_BINARY_DIR}/jerry-source")
+endif()
+
 set(MCUJS_SOURCES
     board_power.c
     main.c

@@ -38,6 +38,7 @@ void js_bind_timers(void);
  * Returns true if there are still pending timers
  */
 bool js_timers_process(void);
+void js_timers_cleanup(void);
 
 /*
  * Register PWM bindings

@@ -641,6 +641,9 @@ void js_engine_cleanup(void) {
 #if MCUJS_FEATURE_MODULE_LOADER
     js_module_loader_cleanup();
 #endif
+#if MCUJS_FEATURE_TIMERS
+    js_timers_cleanup();
+#endif
     jerry_cleanup();
     s_initialized = false;
 }
@@ -821,16 +824,37 @@ void js_register_bindings(void) {
 #endif
 }
 
+/* Cooperative checkpoints, not browser drain-to-empty microtask semantics.
+ * Two 16-job batches let timers and platform I/O progress even when jobs
+ * replenish their own queue. An individual JavaScript callback must yield. */
+static bool process_promise_jobs(void) {
+    bool pending = false;
+    jerry_value_t result = mcujs_jerry_run_jobs(16, &pending);
+    if (jerry_value_is_exception(result)) {
+        store_error(result);
+        printf("Promise job error: %s\r\n", s_error_message);
+    }
+    jerry_value_free(result);
+    return pending;
+}
+
 bool js_engine_process_timers(void) {
+    static bool processing = false;
+    if (!s_initialized || processing) {
+        return false;
+    }
+    processing = true;
+    process_promise_jobs();
+    bool active = false;
 #if MCUJS_FEATURE_TIMERS
-    bool worked = js_timers_process();
+    active = js_timers_process();
+#endif
+    bool pending = process_promise_jobs();
 #if defined(MCUJS_PLATFORM_ESP32) && defined(MCUJS_EXPERIMENTAL_CANVAS)
     js_canvas_present();
 #endif
-    return worked;
-#else
-    return false;
-#endif
+    processing = false;
+    return active || pending;
 }
 
 void js_engine_register_global_identifier(const char *name) {

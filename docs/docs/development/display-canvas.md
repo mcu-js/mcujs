@@ -4,7 +4,7 @@ The public object is a display with a stable, read-only `display.canvas`:
 
 ```js
 var ST7789 = require('displays/st7789');
-var display = ST7789.connect(); // built-in LCD wiring on RP2350 LCD 1.47-A
+var display = ST7789.connect(); // built-in LCD wiring on either supported RP2350 LCD board
 var ctx = display.canvas.getContext('2d');
 ctx.fillStyle = '#00eeee';
 ctx.fillRect(10, 10, 40, 40);
@@ -15,22 +15,35 @@ connection, `spi` is the numeric bus index used by MCU.js, not a new bus object:
 
 ```js
 var display = ST7789.connect({
+  profile: 'waveshare-1.47',
   spi: 0, sck: 18, mosi: 19, cs: 17, dc: 16,
   reset: 20, backlight: 21, horizontal: true, baudrate: 37500000
 });
 ```
 
-The initial ST7789 driver is specifically the Waveshare 1.47-A ST7789V3 profile:
-landscape 320x172, or portrait 172x320 with `horizontal: false`. Optional width and
-height must match that orientation. Other panel profiles, arbitrary dimensions,
-I2C drivers and bus objects are **not implemented**. Unknown options (including
-`i2c`) fail rather than silently using the onboard SPI connection.
+Two Waveshare panel profiles are qualified:
+
+- `waveshare-1.47`: LCD 1.47-A / ST7789V3, landscape 320x172 or portrait 172x320.
+- `waveshare-2.8`: Touch LCD 2.8 / ST7789T3, landscape 320x240 or portrait 240x320.
+
+Use `horizontal: false` for portrait. Optional width and height must match the
+selected profile and orientation. The board selects its onboard profile by
+default; explicit external connections can select `profile` separately from pins.
+The 2.8-inch board defaults to SPI1, SCK 10, MOSI 11, CS 13, DC 14, reset 15,
+backlight 16. SPI mode, panel initialization, offsets and wire byte order stay
+inside the backend, not in application drawing code.
+
+Other panel profiles, arbitrary dimensions, I2C drivers and bus objects are
+**not implemented**. Unknown options (including `i2c`) fail rather than silently
+using the onboard SPI connection. The initial 2.8-inch port deliberately withholds
+unqualified public GPIO/bus modules; its private display transport is independent
+of those public API capabilities.
 
 ## Defaults and lifetime
 
 `require('canvas').display` lazily opens and caches the board's default display;
 `require('canvas').canvas` remains an alias for its canvas. On PiZero the default
-is DVI; on RP2350 LCD 1.47-A it is the onboard LCD. Requiring either software
+is DVI; on either supported RP2350 LCD board it is the onboard LCD. Requiring either software
 module alone does not open the hardware.
 
 Use either the explicit connector or the default convenience for a physical
@@ -60,7 +73,7 @@ Presentation runs after JavaScript callbacks finish. No application `show()`,
 wire byte order in bounded chunks; it never swaps or duplicates the whole frame.
 Backlight enables only after a successful initial presentation.
 
-The experimental build supports these two board targets only. The RP2350 uses
+The experimental build supports PiZero, RP2350 LCD 1.47-A and RP2350 Touch LCD 2.8 only. The RP2350 uses
 its own SDK-derived linker layout with a separately reserved Core 0 stack; it
 must not inherit the RP2040 boot/image layout. Normal builds remain gated off.
 The Canvas subset limits documented in `canvas-first-slice.md` still apply.

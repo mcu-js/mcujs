@@ -33,7 +33,24 @@ or timer processing only if dirty. Each update resets/wakes, uploads one full
 image, refreshes, waits (15-second BUSY timeout), sleeps, and disables panel power.
 SPI runs conservatively at 4 MHz instead of vendor's 40 MHz. Timeout closes the
 surface and cuts power; USB and watchdog are serviced while waiting. This is not
-an animation/partial-refresh implementation.
+an animation implementation in the default build.
+
+### Opt-in partial-waveform experiment
+
+`MCUJS_EXPERIMENTAL_EPAPER_PARTIAL=1` additionally enables the vendor V2
+`WF_PARTIAL_1IN54_0` LUT and `0x22/CF` update sequence. The application still
+uses ordinary Canvas drawing. This is a partial **waveform**, not cropped SPI
+transfers: a complete 5000-byte monochrome image is sent.
+
+First presentation is full; at most four subsequent presentations are partial,
+then a full cleaning refresh is forced. A 5000-byte previous-image cache is
+stored after the existing RGB565 surface in the same PSRAM allocation. It
+restores both controller RAM planes after power-on before the next partial
+update. There is no second RGB565 framebuffer. Every update still sleeps and
+cuts panel power; errors invalidate the base image and force the next update
+through the full path. These conservative choices favour a bounded experiment
+over maximum refresh speed. Ghosting, timing and long-term endurance require
+physical qualification; do not treat this as a production refresh policy.
 
 ## Parent-owned Docker build / provisioning
 Use the pinned image supplied by the parent; no host SDK installs. Mount source
@@ -59,7 +76,7 @@ metadata before writing. Do not erase/write old NVS or PHY. Do not restore old
 factory app tails over FFAT. First runtime boot formats FFAT as needed.
 TinyUF2 recovery is explicitly unavailable: `board.enterUf2()` throws and the
 shared REPL board service returns failure, never a XIAO loader reset hint.
-Use physical BOOT/reset to enter Espressif ROM and esptool recovery.
+Use BOOT held during a PWR off/on cycle to enter Espressif ROM. After flashing, release BOOT and cycle PWR normally if USB reset leaves the board waiting for download.
 
 ## Verification boundaries
 Host tests cover conservative board discovery, the shared Jerry/Canvas path,

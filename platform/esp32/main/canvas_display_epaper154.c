@@ -25,6 +25,35 @@
 #define POWER 6
 static spi_device_handle_t spi;
 static bool owned;
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+/* Retain one packed previous frame across panel power-off, not another RGB565 surface. */
+#define SURFACE_BYTES (80000 + 5000)
+static bool previous_valid;
+static unsigned partial_count;
+static const uint8_t partial_lut[159] = {
+    0x0,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x80,0x80,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x40,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x80,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0xF,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x1,0x1,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x0,0x0,0x0,0x0,0x0,0x0,0x0,
+    0x22,0x22,0x22,0x22,0x22,0x22,0x0,0x0,0x0,
+    0x02,0x17,0x41,0xB0,0x32,0x28,
+};
+#else
+#define SURFACE_BYTES 80000
+#endif
 static const uint8_t lut[159] = {
  0x80,0x48,0x40,0,0,0,0,0,0,0,0,0,
  0x40,0x48,0x80,0,0,0,0,0,0,0,0,0,
@@ -59,7 +88,32 @@ static bool cmd(uint8_t c,const uint8_t *data,size_t n) {
 }
 #define C(c, ...) cmd(c,(const uint8_t[]){__VA_ARGS__},sizeof((const uint8_t[]){__VA_ARGS__}))
 static uint16_t *acquire(canvas_display_t *d) {return d->state;}
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+static bool write_previous(uint8_t command,const uint8_t *previous) {
+ if(!C(0x4e,0) || !C(0x4f,199,0) || !cmd(command,NULL,0))return false;
+ for(unsigned i=0;i<5000;i+=25)if(!send(true,previous+i,25))return false;
+ return true;
+}
+static bool prepare_partial(const uint8_t *previous) {
+ /* RAM loses its base image at power-off. Restore BOTH planes before changing it. */
+ if(!write_previous(0x24,previous) || !write_previous(0x26,previous))return false;
+ gpio_set_level(RST,1);delay_ms(50);gpio_set_level(RST,0);delay_ms(20);gpio_set_level(RST,1);delay_ms(50);
+ bool ok=idle() && cmd(0x32,partial_lut,153) && idle()
+  && C(0x3f,partial_lut[153]) && C(0x03,partial_lut[154])
+  && C(0x04,partial_lut[155],partial_lut[156],partial_lut[157]) && C(0x2c,partial_lut[158])
+  && C(0x37,0,0,0,0,0,0x40,0,0,0,0) && C(0x3c,0x80)
+  && C(0x22,0xc0) && cmd(0x20,NULL,0);
+ delay_ms(10);
+ return ok && idle() && C(0x11,1) && C(0x44,0,24) && C(0x45,199,0,0,0)
+  && C(0x4e,0) && C(0x4f,199,0) && cmd(0x24,NULL,0);
+}
+#endif
 static bool present(canvas_display_t *d) {
+ bool partial=false;
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+ uint8_t *previous=(uint8_t*)d->state+80000;
+ partial=previous_valid && partial_count<4;
+#endif
  gpio_set_level(POWER,0);delay_ms(20);
  gpio_set_level(RST,1);delay_ms(50);gpio_set_level(RST,0);delay_ms(20);gpio_set_level(RST,1);delay_ms(50);
  bool ok=idle() && cmd(0x12,NULL,0) && idle() && C(0x01,0xc7,0,1) && C(0x11,1)
@@ -67,6 +121,9 @@ static bool present(canvas_display_t *d) {
   && C(0x22,0xb1) && cmd(0x20,NULL,0) && C(0x4e,0) && C(0x4f,199,0) && idle()
   && cmd(0x32,lut,153) && idle() && C(0x3f,lut[153]) && C(0x03,lut[154])
   && C(0x04,lut[155],lut[156],lut[157]) && C(0x2c,lut[158]) && cmd(0x24,NULL,0);
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+ if(ok && partial)ok=prepare_partial(previous);
+#endif
  uint16_t *pixels=d->state;
  for(int y=0;ok && y<200;y++) {
   uint8_t row[25]={0};
@@ -76,13 +133,23 @@ static bool present(canvas_display_t *d) {
    if(299*r+587*g+114*b>=128000)row[x/8]|=0x80>>(x%8);
   }
   ok=send(true,row,sizeof(row));
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+  if(ok)memcpy(previous+y*25,row,25);
+#endif
  }
- ok=ok && C(0x22,0xc7) && cmd(0x20,NULL,0);
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+ if(ok && !partial)ok=write_previous(0x26,previous);
+#endif
+ ok=ok && C(0x22,partial?0xcf:0xc7) && cmd(0x20,NULL,0);
  delay_ms(10); /* Allow BUSY to assert before observing completion. */
  ok=ok && idle();
  if(ok)ok=C(0x10,1); /* SSD1681 deep sleep; reset required next update. */
  delay_ms(10);
  gpio_set_level(POWER,1);
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+ previous_valid=ok;
+ partial_count=(ok && partial)?partial_count+1:0;
+#endif
  return ok;
 }
 static void release(canvas_display_t *d) {
@@ -92,9 +159,12 @@ static void release(canvas_display_t *d) {
 }
 bool canvas_display_epaper154_init(canvas_display_t *d) {
  if(owned)return false;
- uint16_t *pixels=heap_caps_malloc(200*200*2,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+ uint16_t *pixels=heap_caps_malloc(SURFACE_BYTES,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
  if(!pixels)return false;
- memset(pixels,0xff,200*200*2);
+ memset(pixels,0xff,SURFACE_BYTES);
+#ifdef MCUJS_EXPERIMENTAL_EPAPER_PARTIAL
+ previous_valid=false;partial_count=0;
+#endif
  gpio_config_t out={.pin_bit_mask=(1ULL<<DC)|(1ULL<<CS)|(1ULL<<RST)|(1ULL<<POWER),.mode=GPIO_MODE_OUTPUT};
  gpio_config_t in={.pin_bit_mask=1ULL<<BUSY,.mode=GPIO_MODE_INPUT,.pull_up_en=GPIO_PULLUP_ENABLE};
  if(gpio_config(&out)!=ESP_OK || gpio_config(&in)!=ESP_OK){free(pixels);return false;}

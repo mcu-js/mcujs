@@ -140,6 +140,9 @@ set_target_properties(mcujs_jerry_core PROPERTIES
 # ESP-IDF target so static archive ordering cannot discard the port objects.
 target_link_libraries(mcujs_jerry_core INTERFACE ${COMPONENT_LIB})
 target_link_libraries(${COMPONENT_LIB} INTERFACE mcujs_jerry_core m)
+if(MCUJS_EXPERIMENTAL_EPAPER_PARTIAL)
+ target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_EXPERIMENTAL_EPAPER_PARTIAL=1)
+endif()
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
     MCUJS_VERSION="${MCUJS_VERSION}"

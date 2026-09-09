@@ -22,6 +22,12 @@ set(BINDINGS_SOURCES
     ${MCUJS_PLATFORM_OPTIONAL_BINDING_SOURCES}
 )
 
+# This first RP2350 2.8 port intentionally omits the legacy image API.
+# image.c enforces its registry gate at compile time (no unavailable stub).
+if(BOARD STREQUAL "waveshare_rp2350_touch_lcd_2.8")
+    list(REMOVE_ITEM BINDINGS_SOURCES image.c $ENV{PICOJPEG_PATH}/picojpeg.c)
+endif()
+
 # JavaScript API bindings library
 add_library(mcujs_bindings STATIC ${BINDINGS_SOURCES})
 if(MCUJS_EXPERIMENTAL_CANVAS)

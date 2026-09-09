@@ -7,8 +7,8 @@ HTML Canvas, `HTMLCanvasElement`, or `OffscreenCanvas`. It exposes ordinary Canv
 
 ## Application interface
 
-Install `lib/lib/canvas.js` on the board as **`/lib/canvas.js`**, so the runtime module
-loader can resolve:
+Experimental Canvas firmware bundles `lib/canvas.js` into the UF2. No library
+file installation or filesystem access is needed for:
 
 ```js
 var canvas = require('canvas').canvas;
@@ -91,8 +91,9 @@ native must support this same maximum and must not retain a pointer to JS storag
 ### Native prototype limits and known gaps
 
 This native backend is enabled only with `-DMCUJS_EXPERIMENTAL_CANVAS=ON`
-on the PiZero. Standard firmware remains unchanged. Install this JS module as
-`/lib/canvas.js`; the private native module is not the application API.
+on the PiZero. Standard firmware has neither the public Canvas module nor its
+private native backend. The private module is not the application API.
+The ctx.graphics copyright and permission notice is in `third_party/ctx/LICENSE`.
 
 - Coordinates and rectangle dimensions are restricted to `[-512, 512]`, and
   native line width to `(0, 640]`, to bound fixed-point edge arithmetic.
@@ -160,8 +161,12 @@ draw(flatCommands, modeString, rgbaArray, lineWidth) -> undefined
 | 3 | none | closePath |
 | 4 | x, y, width, height | rect |
 
-Every native draw starts a fresh native path from the supplied list and
-**automatically presents**. The JavaScript module owns all retained path/state.
+Every native draw starts a fresh native path from the supplied list. Drawing
+within one JavaScript task accumulates in the existing back buffer; the runtime
+**automatically presents after the task/timer callbacks finish**. This prevents
+intermediate clears from appearing as blank video frames. No application
+`present()` or `flush()` call is required. The JavaScript module owns retained
+path/state.
 The external rasterizer/native adapter is responsible for nonzero fill, implicit
 closure for fill without changing the JS path, default butt caps/miter joins,
 antialiasing, alpha blending onto the opaque surface, bounds clipping, and actual
@@ -222,3 +227,32 @@ Check a compiled experimental image with:
 ```sh
 python3 tests/check_canvas_stack_layout.py path/to/firmware.elf.map
 ```
+
+## Bounded animation and packaged-module acceptance
+
+Firmware **0.1.0+bd2e87c** completed the one-minute `canvas-animation.js` run:
+988 drawing updates in 60,016 ms. Seven in-run post-collection samples each
+reported 16,208 bytes of JS heap use and 11,708 bytes of native allocations.
+This is sampled bounded-run evidence, not a general leak-freedom claim; the
+post-restart sample includes an additional retained controller object.
+
+In the 50-second interior of the actual ShadowCast recording, all 1,500 captured
+frames contained both the moving square and following line. The preceding
+per-operation presentation implementation exposed 500 blank intermediate frames
+in the same-sized sample. A host regression requires no presentation during the
+synchronous drawing sequence and one complete presentation when the task ends.
+
+The animation controller stopped at its deadline, restarted, stopped manually,
+and stayed stopped. DVI was stopped at the end and `.info` stayed responsive.
+Restarting DVI itself after shutting down its hardware worker remains unqualified.
+No autorun was installed.
+
+`require('canvas')` succeeded while the device filesystem was still owned by the
+USB host, proving that the library is firmware-packaged. Non-Canvas Pico and
+PiZero builds compiled successfully with Canvas factory/renderer symbols and
+module strings absent. Experimental heap instrumentation and recovery markers
+are gated off in those standard builds.
+
+These are local experimental builds, not release artifacts; filesystem placement
+still follows firmware size, so upgrades must preserve files when that boundary
+moves. No release or long-duration stability claim is made.

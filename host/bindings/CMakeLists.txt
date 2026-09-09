@@ -40,10 +40,7 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
             "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
     endforeach()
     target_sources(mcujs_bindings PRIVATE canvas_native.c canvas_renderer.c canvas_module.c
-                   canvas_display_st7789.c canvas_spi.c)
-    if(MCUJS_HAS_DVI)
-        target_sources(mcujs_bindings PRIVATE canvas_display_dvi.c)
-    endif()
+                   ${MCUJS_PLATFORM_CANVAS_BINDING_SOURCES})
     target_include_directories(mcujs_bindings PRIVATE $ENV{CTX_PATH})
 endif()
 

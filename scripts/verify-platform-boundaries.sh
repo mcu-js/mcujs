@@ -32,6 +32,7 @@ required_variables=(
     MCUJS_PLATFORM_HARDWARE_BINDING_SOURCES
     MCUJS_PLATFORM_USB_BINDING_SOURCES
     MCUJS_PLATFORM_OPTIONAL_BINDING_SOURCES
+    MCUJS_PLATFORM_CANVAS_BINDING_SOURCES
     MCUJS_PLATFORM_INCLUDE_DIRS
 )
 
@@ -75,6 +76,10 @@ legacy_sources=(
     host/bindings/keyboard.c
     host/bindings/mouse.c
     host/bindings/dvi.c
+    host/bindings/canvas_display_dvi.c
+    host/bindings/canvas_display_st7789.c
+    host/bindings/canvas_spi.c
+    host/bindings/canvas_spi.h
     pico_sdk_import.cmake
 )
 

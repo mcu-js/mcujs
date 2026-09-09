@@ -13,6 +13,7 @@ static gpio_function_t funcs[NUM_BANK0_GPIOS];
 static unsigned hardware_calls, alloc_calls, fail_alloc, live_allocs;
 static bool busy[2], readable[2];
 static int fail_write = -1;
+static unsigned expected_mode;
 static size_t write_calls, max_write;
 typedef struct { uint8_t value, dc, bus, cs; } wire_byte;
 static wire_byte wire[300000];
@@ -63,7 +64,7 @@ void spi_deinit(spi_inst_t *spi) {
 }
 int spi_write_blocking(spi_inst_t *spi, const uint8_t *data, size_t len) {
     ++hardware_calls;
-    assert((spi->hw.cr0 & 255u) == 7u);
+    assert((spi->hw.cr0 & 255u) == (expected_mode == 3 ? 0xc7u : 7u));
     assert(spi->hw.cr1 == SPI_SSPCR1_SSE_BITS);
     assert(spi->hw.dmacr == 0 && spi->hw.imsc == 0);
     assert(funcs[spi->id ? 10 : 18] == GPIO_FUNC_SPI);
@@ -296,6 +297,43 @@ static void test_partial_chunk(void) {
     assert(pixels[1] == 0x1234 && pixels[2] == 0xabcd);
     d.release(&d); assert(!live_allocs);
 }
+static void test_panel_28(void) {
+    canvas_display_t d={0};
+    canvas_lcd_config_t c=panel();
+    c.profile=CANVAS_PANEL_WAVESHARE_2_8;c.spi=1;c.sck=10;c.mosi=11;
+    c.cs=13;c.dc=14;c.reset=15;c.backlight=16;c.width=320;c.height=240;
+    c.x_offset=0;c.y_offset=0;
+    expected_mode=3;data_commands[2]=14;clear_wire();
+    spi_hw_t original=fake_spi[1].hw;
+    assert(canvas_display_st7789_init(&d,&c));
+    assert(memcmp(&original,&fake_spi[1].hw,sizeof(original))==0);
+    assert(!pins[16]);
+    /* Literal panel sequence from Waveshare bsp_st7789.c, rotated landscape. */
+    const uint8_t init[]={0x29,0x11,0x36,0x60,0x3a,0x05,0xb0,0,0xe8,
+        0xb2,0x0c,0x0c,0,0x33,0x33,0xb7,0x75,0xbb,0x1a,0xc0,0x2c,
+        0xc2,0x01,0xff,0xc3,0x13,0xc4,0x20,0xc6,0x0f,0xd0,0xa4,0xa1,0xd6,0xa1,
+        0xe0,0xd0,0x0d,0x14,0x0d,0x0d,0x09,0x38,0x44,0x4e,0x3a,0x17,0x18,0x2f,0x30,
+        0xe1,0xd0,0x09,0x0f,0x08,0x07,0x14,0x37,0x44,0x4d,0x38,0x15,0x16,0x2c,0x2e,
+        0x21,0x29,0x2c};
+    assert(wire_size==sizeof(init));
+    for(size_t i=0;i<sizeof(init);i++)assert(wire[i].value==init[i]);
+    uint16_t *pixels=d.acquire(&d);pixels[0]=0xf800;pixels[1]=0x07e0;pixels[2]=0x001f;
+    clear_wire();assert(d.present(&d));assert(pins[16]);
+    const uint8_t prefix[]={0x2a,0,0,1,0x3f,0x2b,0,0,0,0xef,0x2c,0,0xf8,0xe0,7,0x1f,0};
+    assert(wire_size==153611);
+    for(size_t i=0;i<sizeof(prefix);i++)assert(wire[i].value==prefix[i]);
+    assert(pixels[0]==0xf800 && pixels[1]==0x07e0 && pixels[2]==0x001f);
+    assert(memcmp(&original,&fake_spi[1].hw,sizeof(original))==0);
+    d.release(&d);assert(!live_allocs);
+    c.horizontal=false;c.width=240;c.height=320;
+    clear_wire();assert(canvas_display_st7789_init(&d,&c));assert(wire[3].value==0);
+    clear_wire();assert(d.present(&d));
+    const uint8_t portrait[]={0x2a,0,0,0,0xef,0x2b,0,0,1,0x3f,0x2c};
+    for(size_t i=0;i<sizeof(portrait);i++)assert(wire[i].value==portrait[i]);
+    d.release(&d);assert(!live_allocs);
+    data_commands[2]=12;expected_mode=0;
+}
+
 int main(void) {
     test_initialization();
     test_frame();
@@ -303,6 +341,7 @@ int main(void) {
     test_restore_and_failures();
     test_validation();
     test_partial_chunk();
+    test_panel_28();
     puts("canvas ST7789 host tests: PASS (Waveshare init, RGB565/wire bytes, both windows, 256-byte chunks,");
     puts("  shared/independent buses, conflicts, register/mux/reset restoration, OOM,");
     puts("  transfer failures, busy/unread bus refusal, validation, release/reopen)");

@@ -13,8 +13,13 @@ int main(void) {
     assert(strstr(registry->board_json, MCUJS_EXPECTED_MANIFEST_NAME) != NULL);
     assert(strstr(registry->manifest_json, MCUJS_EXPECTED_MANIFEST_NAME) != NULL);
     assert(registry->capability_count > 0);
+#if MCUJS_FEATURE_GPIO
     assert(mcujs_runtime_find_capability("gpio") != NULL);
     assert(strstr(mcujs_runtime_find_capability("gpio")->json, "\"pins\"") != NULL);
+#else
+    assert(mcujs_runtime_find_capability("gpio") == NULL);
+    assert(!mcujs_runtime_has_module("gpio"));
+#endif
     assert(mcujs_runtime_find_capability("not-a-capability") == NULL);
     assert(mcujs_runtime_has_module("board"));
     assert(mcujs_runtime_has_module("fs"));

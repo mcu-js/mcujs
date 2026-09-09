@@ -20,7 +20,7 @@ bool canvas_spi_configure(canvas_spi_t *bus, int spi, int sck, int mosi, int bau
 }
 
 bool canvas_spi_begin(canvas_spi_t *bus) {
-    if (!bus || bus->active) return false;
+    if (!bus || bus->active || bus->mode > 3) return false;
     spi_inst_t *spi = bus->instance;
     uint32_t reset_bit = spi == spi0 ? RESETS_RESET_SPI0_BITS : RESETS_RESET_SPI1_BITS;
     bus->was_reset = (resets_hw->reset & reset_bit) != 0;
@@ -40,7 +40,8 @@ bool canvas_spi_begin(canvas_spi_t *bus) {
     hw->imsc = 0;
     hw->cr0 = 0; /* Motorola SPI, including clearing any previous frame format. */
     spi_set_baudrate(spi, bus->baudrate);
-    spi_set_format(spi, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+    spi_set_format(spi, 8, (spi_cpol_t)((bus->mode >> 1) & 1),
+                   (spi_cpha_t)(bus->mode & 1), SPI_MSB_FIRST);
     gpio_set_function((uint)bus->sck, GPIO_FUNC_SPI);
     gpio_set_function((uint)bus->mosi, GPIO_FUNC_SPI);
     hw->cr1 = SPI_SSPCR1_SSE_BITS;

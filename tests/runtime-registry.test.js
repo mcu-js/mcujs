@@ -29,6 +29,7 @@ const expectedBoards = [
   "waveshare_rp2040_touch_lcd_1.28",
   "waveshare_rp2350_lcd_1.47_a",
   "waveshare_rp2350_touch_lcd_1.69",
+  "waveshare_rp2350_touch_lcd_2.8",
   "adafruit_feather_rp2040",
   "seeed_xiao_esp32s3",
 ];
@@ -61,6 +62,7 @@ const expectedPresentation = {
   "waveshare_rp2040_touch_lcd_1.28": { label: "Waveshare RP2040 Touch LCD 1.28", flash: "4MB", notes: "Round LCD, touch, IMU" },
   "waveshare_rp2350_lcd_1.47_a": { label: "Waveshare RP2350-LCD-1.47-A", flash: "16MB", notes: "LCD, NeoPixel" },
   "waveshare_rp2350_touch_lcd_1.69": { label: "Waveshare RP2350-Touch-LCD-1.69", flash: "16MB", notes: "LCD, touch, IMU, buzzer" },
+  "waveshare_rp2350_touch_lcd_2.8": { label: "Waveshare RP2350-Touch-LCD-2.8", flash: "16MB", notes: "Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; touch/audio/SD/sensors unsupported" },
   adafruit_feather_rp2040: { label: "Adafruit Feather RP2040", flash: "8MB", notes: "NeoPixel, STEMMA QT" },
   seeed_xiao_esp32s3: { label: "Seeed Studio XIAO ESP32-S3", flash: "8MB", notes: "Native USB, onboard LED" },
 };
@@ -83,6 +85,9 @@ const expectedOnboardDevices = {
   },
   "waveshare_rp2350_touch_lcd_1.69": {
     display: { type: "lcd", controller: "ST7789V2", width: 240, height: 280 },
+  },
+  "waveshare_rp2350_touch_lcd_2.8": {
+    display: { type: "lcd", controller: "ST7789T3", width: 240, height: 320 },
   },
   adafruit_feather_rp2040: {
     led: { type: "gpio", pin: 13, activeLow: false },
@@ -142,7 +147,7 @@ test("all shipping boards have explicit, closed feature maps", () => {
   }
 });
 
-test("all ten board identities, presentation rows, and onboard inventories are explicit", () => {
+test("all eleven board identities, presentation rows, and onboard inventories are explicit", () => {
   assert.deepEqual(Object.keys(expectedPresentation), expectedBoards);
   assert.deepEqual(Object.keys(expectedOnboardDevices), expectedBoards);
   const version = readFileSync(join(root, "version.txt"), "utf8").trim();
@@ -320,6 +325,13 @@ test("external NeoPixel capability is independent from onboard inventory", () =>
   for (const boardId of shippingBoardIds) {
     const descriptor = boardDescriptors[boardId];
     const capability = descriptor.capabilities.neopixel;
+    if (boardId === "waveshare_rp2350_touch_lcd_2.8") {
+      assert.equal(descriptor.features.neopixel, false);
+      assert.equal(capability, undefined);
+      assert.equal(descriptor.modules.includes("neopixel"), false);
+      assert.equal(descriptor.board.devices.neopixel, undefined);
+      continue;
+    }
     assert.equal(descriptor.features.neopixel, true, `${boardId} external driver`);
     assert.ok(descriptor.modules.includes("neopixel"), `${boardId} module`);
     assert.deepEqual(capability.orders, ["RGB", "GRB"], `${boardId} orders`);
@@ -443,6 +455,10 @@ test("RP PWM limits count distinct reachable hardware outputs and slices", () =>
 
 test("PWM descriptors expose exact ratio units and truthful physical limits", () => {
   for (const boardId of shippingBoardIds) {
+    if (boardId === "waveshare_rp2350_touch_lcd_2.8") {
+      assert.equal(boardDescriptors[boardId].capabilities.pwm, undefined);
+      continue;
+    }
     assert.deepEqual(
       boardDescriptors[boardId].capabilities.pwm.duty,
       { min: 0, max: 1, unit: "ratio" },

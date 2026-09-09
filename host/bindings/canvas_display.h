@@ -17,6 +17,7 @@ typedef struct {
     int spi, sck, mosi, cs, dc, reset, backlight;
     int width, height, x_offset, y_offset, baudrate;
     bool horizontal;
+    enum { CANVAS_PANEL_WAVESHARE_1_47=0, CANVAS_PANEL_WAVESHARE_2_8=1 } profile;
 } canvas_lcd_config_t;
 bool canvas_display_dvi_init(canvas_display_t *display);
 bool canvas_display_st7789_init(canvas_display_t *display, const canvas_lcd_config_t *config);

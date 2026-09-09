@@ -96,7 +96,7 @@ static bool known_options(jerry_value_t opts) {
     jerry_value_t keys=jerry_object_keys(opts);
     if(jerry_value_is_exception(keys)){jerry_value_free(keys);return false;}
     bool valid=true;
-    const char *allowed[]={"spi","sck","mosi","cs","dc","reset","backlight","width","height","baudrate","horizontal"};
+    const char *allowed[]={"profile","spi","sck","mosi","cs","dc","reset","backlight","width","height","baudrate","horizontal"};
     for(uint32_t i=0;i<jerry_array_length(keys);i++) {
         jerry_value_t key=jerry_object_get_index(keys,i);char text[32]={0};
         jerry_size_t n=jerry_string_size(key,JERRY_ENCODING_UTF8);bool found=false;
@@ -111,17 +111,35 @@ static bool known_options(jerry_value_t opts) {
 static bool lcd_options(jerry_value_t opts,canvas_lcd_config_t *c) {
     *c=(canvas_lcd_config_t){.spi=-1,.sck=-1,.mosi=-1,.cs=-1,.dc=-1,.reset=-1,.backlight=-1,
         .width=320,.height=172,.x_offset=0,.y_offset=34,.baudrate=37500000,.horizontal=true};
-#ifdef MCUJS_CANVAS_DEFAULT_ST7789
+#ifdef MCUJS_CANVAS_DEFAULT_ST7789_2_8
+    c->spi=1;c->sck=10;c->mosi=11;c->cs=13;c->dc=14;c->reset=15;c->backlight=16;
+    c->profile=CANVAS_PANEL_WAVESHARE_2_8;
+#elif defined(MCUJS_CANVAS_DEFAULT_ST7789)
     c->spi=0;c->sck=18;c->mosi=19;c->cs=17;c->dc=16;c->reset=20;c->backlight=21;
 #endif
     if(!known_options(opts))return false;
-    jerry_value_t key=jerry_string_sz("horizontal"),v=jerry_object_get(opts,key);jerry_value_free(key);
+    jerry_value_t key=jerry_string_sz("profile"),v=jerry_object_get(opts,key);jerry_value_free(key);
+    if(!jerry_value_is_undefined(v)) {
+        if(!jerry_value_is_string(v)){jerry_value_free(v);return false;}
+        char profile[32]={0};jerry_size_t n=jerry_string_size(v,JERRY_ENCODING_UTF8);
+        if(n>=sizeof(profile)){jerry_value_free(v);return false;}
+        jerry_string_to_buffer(v,JERRY_ENCODING_UTF8,(jerry_char_t*)profile,n);
+        if(strlen(profile)!=n){jerry_value_free(v);return false;}
+        if(strcmp(profile,"waveshare-2.8")==0)c->profile=CANVAS_PANEL_WAVESHARE_2_8;
+        else if(strcmp(profile,"waveshare-1.47")==0)c->profile=CANVAS_PANEL_WAVESHARE_1_47;
+        else {jerry_value_free(v);return false;}
+    }
+    jerry_value_free(v);
+    key=jerry_string_sz("horizontal");v=jerry_object_get(opts,key);jerry_value_free(key);
     if(!jerry_value_is_undefined(v)) {
         if(!jerry_value_is_boolean(v)){jerry_value_free(v);return false;}
         c->horizontal=jerry_value_is_true(v);
     }
     jerry_value_free(v);
-    if(!c->horizontal){c->width=172;c->height=320;c->x_offset=34;c->y_offset=0;}
+    if(c->profile==CANVAS_PANEL_WAVESHARE_2_8) {
+        c->width=c->horizontal?320:240;c->height=c->horizontal?240:320;
+        c->x_offset=c->y_offset=0;
+    } else if(!c->horizontal){c->width=172;c->height=320;c->x_offset=34;c->y_offset=0;}
     int width=c->width,height=c->height;
     if(!integer_option(opts,"spi",&c->spi,0,1) ||
        !integer_option(opts,"sck",&c->sck,0,29) || !integer_option(opts,"mosi",&c->mosi,0,29) ||
@@ -154,7 +172,7 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
     }
     if(!dvi && !lcd)return jerry_throw_sz(JERRY_ERROR_TYPE,"Unsupported display driver");
     canvas_lcd_config_t cfg;
-    if(lcd && !lcd_options(args[1],&cfg))return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid ST7789V3 panel or SPI connection options");
+    if(lcd && !lcd_options(args[1],&cfg))return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid ST7789 panel profile or SPI connection options");
     if(dvi) {
         jerry_value_t keys=jerry_object_keys(args[1]);
         bool valid=!jerry_value_is_exception(keys) && jerry_array_length(keys)==0;jerry_value_free(keys);

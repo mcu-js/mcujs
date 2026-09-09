@@ -5,9 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-static uint16_t buffers[2][320*172];
+static uint16_t buffers[2][320*320];
 static bool occupied[2];
 static unsigned opened,released,presented;
+static canvas_lcd_config_t last_config;
 static jerry_value_t native, api;
 extern jerry_value_t js_create_canvas_native_module(void);
 extern jerry_value_t js_create_canvas_module(void);
@@ -17,6 +18,7 @@ static uint16_t *acquire(canvas_display_t *d){return d->state;}
 static bool present(canvas_display_t *d){(void)d;presented++;return true;}
 static void release(canvas_display_t *d){for(int i=0;i<2;i++)if(d->state==buffers[i])occupied[i]=false;released++;d->state=NULL;}
 bool canvas_display_st7789_init(canvas_display_t *d,const canvas_lcd_config_t *c){
+ last_config=*c;
  int i;for(i=0;i<2;i++)if(!occupied[i])break;if(i==2)return false;
  occupied[i]=true;opened++;memset(buffers[i],0,sizeof(buffers[i]));
  d->width=c->width;d->height=c->height;d->state=buffers[i];d->acquire=acquire;d->present=present;d->release=release;return true;
@@ -41,6 +43,16 @@ int main(void){
  jerry_init(JERRY_INIT_EMPTY);native=js_create_canvas_native_module();jerry_value_t g=jerry_current_realm();
  set(g,"require",jerry_function_external(require_stub));api=js_create_canvas_module();assert(!jerry_value_is_exception(api));assert(opened==0);
  set(g,"Canvas",jerry_value_copy(api));set(g,"ST7789",js_create_st7789_module());assert(opened==0);
+#ifdef MCUJS_CANVAS_DEFAULT_ST7789_2_8
+ eval("var d=Canvas.display;if(d.canvas.width!==320||d.canvas.height!==240)throw Error('wrong default T3 geometry');var c=d.canvas.getContext('2d');c.fillStyle='red';c.fillRect(0,0,320,240);");
+ assert(last_config.profile==CANVAS_PANEL_WAVESHARE_2_8 && last_config.spi==1 && last_config.sck==10 && last_config.mosi==11 && last_config.cs==13 && last_config.dc==14 && last_config.reset==15 && last_config.backlight==16 && last_config.x_offset==0 && last_config.y_offset==0);
+ js_canvas_present();assert(buffers[0][76799]==0xf800);
+ eval("d.close();var d2=ST7789.connect();if(d2.canvas.height!==240)throw Error('wrong no-option T3 geometry');d2.close();var d3=ST7789.connect({});if(d3.canvas.height!==240)throw Error('wrong empty-option T3 geometry');d3.close();");
+ assert(opened==3 && released==3);
+ jerry_value_free(g);jerry_value_free(api);jerry_value_free(native);jerry_cleanup();
+ puts("PASS: real Jerry T3 board defaults, lazy canvas, full 320x240 pixels, empty/absent options and close/reopen");return 0;
+#endif
+
  eval("var a=ST7789.connect();var b=ST7789.connect({cs:9,dc:8,reset:13,backlight:25,horizontal:false});var ac=a.canvas.getContext('2d');var bc=b.canvas.getContext('2d');if(a.canvas===b.canvas||a.canvas.width!==320||b.canvas.width!==172)throw Error('identity/dimensions');ac.fillStyle='#ff0000';ac.fillRect(0,0,3,3);bc.fillStyle='#0000ff';bc.fillRect(0,0,3,3);");
  assert(opened==2 && presented==0);js_canvas_present();assert(presented==2);
  assert(buffers[0][0]==0xf800 && buffers[1][0]==0x001f);
@@ -54,6 +66,11 @@ int main(void){
  eval("b.close();");assert(released==2);
  eval("var d=Canvas.display;if(d.canvas!==Canvas.canvas||Canvas.display!==d)throw Error('default identity');d.canvas.getContext('2d').fillRect(0,0,1,1);d.close();");assert(opened==3 && released==3);
  js_canvas_present();assert(presented==4);
+ eval("var p28=ST7789.connect({profile:'waveshare-2.8',spi:1,sck:10,mosi:11,cs:13,dc:14,reset:15,backlight:16});if(p28.canvas.width!==320||p28.canvas.height!==240)throw Error('2.8 dimensions');var t=p28.canvas.getContext('2d');t.fillStyle='lime';t.fillRect(0,0,320,240);");
+ assert(last_config.profile==CANVAS_PANEL_WAVESHARE_2_8 && last_config.spi==1 && last_config.x_offset==0 && last_config.y_offset==0);
+ js_canvas_present();assert(buffers[0][0]==0x07e0 && buffers[0][76799]==0x07e0);
+ eval("p28.close();var no=false;try{ST7789.connect({profile:'unknown'});}catch(e){no=true;}if(!no)throw Error('unknown profile accepted');");
+ assert(opened==4 && released==4);
  jerry_value_free(g);jerry_value_free(api);jerry_value_free(native);jerry_cleanup();
- assert(released==3);puts("PASS: real Jerry per-display RGB565 pixels, isolation, retained drawing, close, default identity, SPI option rejection");return 0;
+ assert(released==4);puts("PASS: real Jerry per-display RGB565 pixels, isolation, retained drawing, close, default identity, SPI option rejection");return 0;
 }

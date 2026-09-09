@@ -56,8 +56,8 @@
         },
         "exposedPins": {
           "type": "array",
-          "description": "Authoritative set of safe MCU GPIO identifiers exposed by this firmware's public metadata and peripheral APIs. It includes intentional onboard GPIO endpoints and excludes reserved/internal implementation pins. Every MCU pin published through board.pins, board.devices, or a capability descriptor must appear here.",
-          "minItems": 1,
+          "description": "Authoritative set of safe MCU GPIO identifiers exposed by this firmware's public metadata and peripheral APIs. It includes intentional onboard GPIO endpoints and excludes reserved/internal implementation pins. Every MCU pin published through board.pins, board.devices, or a capability descriptor must appear here. May be empty when the firmware exposes no qualified public GPIO endpoints.",
+          "minItems": 0,
           "uniqueItems": true,
           "items": {
             "$ref": "#/$defs/pin"
@@ -195,7 +195,8 @@
           "enum": [
             "GC9A01A",
             "ST7789V2",
-            "ST7789V3"
+            "ST7789V3",
+            "ST7789T3"
           ]
         },
         "width": {

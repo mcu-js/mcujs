@@ -10,6 +10,7 @@ MCUJS_BOARDS=(
     waveshare_rp2040_touch_lcd_1.28
     waveshare_rp2350_lcd_1.47_a
     waveshare_rp2350_touch_lcd_1.69
+    waveshare_rp2350_touch_lcd_2.8
     adafruit_feather_rp2040
 )
 
@@ -47,6 +48,7 @@ mcujs_board_label() {
         waveshare_rp2040_touch_lcd_1.28) printf 'Waveshare RP2040 Touch LCD 1.28' ;;
         waveshare_rp2350_lcd_1.47_a) printf 'Waveshare RP2350-LCD-1.47-A' ;;
         waveshare_rp2350_touch_lcd_1.69) printf 'Waveshare RP2350-Touch-LCD-1.69' ;;
+        waveshare_rp2350_touch_lcd_2.8) printf 'Waveshare RP2350-Touch-LCD-2.8' ;;
         adafruit_feather_rp2040) printf 'Adafruit Feather RP2040' ;;
         seeed_xiao_esp32s3) printf 'Seeed Studio XIAO ESP32-S3' ;;
         *) return 1 ;;
@@ -58,7 +60,7 @@ mcujs_board_chip() {
         pico|waveshare_rp2040_zero|waveshare_rp2040_pizero|waveshare_rp2040_touch_lcd_1.28|adafruit_feather_rp2040)
             printf 'RP2040'
             ;;
-        pico2|pico2_w|waveshare_rp2350_lcd_1.47_a|waveshare_rp2350_touch_lcd_1.69)
+        pico2|pico2_w|waveshare_rp2350_lcd_1.47_a|waveshare_rp2350_touch_lcd_1.69|waveshare_rp2350_touch_lcd_2.8)
             printf 'RP2350'
             ;;
         seeed_xiao_esp32s3) printf 'ESP32-S3' ;;
@@ -73,7 +75,7 @@ mcujs_board_flash() {
         pico|waveshare_rp2040_zero) printf '2MB' ;;
         pico2|pico2_w|waveshare_rp2040_touch_lcd_1.28) printf '4MB' ;;
         adafruit_feather_rp2040) printf '8MB' ;;
-        waveshare_rp2040_pizero|waveshare_rp2350_lcd_1.47_a|waveshare_rp2350_touch_lcd_1.69) printf '16MB' ;;
+        waveshare_rp2040_pizero|waveshare_rp2350_lcd_1.47_a|waveshare_rp2350_touch_lcd_1.69|waveshare_rp2350_touch_lcd_2.8) printf '16MB' ;;
         seeed_xiao_esp32s3) printf '8MB' ;;
         *) return 1 ;;
     esac
@@ -89,6 +91,7 @@ mcujs_board_features() {
         waveshare_rp2040_touch_lcd_1.28) printf 'Round LCD, touch, IMU' ;;
         waveshare_rp2350_lcd_1.47_a) printf 'LCD, NeoPixel' ;;
         waveshare_rp2350_touch_lcd_1.69) printf 'LCD, touch, IMU, buzzer' ;;
+        waveshare_rp2350_touch_lcd_2.8) printf 'Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; touch/audio/SD/sensors unsupported' ;;
         adafruit_feather_rp2040) printf 'NeoPixel, STEMMA QT' ;;
         seeed_xiao_esp32s3) printf 'Native USB, onboard LED' ;;
         *) return 1 ;;

@@ -1,0 +1,32 @@
+{
+  "formatVersion": 1,
+  "apiVersion": "0.2",
+  "board": {
+    "name": "waveshare_rp2350_touch_lcd_2.8",
+    "chip": "RP2350",
+    "firmwareVersion": "0.1.0",
+    "exposedPins": [],
+    "pins": {},
+    "devices": {
+      "display": {
+        "type": "lcd",
+        "controller": "ST7789T3",
+        "width": 240,
+        "height": 320
+      }
+    }
+  },
+  "capabilities": {
+    "fs": {
+      "implementation": "fat",
+      "writable": true,
+      "hostTransfer": true
+    },
+    "usb": {
+      "classes": [
+        "cdc",
+        "msc"
+      ]
+    }
+  }
+}

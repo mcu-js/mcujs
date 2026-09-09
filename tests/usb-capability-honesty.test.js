@@ -22,9 +22,10 @@ function source(path) {
 }
 
 test("every shipping image advertises its exact enabled USB classes", () => {
-  assert.equal(rpBoardIds.length, 9);
+  assert.equal(rpBoardIds.length, 10);
   for (const boardId of rpBoardIds) {
-    assert.deepEqual(boardDescriptors[boardId].capabilities.usb.classes, rpUsbClasses, boardId);
+    const expected = boardId === "waveshare_rp2350_touch_lcd_2.8" ? ["cdc", "msc"] : rpUsbClasses;
+    assert.deepEqual(boardDescriptors[boardId].capabilities.usb.classes, expected, boardId);
   }
   assert.deepEqual(
     boardDescriptors.seeed_xiao_esp32s3.capabilities.usb.classes,

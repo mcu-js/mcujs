@@ -53,7 +53,7 @@ function expectedImageCapability(maxInputBytes) {
 }
 
 test("shipping image capability exactly matches compiled current-image support", () => {
-  assert.equal(shippingBoardIds.length, 10);
+  assert.equal(shippingBoardIds.length, 11);
   for (const boardId of shippingBoardIds) {
     const descriptor = boardDescriptors[boardId];
     const capability = descriptor.capabilities.image;
@@ -67,7 +67,7 @@ test("shipping image capability exactly matches compiled current-image support",
     } else if (rp2350Boards.has(boardId)) {
       assert.deepEqual(capability, expectedImageCapability(192 * 1024), boardId);
     } else {
-      assert.equal(boardId, "seeed_xiao_esp32s3");
+      assert.ok(["seeed_xiao_esp32s3", "waveshare_rp2350_touch_lcd_2.8"].includes(boardId));
       assert.equal(capability, undefined);
       assert.equal(descriptor.modules.includes("image"), false);
     }

@@ -840,6 +840,87 @@
     X("image", "{\"methods\":[\"info\",\"decodeJPEG\",\"decodeBMP\",\"drawJPEG\",\"drawBMP\"],\"formats\":{\"jpeg\":{\"profiles\":[\"baseline\"]},\"bmp\":{\"variants\":[{\"bitsPerPixel\":16,\"pixelFormat\":\"rgb565\",\"compression\":[\"none\",\"rgb565-bitfields\"]},{\"bitsPerPixel\":24,\"pixelFormat\":\"bgr888\",\"compression\":[\"none\"]},{\"bitsPerPixel\":32,\"pixelFormat\":\"bgra8888\",\"alpha\":\"ignored\",\"compression\":[\"none\"]}],\"maxWidth\":4096,\"maxHeight\":4096}},\"maxInputBytes\":196608,\"destination\":{\"pixelFormat\":\"rgb565\",\"byteOrders\":[\"swapped\",\"native\"]}}") \
     X("graphics", "{\"methods\":[\"createBuffer\",\"freeBuffer\",\"getBufferInfo\",\"getPointer\",\"fill\",\"setPixel\",\"fillRect\",\"color565\"],\"buffer\":{\"pixelFormat\":\"rgb565\",\"bytesPerPixel\":2,\"maxWidth\":320,\"maxHeight\":320,\"maxActiveBuffers\":1},\"color565ByteOrder\":\"swapped\",\"pointerAccess\":true}") \
     X("screen", "{\"methods\":[\"init\",\"fill\",\"setPixel\",\"fillRect\",\"drawLine\",\"drawCircle\",\"fillCircle\",\"drawText\",\"rgb\",\"color\",\"show\",\"getWidth\",\"getHeight\",\"getBufferHandle\",\"getByteOrder\"],\"constants\":[\"BLACK\",\"WHITE\",\"RED\",\"GREEN\",\"BLUE\",\"CYAN\",\"MAGENTA\",\"YELLOW\",\"ORANGE\",\"GRAY\"],\"framebuffer\":{\"pixelFormat\":\"rgb565\",\"bytesPerPixel\":2,\"maxWidth\":320,\"maxHeight\":240,\"maxActiveBuffers\":1,\"byteOrders\":[\"native\",\"swapped\"]},\"driver\":{\"requiredMethods\":[\"show\"],\"optionalMethods\":[\"init\"],\"externalBuffer\":true}}")
+#elif defined(MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_2_8)
+#define MCUJS_RUNTIME_BOARD_ID "waveshare_rp2350_touch_lcd_2.8"
+#define MCUJS_FEATURE_MODULE_LOADER 1
+#define MCUJS_FEATURE_CONSOLE 1
+#define MCUJS_FEATURE_TIMERS 1
+#define MCUJS_FEATURE_BOARD 1
+#define MCUJS_FEATURE_GPIO 0
+#define MCUJS_FEATURE_PWM 0
+#define MCUJS_FEATURE_I2C 0
+#define MCUJS_FEATURE_SPI 0
+#define MCUJS_FEATURE_ADC 0
+#define MCUJS_FEATURE_NEOPIXEL 0
+#define MCUJS_FEATURE_PROCESS 1
+#define MCUJS_FEATURE_REQUIRE 1
+#define MCUJS_FEATURE_FS 1
+#define MCUJS_FEATURE_IMAGE 0
+#define MCUJS_FEATURE_KEYBOARD 0
+#define MCUJS_FEATURE_MOUSE 0
+#define MCUJS_FEATURE_GRAPHICS 0
+#define MCUJS_FEATURE_SCREEN 0
+#define MCUJS_HAS_DVI 0
+#define MCUJS_REGISTRY_ONBOARD_LED 0
+#define MCUJS_REGISTRY_ONBOARD_BUTTON 0
+#define MCUJS_REGISTRY_ONBOARD_NEOPIXEL 0
+#define MCUJS_REGISTRY_LED_PIN 0
+#define MCUJS_REGISTRY_ADC_VSYS 0
+#define MCUJS_REGISTRY_ADC_VOLTAGE 0
+#define MCUJS_REGISTRY_ADC_TEMPERATURE 0
+#define MCUJS_REGISTRY_SAFE_MODE 0
+#define MCUJS_REGISTRY_STORAGE_READY 1
+#define MCUJS_USB_CDC 1
+#define MCUJS_USB_MSC 1
+#define MCUJS_USB_KEYBOARD_HID 0
+#define MCUJS_USB_MOUSE_HID 0
+#define MCUJS_RUNTIME_GPIO_PIN_MASK 0x0ULL
+#define MCUJS_RUNTIME_GPIO_OUTPUT_PIN_MASK 0x0ULL
+#define MCUJS_RUNTIME_PWM_PIN_MASK 0x0ULL
+#define MCUJS_RUNTIME_ADC_PIN_MASK 0x0ULL
+#define MCUJS_RUNTIME_ADC_CHANNEL_MASK 0x0ULL
+#define MCUJS_REGISTRY_ADC_TEMP_RAW_CHANNEL 0
+#define MCUJS_RUNTIME_NEOPIXEL_PIN_MASK 0x0ULL
+#define MCUJS_RUNTIME_NEOPIXEL_MAX_LENGTH 0
+#define MCUJS_RUNTIME_NEOPIXEL_ORDER_RGB 0
+#define MCUJS_RUNTIME_NEOPIXEL_ORDER_GRB 0
+#define MCUJS_RUNTIME_IMAGE_MAX_INPUT_BYTES 0
+#define MCUJS_RUNTIME_GRAPHICS_MAX_WIDTH 0
+#define MCUJS_RUNTIME_GRAPHICS_MAX_HEIGHT 0
+#define MCUJS_RUNTIME_SCREEN_MAX_WIDTH 0
+#define MCUJS_RUNTIME_SCREEN_MAX_HEIGHT 0
+#define MCUJS_RUNTIME_DVI_MAX_WIDTH 0
+#define MCUJS_RUNTIME_DVI_MAX_HEIGHT 0
+#define MCUJS_RUNTIME_PWM_MIN_HZ 0
+#define MCUJS_RUNTIME_PWM_MAX_HZ 0
+#define MCUJS_RUNTIME_I2C_DEFAULT_BUS 0
+#define MCUJS_RUNTIME_I2C_DEFAULT_SDA -1
+#define MCUJS_RUNTIME_I2C_DEFAULT_SCL -1
+#define MCUJS_RUNTIME_I2C_MIN_HZ 0
+#define MCUJS_RUNTIME_I2C_MAX_HZ 0
+#define MCUJS_RUNTIME_I2C_MAX_TRANSFER_BYTES 0
+#define MCUJS_RUNTIME_I2C_ROUTES(X)
+#define MCUJS_RUNTIME_SPI_DEFAULT_BUS 0
+#define MCUJS_RUNTIME_SPI_DEFAULT_SCK -1
+#define MCUJS_RUNTIME_SPI_DEFAULT_MOSI -1
+#define MCUJS_RUNTIME_SPI_DEFAULT_MISO -1
+#define MCUJS_RUNTIME_SPI_MAX_TRANSFER_BYTES 0
+#define MCUJS_RUNTIME_SPI_MODE_MASK 0u
+#define MCUJS_RUNTIME_SPI_ROUTES(X)
+#define MCUJS_RUNTIME_SPI_MIN_HZ 0
+#define MCUJS_RUNTIME_SPI_MAX_HZ 0
+#define MCUJS_RUNTIME_API_VERSION "0.2"
+#define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_touch_lcd_2.8\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789T3\",\"width\":240,\"height\":320}}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_touch_lcd_2.8\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789T3\",\"width\":240,\"height\":320}}},\"capabilities\":{\"fs\":{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\"]}}}"
+#define MCUJS_RUNTIME_BUILTIN_MODULES(X) \
+    X("board") \
+    X("fs") \
+    X("process") \
+    X("mcujs:module") \
+    X("node:module")
+#define MCUJS_RUNTIME_CAPABILITIES(X) \
+    X("fs", "{\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true}") \
+    X("usb", "{\"classes\":[\"cdc\",\"msc\"]}")
 #elif defined(MCUJS_BOARD_ADAFRUIT_FEATHER_RP2040)
 #define MCUJS_RUNTIME_BOARD_ID "adafruit_feather_rp2040"
 #define MCUJS_FEATURE_MODULE_LOADER 1

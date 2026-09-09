@@ -30,8 +30,12 @@ const dviMethods = [
   "init", "start", "stop", "show", "fill", "isRunning",
   "getDrawBuffer", "getBufferSize", "swapAndShow",
 ];
-const rpBoards = new Set(shippingBoardIds.filter((id) => id !== "seeed_xiao_esp32s3"));
+const rpBoards = new Set(shippingBoardIds.filter((id) =>
+  id !== "seeed_xiao_esp32s3" && id !== "waveshare_rp2350_touch_lcd_2.8"));
 const onboardPanels = {
+  "waveshare_rp2350_touch_lcd_2.8": {
+    type: "lcd", controller: "ST7789T3", width: 240, height: 320,
+  },
   "waveshare_rp2040_touch_lcd_1.28": {
     type: "lcd", controller: "GC9A01A", width: 240, height: 240,
   },
@@ -103,7 +107,7 @@ function expectedDvi() {
 }
 
 test("shipping graphics, screen/display, and DVI descriptors match current-image exposure", () => {
-  assert.equal(shippingBoardIds.length, 10);
+  assert.equal(shippingBoardIds.length, 11);
   for (const boardId of shippingBoardIds) {
     const descriptor = boardDescriptors[boardId];
     const graphics = descriptor.capabilities.graphics;

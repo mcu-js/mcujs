@@ -1,4 +1,4 @@
-/* ST7789V3 profile: Waveshare RP2350 LCD 1.47-A, not all ST7789 panels.
+/* ST7789 profiles: Waveshare 1.47-A V3 and Touch LCD 2.8 T3.
  * One retained native-endian RGB565 surface per display; no DMA or scratch
  * full-frame copy. All entry points run on the serialized JS task thread.
  */
@@ -36,7 +36,8 @@ static bool connection_conflicts(const canvas_lcd_config_t *c) {
 }
 
 static bool valid_config(const canvas_lcd_config_t *c) {
-    if (!c || c->width <= 0 || c->height <= 0 || c->x_offset < 0 || c->y_offset < 0)
+    if (!c || (c->profile != CANVAS_PANEL_WAVESHARE_1_47 &&
+               c->profile != CANVAS_PANEL_WAVESHARE_2_8) || c->width <= 0 || c->height <= 0 || c->x_offset < 0 || c->y_offset < 0)
         return false;
     /* MADCTL exchanges the controller's 240x320 address axes. */
     int max_x = c->horizontal ? 320 : 240;
@@ -109,8 +110,11 @@ static bool present(canvas_display_t *display) {
         if (count > sizeof(chunk) / 2) count = sizeof(chunk) / 2;
         for (size_t i = 0; i < count; ++i) {
             uint16_t pixel = lcd->pixels[pos + i];
-            chunk[2 * i] = (uint8_t)(pixel >> 8);
-            chunk[2 * i + 1] = (uint8_t)pixel;
+            /* T3 factory RAMCTRL (B0 00 E8) uses little-endian RGB565;
+             * the 1.47 V3 uses high-byte first. Never mutate native pixels. */
+            bool little = c->profile == CANVAS_PANEL_WAVESHARE_2_8;
+            chunk[2 * i] = little ? (uint8_t)pixel : (uint8_t)(pixel >> 8);
+            chunk[2 * i + 1] = little ? (uint8_t)(pixel >> 8) : (uint8_t)pixel;
         }
         ok = canvas_spi_write(&lcd->bus, chunk, count * 2);
         pos += count;
@@ -142,12 +146,46 @@ static void release(canvas_display_t *display) {
     display->state = NULL;
 }
 
+/* Register values/rotation from Waveshare's RP2350-Touch-LCD-2.8 demo,
+ * C/libraries/bsp/bsp_st7789.c. Keep its native-endian RAMCTRL mode. */
+static bool initialize_panel_28(st7789_t *lcd) {
+    const canvas_lcd_config_t *c=&lcd->config;
+    if(c->reset>=0) {
+        gpio_put((uint)c->reset,false);sleep_ms(50);
+        gpio_put((uint)c->reset,true);sleep_ms(50);
+    } else {
+        if(!command(lcd,0x01,NULL,0))return false;
+        sleep_ms(150);
+    }
+    if(!command(lcd,0x29,NULL,0))return false;
+    sleep_ms(10);
+    if(!command(lcd,0x11,NULL,0))return false;
+    sleep_ms(120); /* Conservative sleep-out wait, rather than vendor's 10 ms. */
+    const uint8_t madctl=c->horizontal?0x60:0x00;
+    if(!command(lcd,0x36,&madctl,1))return false;
+    static const struct {uint8_t cmd,count,data[14];} init[]={
+        {0x3a,1,{0x05}}, {0xb0,2,{0x00,0xe8}},
+        {0xb2,5,{0x0c,0x0c,0x00,0x33,0x33}},
+        {0xb7,1,{0x75}}, {0xbb,1,{0x1a}}, {0xc0,1,{0x2c}},
+        {0xc2,2,{0x01,0xff}}, {0xc3,1,{0x13}}, {0xc4,1,{0x20}},
+        {0xc6,1,{0x0f}}, {0xd0,2,{0xa4,0xa1}}, {0xd6,1,{0xa1}},
+        {0xe0,14,{0xd0,0x0d,0x14,0x0d,0x0d,0x09,0x38,0x44,0x4e,0x3a,0x17,0x18,0x2f,0x30}},
+        {0xe1,14,{0xd0,0x09,0x0f,0x08,0x07,0x14,0x37,0x44,0x4d,0x38,0x15,0x16,0x2c,0x2e}},
+        {0x21,0,{0}}, {0x29,0,{0}}, {0x2c,0,{0}}
+    };
+    for(size_t i=0;i<sizeof(init)/sizeof(init[0]);i++)
+        if(!command(lcd,init[i].cmd,init[i].data,init[i].count))return false;
+    sleep_ms(20);
+    return true;
+}
+
 static bool initialize_panel(st7789_t *lcd) {
     const canvas_lcd_config_t *c = &lcd->config;
     output(c->cs, true);
     output(c->dc, false);
     output(c->backlight, false);
     output(c->reset, true);
+    if(c->profile == CANVAS_PANEL_WAVESHARE_2_8) return initialize_panel_28(lcd);
     if (c->reset >= 0) {
         sleep_ms(100);
         gpio_put((uint)c->reset, false);
@@ -190,6 +228,7 @@ bool canvas_display_st7789_init(canvas_display_t *display, const canvas_lcd_conf
     if (!lcd) return false;
     lcd->config = *config;
     lcd->bus = bus;
+    lcd->bus.mode = config->profile == CANVAS_PANEL_WAVESHARE_2_8 ? 3 : 0;
     lcd->pixels = calloc((size_t)config->width * (size_t)config->height, sizeof(uint16_t));
     if (!lcd->pixels) { free(lcd); return false; }
     /* All allocation succeeds before the first GPIO/controller write. */

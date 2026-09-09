@@ -42,3 +42,9 @@ compile_registry_test "${CONSTRAINED}" \
     -DMCUJS_EXPECTED_BOARD='"seeed_xiao_esp32s3"' \
     -DMCUJS_EXPECTED_MANIFEST_NAME='"\"name\":\"seeed_xiao_esp32s3\""'
 "${CONSTRAINED}"
+
+compile_registry_test "${CONSTRAINED_RP}" \
+    -DMCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_2_8=1 \
+    -DMCUJS_EXPECTED_BOARD='"waveshare_rp2350_touch_lcd_2.8"' \
+    -DMCUJS_EXPECTED_MANIFEST_NAME='"\"name\":\"waveshare_rp2350_touch_lcd_2.8\""'
+"${CONSTRAINED_RP}"

@@ -23,6 +23,7 @@ package set in `MCUJS_RELEASE_BOARDS`; keep this table in sync with both lanes.
 | `waveshare_rp2040_touch_lcd_1.28` | Waveshare RP2040 Touch LCD 1.28 | RP2040 | 4MB | Round LCD, touch, IMU |
 | `waveshare_rp2350_lcd_1.47_a` | Waveshare RP2350-LCD-1.47-A | RP2350 | 16MB | LCD, NeoPixel |
 | `waveshare_rp2350_touch_lcd_1.69` | Waveshare RP2350-Touch-LCD-1.69 | RP2350 | 16MB | LCD, touch, IMU, buzzer |
+| `waveshare_rp2350_touch_lcd_2.8` | Waveshare RP2350-Touch-LCD-2.8 | RP2350 | 16MB | Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; touch/audio/SD/sensors unsupported |
 | `adafruit_feather_rp2040` | Adafruit Feather RP2040 | RP2040 | 8MB | NeoPixel, STEMMA QT |
 | `seeed_xiao_esp32s3` | Seeed Studio XIAO ESP32-S3 | ESP32-S3 | 8MB | Native USB, onboard LED |
 
@@ -46,6 +47,7 @@ output, and DVI are independent capabilities; none implies another.
 | `waveshare_rp2040_touch_lcd_1.28` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (16 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | GC9A01A LCD (240 × 240) |
 | `waveshare_rp2350_lcd_1.47_a` | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ (192 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | NeoPixel (GPIO 22, 1 × GRB) + ST7789V3 LCD (172 × 320) |
 | `waveshare_rp2350_touch_lcd_1.69` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (192 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ST7789V2 LCD (240 × 280) |
+| `waveshare_rp2350_touch_lcd_2.8` | — | — | — | — | — | — | — | — | — | — | ✓ | ✓ | — | — | ST7789T3 LCD (240 × 320) |
 | `adafruit_feather_rp2040` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (16 KiB) | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | LED (GPIO 13, active-high) + NeoPixel (GPIO 16, 1 × GRB) |
 | `seeed_xiao_esp32s3` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ | ✓ | — | — | BOOT button (managed, read-only) + LED (GPIO 21, active-low) |
 
@@ -66,6 +68,7 @@ corresponding physical device is listed.
 | `waveshare_rp2040_touch_lcd_1.28` | `A0=26`, `A1=27`, `A2=28`, `SDA=6`, `SCL=7`, `SCK=10`, `MOSI=11`, `MISO=12` | GC9A01A LCD (240 × 240) | — |
 | `waveshare_rp2350_lcd_1.47_a` | `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=0`, `NEOPIXEL=22` | NeoPixel (GPIO 22, 1 × GRB) + ST7789V3 LCD (172 × 320) | `board.neopixel()` |
 | `waveshare_rp2350_touch_lcd_1.69` | `A0=26`, `A1=27`, `A2=28`, `SDA=6`, `SCL=7`, `SCK=10`, `MOSI=11`, `MISO=12` | ST7789V2 LCD (240 × 280) | — |
+| `waveshare_rp2350_touch_lcd_2.8` | — | ST7789T3 LCD (240 × 320) | — |
 | `adafruit_feather_rp2040` | `A0=26`, `A1=27`, `A2=28`, `A3=29`, `SDA=2`, `SCL=3`, `SCK=18`, `MOSI=19`, `MISO=20`, `LED=13`, `NEOPIXEL=16` | LED (GPIO 13, active-high) + NeoPixel (GPIO 16, 1 × GRB) | `board.led()` + `board.neopixel()` |
 | `seeed_xiao_esp32s3` | `A0=1`, `A1=2`, `A2=3`, `A3=4`, `A4=5`, `A5=6`, `A6=7`, `A7=8`, `A8=9`, `SDA=5`, `SCL=6`, `SCK=7`, `MISO=8`, `MOSI=9`, `LED=21` | BOOT button (managed, read-only) + LED (GPIO 21, active-low) | `board.led()` + `board.buttonPressed()` |
 <!-- END GENERATED BOARD REGISTRY -->

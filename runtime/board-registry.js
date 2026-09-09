@@ -26,6 +26,7 @@ const boardPresentation = Object.freeze({
   "waveshare_rp2040_touch_lcd_1.28": { label: "Waveshare RP2040 Touch LCD 1.28", flash: "4MB", notes: "Round LCD, touch, IMU" },
   "waveshare_rp2350_lcd_1.47_a": { label: "Waveshare RP2350-LCD-1.47-A", flash: "16MB", notes: "LCD, NeoPixel" },
   "waveshare_rp2350_touch_lcd_1.69": { label: "Waveshare RP2350-Touch-LCD-1.69", flash: "16MB", notes: "LCD, touch, IMU, buzzer" },
+  "waveshare_rp2350_touch_lcd_2.8": { label: "Waveshare RP2350-Touch-LCD-2.8", flash: "16MB", notes: "Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; touch/audio/SD/sensors unsupported" },
   adafruit_feather_rp2040: { label: "Adafruit Feather RP2040", flash: "8MB", notes: "NeoPixel, STEMMA QT" },
   seeed_xiao_esp32s3: { label: "Seeed Studio XIAO ESP32-S3", flash: "8MB", notes: "Native USB, onboard LED" },
 });
@@ -252,6 +253,9 @@ const rpFeatureMaps = Object.freeze({
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
     "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen",
   ),
+  "waveshare_rp2350_touch_lcd_2.8": featureMap(
+    "moduleLoader", "console", "timers", "board", "process", "require", "fs",
+  ),
   adafruit_feather_rp2040: featureMap(
     "moduleLoader", "console", "timers", "board", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
     "process", "require", "fs", "image", "keyboard", "mouse", "graphics", "screen", "onboardLed", "onboardNeopixel",
@@ -278,10 +282,11 @@ function rpDescriptor({
   neopixelPins = gpioPins,
 }) {
   const capabilities = {
-    gpio: gpioCapability(gpioPins, gpioOutputPins),
-    pwm: pwmCapability(pwmPins, chip),
+    ...(features.gpio ? { gpio: gpioCapability(gpioPins, gpioOutputPins) } : {}),
+    ...(features.pwm ? { pwm: pwmCapability(pwmPins, chip) } : {}),
     fs: { implementation: "fat", writable: true, hostTransfer: true },
-    usb: usbCapability(rpUsbClasses),
+    usb: usbCapability(rpUsbClasses.filter((name) =>
+      name === "keyboardHid" ? features.keyboard : name === "mouseHid" ? features.mouse : true)),
   };
   if (features.adc) capabilities.adc = adcCapability(adcPins, adcAliases, adcOptions);
   if (features.i2c) capabilities.i2c = i2cCapability(i2cRoutes, i2cDefaultBus);
@@ -402,6 +407,12 @@ const boardDescriptors = {
     gpioOutputPins: [0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 22, 25, 26, 27, 28],
     pwmPins: [0, 1, 4, 5, 16, 17, 18, 19, 26, 27, 28],
     neopixelPins: [0, 1, 4, 5, 16, 17, 18, 19, 26, 27, 28],
+  }),
+  "waveshare_rp2350_touch_lcd_2.8": rpDescriptor({
+    name: "waveshare_rp2350_touch_lcd_2.8", chip: "RP2350",
+    features: rpFeatureMaps["waveshare_rp2350_touch_lcd_2.8"],
+    exposedPins: [], aliases: {},
+    devices: { display: { type: "lcd", controller: "ST7789T3", width: 240, height: 320 } },
   }),
   adafruit_feather_rp2040: rpDescriptor({
     name: "adafruit_feather_rp2040", chip: "RP2040",

@@ -14,6 +14,7 @@ typedef struct {
     spi_inst_t *instance;
     int sck, mosi;
     uint32_t baudrate;
+    unsigned mode;
     uint32_t cr0, cr1, cpsr, dmacr, imsc;
     gpio_function_t sck_function, mosi_function;
     bool was_reset, active;

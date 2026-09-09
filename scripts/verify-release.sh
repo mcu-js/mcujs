@@ -112,7 +112,10 @@ check_board_registry() {
     expected_file="$(mktemp)"
     actual_file="$(mktemp)"
 
-    printf '%s\n' "${MCUJS_BOARDS[@]}" | LC_ALL=C sort > "${expected_file}"
+    # Profiles now include ESP memory policy and experimental targets, not
+    # just the RP release lane. Compare against the authoritative full registry.
+    node -e 'Object.keys(require(process.argv[1]).boardDescriptors).sort().forEach(id => console.log(id))' \
+        "${ROOT_DIR}/runtime/board-registry.js" > "${expected_file}"
     printf '%s\n' "${actual_boards[@]}" | LC_ALL=C sort > "${actual_file}"
 
     if ! diff -u "${expected_file}" "${actual_file}" >/dev/null; then
@@ -123,7 +126,7 @@ check_board_registry() {
     fi
 
     rm -f "${expected_file}" "${actual_file}"
-    pass "board registry covers ${#MCUJS_BOARDS[@]} boards"
+    pass 'board profiles match the complete runtime registry'
 }
 
 check_docs_board_coverage() {
@@ -242,7 +245,7 @@ check_runtime_registry() {
 }
 
 check_release_artifacts() {
-    node --test "${ROOT_DIR}/tests/release-artifacts.test.js"
+    node --test "${ROOT_DIR}/tests/release-artifacts.test.js" "${ROOT_DIR}/tests/release-board-registry.test.js"
     pass 'release orchestration and XIAO artifact freshness checks passed'
 }
 

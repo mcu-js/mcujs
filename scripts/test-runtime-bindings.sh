@@ -49,7 +49,7 @@ python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 from pathlib import Path
 import sys
 root, out = map(Path, sys.argv[1:])
-for name in ['events', 'devices']:
+for name in ['events', 'devices', 'button']:
  source = (root/('lib/'+name+'.js')).read_bytes()
  (out/(name+'_source.h')).write_text('static const jerry_char_t '+name+'_source[] = {' + ','.join(str(b) for b in source) + '};\n')
 tests = (root/'tests/events.test.js').read_text()
@@ -174,3 +174,5 @@ done
 
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-devices-display-tests.sh"
+JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
+    bash "${ROOT}/tests/run-buttons-tests.sh"

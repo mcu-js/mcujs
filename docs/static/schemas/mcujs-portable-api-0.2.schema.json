@@ -141,12 +141,26 @@
       "type": "object",
       "description": "Read-only button managed by board.buttonPressed(). Its reserved hardware pin is not a generic GPIO endpoint.",
       "additionalProperties": false,
-      "required": ["type", "name", "activeLow", "readOnly"],
+      "required": [
+        "type",
+        "name",
+        "activeLow",
+        "readOnly"
+      ],
       "properties": {
-        "type": { "const": "managed" },
-        "name": { "type": "string", "minLength": 1 },
-        "activeLow": { "type": "boolean" },
-        "readOnly": { "const": true }
+        "type": {
+          "const": "managed"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "activeLow": {
+          "type": "boolean"
+        },
+        "readOnly": {
+          "const": true
+        }
       }
     },
     "onboardNeopixel": {
@@ -189,7 +203,10 @@
       ],
       "properties": {
         "type": {
-          "enum": ["lcd", "epaper"]
+          "enum": [
+            "lcd",
+            "epaper"
+          ]
         },
         "controller": {
           "enum": [
@@ -262,9 +279,6 @@
     "devicesCapability": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "display"
-      ],
       "properties": {
         "display": {
           "type": "object",
@@ -281,8 +295,37 @@
               "const": 1
             }
           }
+        },
+        "button": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interface",
+            "readOnly",
+            "maxOpenHandles",
+            "pollIntervalMs",
+            "debounceMs"
+          ],
+          "properties": {
+            "interface": {
+              "const": "button-events"
+            },
+            "readOnly": {
+              "const": true
+            },
+            "maxOpenHandles": {
+              "const": 1
+            },
+            "pollIntervalMs": {
+              "const": 10
+            },
+            "debounceMs": {
+              "const": 30
+            }
+          }
         }
-      }
+      },
+      "minProperties": 1
     },
     "gpioCapability": {
       "type": "object",
@@ -1618,7 +1661,7 @@
         "symbol": "bytes"
       },
       "temperature": {
-        "symbol": "°C"
+        "symbol": "\u00b0C"
       }
     },
     "errors": {
@@ -2116,8 +2159,14 @@
             "signatures": [
               {
                 "arguments": [],
-                "returns": { "types": ["boolean"] },
-                "operationalErrors": ["EIO"],
+                "returns": {
+                  "types": [
+                    "boolean"
+                  ]
+                },
+                "operationalErrors": [
+                  "EIO"
+                ],
                 "operationalErrorConditions": [
                   {
                     "code": "EIO",

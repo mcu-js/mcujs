@@ -2,6 +2,7 @@
 #include "jerryscript.h"
 #include "events_source.h"
 #include "devices_source.h"
+#include "button_source.h"
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
 #include "canvas_source.h"
 #include "st7789_source.h"
@@ -36,6 +37,7 @@ static jerry_value_t load(const jerry_char_t *source,size_t length) {
     return result;
 }
 
+jerry_value_t js_create_button_module(void) { return load(button_source,sizeof(button_source)); }
 jerry_value_t js_create_devices_module(void) { return load(devices_source,sizeof(devices_source)); }
 jerry_value_t js_create_events_module(void) { return load(events_source,sizeof(events_source)); }
 #ifdef MCUJS_EXPERIMENTAL_CANVAS

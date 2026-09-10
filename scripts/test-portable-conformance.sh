@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 node --test \
     "${ROOT}/tests/events.test.js" \
     "${ROOT}/tests/devices.test.js" \
+    "${ROOT}/tests/buttons.test.js" \
     "${ROOT}/tests/device-capabilities.test.js" \
     "${ROOT}/tests/canvas-2d.test.js" \
     "${ROOT}/tests/display-canvas.test.js" \

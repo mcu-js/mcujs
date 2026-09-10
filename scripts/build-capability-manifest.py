@@ -15,6 +15,6 @@ if not args.board or Path(args.board).name != args.board or '/' in args.board or
     parser.error('invalid board identifier')
 manifest = json.loads((root / 'runtime/manifests' / (args.board + '.json')).read_text())
 if args.configured_display:
-    manifest['capabilities']['devices'] = json.loads((root / 'runtime/device-capabilities.json').read_text())
+    manifest['capabilities'].setdefault('devices', {}).update(json.loads((root / 'runtime/device-capabilities.json').read_text()))
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps(manifest, indent=2) + '\n')

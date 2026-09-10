@@ -4,6 +4,9 @@ title: Configured display handles
 
 # Configured display handles (experimental)
 
+The later [button-events slice](./button-events.md) composes a separately gated
+`devices.button` alongside this display handle; it does not enable new displays.
+
 First vertical slice of [issue #5](https://github.com/mcu-js/mcujs/issues/5), on the
 bounded-events/Promise stack. This is **not completion of all #5 peripherals or
 shared display/SD arbitration**. No device event queue, DOM, plugin registry,

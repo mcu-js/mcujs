@@ -10,6 +10,13 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Added
 
+- Configured, read-only button handles for Pico BOOTSEL and XIAO BOOT through
+  `devices.button`: debounced press/release events, readable state, exclusive
+  polling ownership, cancellation cleanup, error recovery and VM-safe timers.
+  Unsupported/reset/power controls remain absent; touch is not included.
+- `EventTarget.clear(target)` lifecycle extension removes current registrations
+  and signal links; it does not close devices or abort signals.
+
 - First configured-display device slice: lazy `require('devices')` discovery
   backed by compiled capabilities, absent unsupported displays, stable frozen
   descriptors, exclusive native ownership, live state and repeatable cleanup.

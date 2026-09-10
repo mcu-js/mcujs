@@ -26,6 +26,7 @@
 #include "../runtime_registry.h"
 jerry_value_t js_create_events_module(void);
 jerry_value_t js_create_devices_module(void);
+jerry_value_t js_create_button_module(void);
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
 jerry_value_t js_create_canvas_native_module(void);
 jerry_value_t js_create_canvas_module(void);
@@ -715,6 +716,9 @@ static const builtin_module_t s_builtin_modules[] = {
 #endif
     {"events", js_create_events_module},
     {"devices", js_create_devices_module},
+#if MCUJS_HAS_CONFIGURED_BUTTON
+    {"mcujs:button", js_create_button_module},
+#endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}
 };

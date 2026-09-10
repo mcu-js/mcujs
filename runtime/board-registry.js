@@ -14,7 +14,7 @@ const featureNames = Object.freeze([
 const moduleOrder = Object.freeze([
   "board", "fs", "process", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
   "image", "keyboard", "mouse", "graphics", "screen", "dvi",
-  "events", "devices", "mcujs:module", "node:module",
+  "events", "devices", "mcujs:button", "mcujs:module", "node:module",
 ]);
 
 const boardPresentation = Object.freeze({
@@ -217,6 +217,7 @@ function usbCapability(classes) {
 function modulesFor(features) {
   return moduleOrder.filter((name) => {
     if (name === "board") return features.board;
+    if (name === "mcujs:button") return Boolean(features.onboardButton && features.board && features.timers && features.require);
     if (name === "events" || name === "devices" || name === "mcujs:module" || name === "node:module") return features.require;
     return features[featureModule[name]];
   });
@@ -494,6 +495,11 @@ for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];
   if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
   descriptor.presentation = Object.freeze({ ...presentation });
+  if (descriptor.features.onboardButton && descriptor.features.board && descriptor.features.timers && descriptor.features.require) {
+    descriptor.capabilities.devices = { button: {
+      interface: 'button-events', readOnly: true, maxOpenHandles: 1, pollIntervalMs: 10, debounceMs: 30,
+    } };
+  }
 }
 for (const boardId of Object.keys(boardPresentation)) {
   if (!boardDescriptors[boardId]) throw new Error(`Presentation metadata names unknown MCU.js board: ${boardId}`);
@@ -515,7 +521,7 @@ function manifestFor(boardId, { configuredDisplay = false } = {}) {
     formatVersion: 1,
     apiVersion: "0.2",
     board: descriptor.board,
-    capabilities: configuredDisplay ? { ...descriptor.capabilities, devices: configuredDeviceCapabilities } : descriptor.capabilities,
+    capabilities: configuredDisplay ? { ...descriptor.capabilities, devices: { ...descriptor.capabilities.devices, ...configuredDeviceCapabilities } } : descriptor.capabilities,
   });
 }
 

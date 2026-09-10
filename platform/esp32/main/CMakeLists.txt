@@ -96,7 +96,7 @@ mcujs_write_capability_manifest("${MCUJS_ROOT}" "${MCUJS_BOARD}"
  "${CMAKE_BINARY_DIR}/mcujs-${MCUJS_VERSION}-${MCUJS_BOARD}.capabilities.json" "${MCUJS_CONFIGURED_DISPLAY}")
 endif()
 
-set(MCUJS_PACKAGED_MODULES events devices)
+set(MCUJS_PACKAGED_MODULES events devices button)
 if(MCUJS_EXPERIMENTAL_CANVAS)
  list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
 endif()

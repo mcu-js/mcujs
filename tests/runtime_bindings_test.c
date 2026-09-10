@@ -366,6 +366,7 @@ int main(void) {
     js_bind_console();
     assert(eval_source("if (!require('mcujs:module').has('events')) throw new Error('events module missing');"));
     assert(eval_source("if (!require('mcujs:module').has('devices') || require('devices') !== require('devices') || !Object.isFrozen(require('devices')) || require('devices').display !== undefined) throw new Error('device discovery contract');"));
+    assert(eval_source("if (board.devices.button) { if (!require('devices').button || require('mcujs:button').getState() !== 'idle') throw Error('button discovery'); } else { if (require('devices').button !== undefined) throw Error('unsupported button'); var missing=false; try { require('mcujs:button'); } catch(e) { missing=true; } if (!missing) throw Error('private button leaked'); }"));
 
     size_t baseline = heap_used();
     assert(eval_source("globalThis.__oneCapability = board.capability('usb');"));

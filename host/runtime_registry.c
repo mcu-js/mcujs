@@ -19,7 +19,7 @@ static const char *const s_builtin_modules[] = {
 #define MCUJS_CAPABILITY(name, json) {name, json},
 static const mcujs_runtime_capability_t s_capabilities[] = {
     MCUJS_RUNTIME_CAPABILITIES(MCUJS_CAPABILITY)
-#if MCUJS_HAS_CONFIGURED_DISPLAY
+#if MCUJS_HAS_CONFIGURED_DISPLAY || MCUJS_HAS_CONFIGURED_BUTTON
     {"devices", MCUJS_RUNTIME_DEVICE_CAPABILITIES_JSON},
 #endif
 };

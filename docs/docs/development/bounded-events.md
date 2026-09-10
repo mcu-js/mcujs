@@ -156,3 +156,11 @@ manually run the example above on approved RP2040, RP2350 and ESP32 hardware,
 then check Promise/timer progress and REPL access. Record the board, firmware
 build ID and result. Do not flash or change startup files without separate
 approval and the device's recovery/preservation plan.
+
+## Owned-target listener cleanup
+
+`EventTarget.clear(target)` is an MCU.js extension for owners such as configured
+button handles. It removes all current listeners and their AbortSignal links,
+including listeners in an active dispatch snapshot. It does not abort signals,
+close a target or stop hardware; future registration is permitted. Device users
+should call the device's `close()` method to release the actual resource.

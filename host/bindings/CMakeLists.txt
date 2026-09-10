@@ -31,7 +31,7 @@ endif()
 
 # JavaScript API bindings library
 add_library(mcujs_bindings STATIC ${BINDINGS_SOURCES})
-set(MCUJS_PACKAGED_MODULES events devices)
+set(MCUJS_PACKAGED_MODULES events devices button)
 if(MCUJS_EXPERIMENTAL_CANVAS)
     list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
 endif()

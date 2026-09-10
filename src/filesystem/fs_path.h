@@ -34,13 +34,18 @@ static inline fs_result_t fs_normalize_path(const char *path, const char *base,
         size_t count = (size_t)(cursor - segment);
         if (!count || (count == 1 && segment[0] == '.')) continue;
         if (count == 2 && segment[0] == '.' && segment[1] == '.') {
-            if (length <= sizeof(FS_APP_ROOT) - 1) return FS_ERROR_INVALID;
+            /* Never leave the first mount component, even transiently. */
+            if (!strchr(normalized + 1, '/')) return FS_ERROR_INVALID;
             while (normalized[--length] != '/') {}
             normalized[length] = '\0';
             continue;
         }
-        if (length == 1 && (count != 3 || memcmp(segment, "app", 3)))
-            return FS_ERROR_NOT_FOUND;
+        if (length == 1 && (count != 3 || memcmp(segment, "app", 3))) {
+#if MCUJS_HAS_SD
+            if (count != 2 || memcmp(segment, "sd", 2))
+#endif
+                return FS_ERROR_NOT_FOUND;
+        }
         size_t slash = length > 1 ? 1 : 0;
         if (length + slash + count >= sizeof(normalized)) return FS_ERROR_INVALID;
         if (slash) normalized[length++] = '/';

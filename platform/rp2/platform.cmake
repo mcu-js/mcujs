@@ -26,6 +26,7 @@ set(MCUJS_PLATFORM_USB_SOURCES
 set(MCUJS_PLATFORM_STORAGE_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/filesystem/diskio.c
     ${CMAKE_CURRENT_LIST_DIR}/filesystem/flash_ops.c
+    ${CMAKE_CURRENT_LIST_DIR}/filesystem/sd_spi.c
 )
 
 set(MCUJS_PLATFORM_BOARD_SOURCE
@@ -103,6 +104,9 @@ function(mcujs_platform_configure_jerry target visibility)
 endfunction()
 
 function(mcujs_platform_configure_core target)
+    if(MCUJS_HAS_SD)
+        target_link_libraries(${target} PUBLIC hardware_spi)
+    endif()
     target_link_libraries(${target} PUBLIC
         pico_stdlib
         pico_multicore

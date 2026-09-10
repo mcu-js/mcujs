@@ -12,6 +12,9 @@
 #include "diskio.h"
 #include "storage.h"
 #include "flash_config.h"
+#if MCUJS_HAS_SD
+#include "sd_spi.h"
+#endif
 
 #include "pico/stdlib.h"
 #include "hardware/flash.h"
@@ -216,6 +219,9 @@ static uint8_t *cache_get_sector(uint32_t sector, bool for_write) {
  * Get disk status
  */
 DSTATUS disk_status(BYTE pdrv) {
+#if MCUJS_HAS_SD
+    if (pdrv == 1) return mcujs_sd_status();
+#endif
     if (pdrv != 0) {
         return STA_NOINIT;
     }
@@ -226,6 +232,9 @@ DSTATUS disk_status(BYTE pdrv) {
  * Initialize disk
  */
 DSTATUS disk_initialize(BYTE pdrv) {
+#if MCUJS_HAS_SD
+    if (pdrv == 1) return mcujs_sd_initialize();
+#endif
     if (pdrv != 0) {
         return STA_NOINIT;
     }
@@ -249,6 +258,9 @@ DSTATUS disk_initialize(BYTE pdrv) {
  * Read sectors
  */
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
+#if MCUJS_HAS_SD
+    if (pdrv == 1) return mcujs_sd_read(buff, sector, count);
+#endif
     if (pdrv != 0) {
         return RES_PARERR;
     }
@@ -271,6 +283,9 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count) {
  * Write sectors
  */
 DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
+#if MCUJS_HAS_SD
+    if (pdrv == 1) return mcujs_sd_write(buff, sector, count);
+#endif
     if (pdrv != 0) {
         return RES_PARERR;
     }
@@ -296,6 +311,9 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count) {
  * Disk I/O control
  */
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
+#if MCUJS_HAS_SD
+    if (pdrv == 1) return mcujs_sd_ioctl(cmd, buff);
+#endif
     if (pdrv != 0) {
         return RES_PARERR;
     }

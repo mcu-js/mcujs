@@ -421,6 +421,17 @@ int main(void) {
     assert(!jerry_value_is_exception(entry));jerry_value_free(entry);
     assert(eval_source("if(appRuns!==2||appEntry.later()!=='white'||appEntry.filename!=='/app/nested/main.js')throw Error('entry rerun and callback import');"));
     js_require_clear_cache();
+    const struct { fs_result_t result; const char *code; } media_errors[] = {
+        {FS_ERROR_NO_MEDIA,"ENOMEDIUM"}, {FS_ERROR_UNSUPPORTED,"ENOTSUP"},
+        {FS_ERROR_READ_ONLY,"EROFS"}, {FS_ERROR_CROSS_DEVICE,"EXDEV"},
+        {FS_ERROR_NO_SPACE,"ENOSPC"}, {FS_ERROR_INVALID,"EINVAL"},
+    };
+    for (unsigned i=0;i<sizeof(media_errors)/sizeof(media_errors[0]);i++) {
+        s_fs_operation_result=media_errors[i].result;
+        char check[256];
+        snprintf(check,sizeof(check),"(function(){try{require('fs').readFileSync('/sd/a');}catch(e){if(e.code==='%s')return;throw e;}throw Error('missing SD error');})()",media_errors[i].code);
+        assert(eval_source(check));
+    }
     s_fs_operation_result = FS_ERROR_BUSY;
     assert(eval_source(s_busy_test_source));
     assert(eval_source("globalThis.eventsBeforeClear = require('events');"));

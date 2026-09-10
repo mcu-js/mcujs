@@ -37,10 +37,29 @@ static storage_state_t s_storage_state = STORAGE_UNINITIALIZED;
 #define MAX_OPEN_FILES 4
 static FIL s_fil_pool[MAX_OPEN_FILES];
 static bool s_fil_used[MAX_OPEN_FILES];
+static bool s_fil_sd[MAX_OPEN_FILES];
+#if MCUJS_HAS_SD
+static FATFS s_sd_fatfs;
+static bool s_sd_mounted;
+#endif
+
+static bool is_sd_path(const char *path) {
+    return path && !strncmp(path, "/sd", 3) && (!path[3] || path[3] == '/');
+}
+static int file_slot(const fs_file_t *file) {
+    for (int i=0; i<MAX_OPEN_FILES; i++)
+        if (s_fil_used[i] && file->internal == &s_fil_pool[i]) return i;
+    return -1;
+}
+static bool has_sd_files(void) {
+    for (int i=0; i<MAX_OPEN_FILES; i++)
+        if (s_fil_used[i] && s_fil_sd[i]) return true;
+    return false;
+}
 
 static bool has_open_files(void) {
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
-        if (s_fil_used[i]) return true;
+        if (s_fil_used[i] && !s_fil_sd[i]) return true;
     }
     return false;
 }
@@ -70,7 +89,13 @@ static fs_result_t ensure_initialized(void) {
 }
 
 /* Map a normalized /app path to the existing physical volume root. */
-static const char *physical_path(const char *logical) {
+static const char *physical_path(char *logical) {
+    if (is_sd_path(logical)) {
+        /* Private drive prefix; raw caller-supplied drive prefixes are rejected. */
+        if (!logical[3]) strcpy(logical, "1:/");
+        else { memmove(logical + 2, logical + 3, strlen(logical + 3) + 1); logical[0]='1'; logical[1]=':'; }
+        return logical;
+    }
     return logical[4] ? logical + 4 : "/";
 }
 
@@ -114,11 +139,16 @@ static fs_result_t fresult_to_fs(FRESULT fr) {
         case FR_EXIST:
             return FS_ERROR_EXISTS;
         case FR_DENIED:
-        case FR_WRITE_PROTECTED:
             return FS_ERROR_INVALID;
+        case FR_WRITE_PROTECTED:
+            return FS_ERROR_READ_ONLY;
+        case FR_NO_FILESYSTEM:
+            return FS_ERROR_UNSUPPORTED;
+        case FR_NOT_READY:
+            return FS_ERROR_NO_MEDIA;
         case FR_DISK_ERR:
         case FR_INT_ERR:
-        case FR_NOT_READY:
+        case FR_INVALID_OBJECT:
             return FS_ERROR_IO;
         case FR_INVALID_NAME:
         case FR_INVALID_PARAMETER:
@@ -126,6 +156,59 @@ static fs_result_t fresult_to_fs(FRESULT fr) {
         default:
             return FS_ERROR;
     }
+}
+
+static fs_result_t volume_result(bool sd, FRESULT fr) {
+#if MCUJS_HAS_SD
+    if (sd && (fr == FR_DISK_ERR || fr == FR_INT_ERR || fr == FR_NOT_READY ||
+               fr == FR_INVALID_OBJECT)) s_sd_mounted = false;
+#else
+    (void)sd;
+#endif
+    return fresult_to_fs(fr);
+}
+
+static fs_result_t path_ready(const char *path) {
+    if (!is_sd_path(path)) return ensure_initialized();
+#if MCUJS_HAS_SD
+    if (s_sd_mounted) return FS_OK;
+    /* Stale open handles must be closed before mounting another card. */
+    if (has_sd_files()) return FS_ERROR_IO;
+    (void)f_mount(NULL, "1:", 0);
+    FRESULT fr=f_mount(&s_sd_fatfs, "1:", 1);
+    s_sd_mounted = fr == FR_OK;
+    /* Never format removable media, regardless of why mount failed. */
+    return fresult_to_fs(fr);
+#else
+    return FS_ERROR_NOT_FOUND;
+#endif
+}
+
+static fs_result_t prepare_path(const char *path, char logical[FS_PATH_MAX]) {
+    fs_result_t result = fs_normalize_path(path, FS_APP_ROOT, logical, FS_PATH_MAX);
+    if (result != FS_OK) {
+        /* Preserve the existing host-ownership error precedence for app calls. */
+        fs_result_t status=fs_access_status();
+        if (!is_sd_path(path) && (status == FS_ERROR_BUSY || status == FS_ERROR_IO)) return status;
+        return result;
+    }
+    return path_ready(logical);
+}
+
+static fs_result_t file_ready(const fs_file_t *file) {
+    int slot=file_slot(file);
+    if (slot >= 0 && s_fil_sd[slot]) {
+#if MCUJS_HAS_SD
+        return s_sd_mounted ? FS_OK : FS_ERROR_IO;
+#else
+        return FS_ERROR_NOT_FOUND;
+#endif
+    }
+    return ensure_initialized();
+}
+static fs_result_t file_result(const fs_file_t *file, FRESULT fr) {
+    int slot=file_slot(file);
+    return volume_result(slot >= 0 && s_fil_sd[slot], fr);
 }
 
 /*
@@ -196,8 +279,6 @@ fs_result_t fs_init(void) {
         return FS_OK;
     }
     
-    /* Initialize file pool */
-    memset(s_fil_used, 0, sizeof(s_fil_used));
     
     /* Mount the filesystem */
     FRESULT fr = f_mount(&s_fatfs, "", 1);  /* 1 = mount immediately */
@@ -255,7 +336,7 @@ fs_result_t fs_init(void) {
 fs_result_t fs_format(void) {
     if (s_storage_state == STORAGE_CLAIMING_HOST ||
         s_storage_state == STORAGE_HOST_OWNED ||
-        s_storage_state == STORAGE_RELEASING_HOST || has_open_files()) {
+        s_storage_state == STORAGE_RELEASING_HOST || has_open_files() || has_sd_files()) {
         return FS_ERROR_BUSY;
     }
 
@@ -306,7 +387,7 @@ fs_result_t fs_sync(void) {
     
     /* Sync all open files */
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
-        if (s_fil_used[i]) {
+        if (s_fil_used[i] && !s_fil_sd[i]) {
             if (f_sync(&s_fil_pool[i]) != FR_OK) {
                 return FS_ERROR_IO;
             }
@@ -411,7 +492,6 @@ fs_result_t fs_end_host_access(void) {
         return FS_ERROR_IO;
     }
 
-    memset(s_fil_used, 0, sizeof(s_fil_used));
     s_initialized = true;
     s_storage_state = STORAGE_DEVICE_OWNED;
     return FS_OK;
@@ -471,15 +551,13 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
 
     file->internal = NULL;
     file->is_open = false;
-    fs_result_t ready = ensure_initialized();
+    char logical[FS_PATH_MAX];
+    fs_result_t ready = prepare_path(path, logical);
     if (ready != FS_OK) {
         return ready;
     }
     
-    char logical[FS_PATH_MAX];
-    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
-    if (path_result != FS_OK) return path_result;
-    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0)
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0 || strcmp(logical, "/sd") == 0)
         return FS_ERROR_INVALID;
 
     /* Find free file slot */
@@ -496,22 +574,25 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     }
     
     /* Open the file */
+    bool sd=is_sd_path(logical);
     BYTE fa_mode = mode_to_fatfs(mode);
     FRESULT fr = f_open(&s_fil_pool[slot], physical_path(logical), fa_mode);
     
     if (fr != FR_OK) {
-        return fresult_to_fs(fr);
+        return volume_result(sd, fr);
     }
     
     /* Handle append mode */
     if (mode & FS_MODE_APPEND) {
-        if (f_lseek(&s_fil_pool[slot], f_size(&s_fil_pool[slot])) != FR_OK) {
+        FRESULT seek_result=f_lseek(&s_fil_pool[slot], f_size(&s_fil_pool[slot]));
+        if (seek_result != FR_OK) {
             (void)f_close(&s_fil_pool[slot]);
-            return FS_ERROR_IO;
+            return volume_result(sd, seek_result);
         }
     }
     
     s_fil_used[slot] = true;
+    s_fil_sd[slot] = sd;
     file->internal = &s_fil_pool[slot];
     file->is_open = true;
     
@@ -532,14 +613,14 @@ fs_result_t fs_close(fs_file_t *file) {
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (&s_fil_pool[i] == fp) {
             FRESULT fr = f_close(fp);
+            bool sd=s_fil_sd[i];
             s_fil_used[i] = false;
             file->is_open = false;
             file->internal = NULL;
             
             /* Flush diskio cache to flash after close */
-            diskio_sync();
-            
-            return fresult_to_fs(fr);
+            if (!sd) diskio_sync();
+            return volume_result(sd, fr);
         }
     }
     
@@ -553,7 +634,7 @@ fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_re
     if (file == NULL || !file->is_open || buffer == NULL) {
         return FS_ERROR_INVALID;
     }
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -567,7 +648,7 @@ fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_re
         *bytes_read = br;
     }
     
-    return fresult_to_fs(fr);
+    return file_result(file, fr);
 }
 
 /*
@@ -577,7 +658,7 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size, size_t *b
     if (file == NULL || !file->is_open || buffer == NULL) {
         return FS_ERROR_INVALID;
     }
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -591,7 +672,8 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size, size_t *b
         *bytes_written = bw;
     }
     
-    return fresult_to_fs(fr);
+    if (fr == FR_OK && bw != size) return FS_ERROR_NO_SPACE;
+    return file_result(file, fr);
 }
 
 /*
@@ -601,7 +683,7 @@ fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
     if (file == NULL || !file->is_open) {
         return FS_ERROR_INVALID;
     }
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -609,7 +691,7 @@ fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
     FIL *fp = (FIL *)file->internal;
     FRESULT fr = f_lseek(fp, offset);
     
-    return fresult_to_fs(fr);
+    return file_result(file, fr);
 }
 
 /*
@@ -619,7 +701,7 @@ fs_result_t fs_size(fs_file_t *file, size_t *size) {
     if (file == NULL || !file->is_open || size == NULL) {
         return FS_ERROR_INVALID;
     }
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -638,17 +720,16 @@ fs_result_t fs_exists(const char *path) {
         return FS_ERROR_INVALID;
     }
 
-    fs_result_t ready = ensure_initialized();
+    char logical[FS_PATH_MAX];
+    fs_result_t ready = prepare_path(path, logical);
     if (ready != FS_OK) {
         return ready;
     }
 
-    char logical[FS_PATH_MAX];
-    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
-    if (path_result != FS_OK) return path_result;
-    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0) return FS_OK;
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0 || strcmp(logical, "/sd") == 0) return FS_OK;
+    bool sd=is_sd_path(logical);
     FILINFO finfo;
-    return fresult_to_fs(f_stat(physical_path(logical), &finfo));
+    return volume_result(sd, f_stat(physical_path(logical), &finfo));
 }
 
 /*
@@ -659,16 +740,15 @@ fs_result_t fs_remove(const char *path) {
         return FS_ERROR_INVALID;
     }
 
-    fs_result_t ready = ensure_initialized();
+    char logical[FS_PATH_MAX];
+    fs_result_t ready = prepare_path(path, logical);
     if (ready != FS_OK) {
         return ready;
     }
-    char logical[FS_PATH_MAX];
-    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
-    if (path_result != FS_OK) return path_result;
-    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0)
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0 || strcmp(logical, "/sd") == 0)
         return FS_ERROR_INVALID;
-    return fresult_to_fs(f_unlink(physical_path(logical)));
+    bool sd=is_sd_path(logical);
+    return volume_result(sd, f_unlink(physical_path(logical)));
 }
 
 /*
@@ -679,19 +759,18 @@ fs_result_t fs_rename(const char *old_path, const char *new_path) {
         return FS_ERROR_INVALID;
     }
 
-    fs_result_t ready = ensure_initialized();
-    if (ready != FS_OK) {
-        return ready;
-    }
     char old_logical[FS_PATH_MAX], new_logical[FS_PATH_MAX];
-    fs_result_t result = fs_normalize_path(old_path, FS_APP_ROOT, old_logical, sizeof(old_logical));
-    if (result != FS_OK) return result;
-    result = fs_normalize_path(new_path, FS_APP_ROOT, new_logical, sizeof(new_logical));
+    fs_result_t ready = prepare_path(old_path, old_logical);
+    if (ready != FS_OK) return ready;
+    fs_result_t result = fs_normalize_path(new_path, FS_APP_ROOT, new_logical, sizeof(new_logical));
     if (result != FS_OK) return result;
     if (strcmp(old_logical, "/") == 0 || strcmp(old_logical, FS_APP_ROOT) == 0 ||
-        strcmp(new_logical, "/") == 0 || strcmp(new_logical, FS_APP_ROOT) == 0)
+        strcmp(new_logical, "/") == 0 || strcmp(new_logical, FS_APP_ROOT) == 0 ||
+        !strcmp(old_logical, "/sd") || !strcmp(new_logical, "/sd"))
         return FS_ERROR_INVALID;
-    return fresult_to_fs(f_rename(physical_path(old_logical), physical_path(new_logical)));
+    bool sd=is_sd_path(old_logical);
+    if (sd != is_sd_path(new_logical)) return FS_ERROR_CROSS_DEVICE;
+    return volume_result(sd, f_rename(physical_path(old_logical), physical_path(new_logical)));
 }
 
 /*
@@ -702,16 +781,15 @@ fs_result_t fs_mkdir(const char *path) {
         return FS_ERROR_INVALID;
     }
 
-    fs_result_t ready = ensure_initialized();
+    char logical[FS_PATH_MAX];
+    fs_result_t ready = prepare_path(path, logical);
     if (ready != FS_OK) {
         return ready;
     }
-    char logical[FS_PATH_MAX];
-    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
-    if (path_result != FS_OK) return path_result;
-    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0)
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0 || strcmp(logical, "/sd") == 0)
         return FS_ERROR_INVALID;
-    return fresult_to_fs(f_mkdir(physical_path(logical)));
+    bool sd=is_sd_path(logical);
+    return volume_result(sd, f_mkdir(physical_path(logical)));
 }
 
 /*
@@ -722,7 +800,8 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
         return FS_ERROR_INVALID;
     }
 
-    fs_result_t ready = ensure_initialized();
+    char logical[FS_PATH_MAX];
+    fs_result_t ready = prepare_path(path, logical);
     if (ready != FS_OK) {
         return ready;
     }
@@ -731,19 +810,23 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
     FILINFO finfo;
     fs_entry_t entry;
     
-    char logical[FS_PATH_MAX];
-    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
-    if (path_result != FS_OK) return path_result;
     if (strcmp(logical, "/") == 0) {
         const fs_entry_t app = {.name = "app", .is_dir = true, .size = 0};
-        (void)callback(&app, user_data);
+        bool more=callback(&app, user_data);
+#if MCUJS_HAS_SD
+        const fs_entry_t sd = {.name = "sd", .is_dir = true, .size = 0};
+        if (more) (void)callback(&sd, user_data);
+#else
+        (void)more;
+#endif
         return FS_OK;
     }
+    bool sd=is_sd_path(logical);
     const char *dir_path = physical_path(logical);
     
     FRESULT fr = f_opendir(&dir, dir_path);
     if (fr != FR_OK) {
-        return fresult_to_fs(fr);
+        return volume_result(sd, fr);
     }
     
     while (1) {
@@ -769,7 +852,6 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
         }
     }
     
-    f_closedir(&dir);
-    
-    return FS_OK;
+    FRESULT closed=f_closedir(&dir);
+    return volume_result(sd, fr != FR_OK ? fr : closed);
 }

@@ -1231,6 +1231,19 @@
         },
         "appRoot": {
           "const": "/app"
+        },
+        "sd": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["root", "implementation", "writable", "hostTransfer", "removable", "formats"],
+          "properties": {
+            "root": {"const": "/sd"},
+            "implementation": {"const": "fat"},
+            "writable": {"const": true},
+            "hostTransfer": {"const": false},
+            "removable": {"const": true},
+            "formats": {"const": ["fat16", "fat32"]}
+          }
         }
       }
     },

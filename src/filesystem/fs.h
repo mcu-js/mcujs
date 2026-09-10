@@ -24,6 +24,10 @@ typedef enum {
     FS_ERROR_INVALID,
     FS_ERROR_IO,
     FS_ERROR_BUSY,
+    FS_ERROR_NO_MEDIA,
+    FS_ERROR_UNSUPPORTED,
+    FS_ERROR_READ_ONLY,
+    FS_ERROR_CROSS_DEVICE,
 } fs_result_t;
 
 #define FS_APP_ROOT "/app"

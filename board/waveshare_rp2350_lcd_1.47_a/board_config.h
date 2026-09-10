@@ -62,7 +62,9 @@
 #define MCUJS_LCD_RST_PIN       20
 #define MCUJS_LCD_BL_PIN        21
 
-/* SD Card pins */
+/* SD Card pins. SPI1 is reserved for this mount, separate from display SPI0.
+ * Verified against Waveshare RP2350-LCD-1.47 Python/02-SD/boot.py. */
+#define MCUJS_HAS_SD            1
 #define MCUJS_SD_SPI_BUS        1
 #define MCUJS_SD_SCK_PIN        10
 #define MCUJS_SD_MOSI_PIN       11

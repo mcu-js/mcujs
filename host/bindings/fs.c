@@ -90,6 +90,11 @@ static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
     if (result == FS_ERROR_NO_SPACE) {
         return create_error("ENOSPC", "no space left on device");
     }
+    if (result == FS_ERROR_NO_MEDIA) return create_error("ENOMEDIUM", "SD card unavailable or not ready");
+    if (result == FS_ERROR_UNSUPPORTED) return create_error("ENOTSUP", "unsupported filesystem; FAT16/FAT32 required, media was not formatted");
+    if (result == FS_ERROR_READ_ONLY) return create_error("EROFS", "media is write-protected");
+    if (result == FS_ERROR_CROSS_DEVICE) return create_error("EXDEV", "cannot rename across mounts");
+    if (result == FS_ERROR_INVALID) return create_error("EINVAL", "invalid filesystem operation or path");
     return mcujs_throw_operational_error(MCUJS_ERROR_IO, fallback, NULL);
 }
 #define CREATE_FS_ERROR(result, fallback) create_fs_error((result), (fallback))

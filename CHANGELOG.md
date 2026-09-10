@@ -4,10 +4,20 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Experimental optional `/sd` on the RP2350 LCD 1.47 A: separate lazy FAT mount,
+  bounded SPI block I/O, no SD auto-format or USB export, unchanged `/app`
+  startup, mount-boundary checks and explicit media errors. A bounded JSON pixel
+  asset demo loaded two distinct pictures from the card: exact hashes after
+  software resets and physical A/B rendering were verified by webcam. The first
+  write returned an I/O error; retry succeeded, but its cause remains unresolved.
+  SD bus/pins stay reserved outside app peripheral routes. Other SD slots,
+  exFAT, SDSC, binary/streaming APIs and hot-swap remain unsupported/unqualified.
+  See [removable SD assets](docs/docs/development/sd-assets.md).
+
 - **Breaking:** internal application volumes use logical `/app` on RP2 and ESP32.
   Boot runs `/app/index.js`; relative filesystem paths start at `/app`, and file
   entry points now run as CommonJS modules with module-relative imports. No
-  legacy absolute-root aliases, SD support, or automatic file migration.
+  legacy absolute-root aliases, automatic SD startup, or automatic file migration.
 - Fixed RP2350 BOOTSEL sampling to use its SDK-defined QSPI input bit rather
   than the RP2040 input bit, which falsely selected safe mode during autorun QA.
   Real held-button recovery remains required for hardware acceptance.

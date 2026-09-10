@@ -20,9 +20,10 @@ Relative filesystem paths always start at `/app`. There is no mutable cwd or
 not replaced by another backend. Existing ownership errors remain visible.
 `board.capability('fs').appRoot` reports `/app`; its existing `implementation`,
 `writable` and `hostTransfer` fields describe configured support, not whether
-storage is currently available. REPL `.info` reports filesystem free space (or
-host ownership). A JS volume-capacity API is not added in this slice. No SD
-capability is advertised here.
+storage is currently available. REPL `.info` reports internal filesystem free
+space (or host ownership). A JS volume-capacity API is not added in this slice.
+The subsequent [optional SD asset slice](sd-assets.md) advertises `fs.sd` only
+on the configured 1.47 board; it does not change the meaning of `/app`.
 
 ## Paths, modules and startup
 
@@ -41,15 +42,17 @@ capability is advertised here.
   segments give one module cache key. Traversing above `/app` fails immediately,
   even if the path would later return to `/app`.
 - Logical `/` and `/app` cannot be opened as files, removed, renamed or created
-  over. Unknown mounts (including `/sd`) are unavailable, not aliases.
+  over. Unknown or unconfigured mounts are unavailable, not aliases. Configured
+  `/sd` is independent; crossing between mounts via `..` is rejected.
 - Backslashes and raw FAT drive prefixes such as `0:` are rejected. Paths fail
   rather than truncate. The namespace/module ceiling is 127 bytes excluding NUL;
   the existing synchronous JS filesystem argument ceiling remains 63 bytes.
 - REPL `.ls` lists `/app`; `.cat`, `.rm`, `.run`, and `.multiline FILE` accept
   logical `/app/...` paths or application-relative paths.
 
-This does not add SD adapters, streams, asynchronous filesystem I/O, cross-volume
-rename support, transparent overflow storage or automatic migration. Existing
+The original internal slice does not add SD adapters; see the subsequent
+[SD asset slice](sd-assets.md). Neither slice adds streams, asynchronous
+filesystem I/O, cross-volume rename, transparent overflow or automatic migration. Existing
 small synchronous file operations retain their memory limits and are not
 power-loss-atomic transactions.
 

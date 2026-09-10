@@ -147,7 +147,18 @@
       "appRoot": "/app",
       "implementation": "fat",
       "writable": true,
-      "hostTransfer": true
+      "hostTransfer": true,
+      "sd": {
+        "root": "/sd",
+        "implementation": "fat",
+        "writable": true,
+        "hostTransfer": false,
+        "removable": true,
+        "formats": [
+          "fat16",
+          "fat32"
+        ]
+      }
     },
     "usb": {
       "classes": [

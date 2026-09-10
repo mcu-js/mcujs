@@ -85,8 +85,12 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
+#if MCUJS_HAS_SD
+#define FF_VOLUMES      2
+#else
 #define FF_VOLUMES      1
-/* Single volume - flash filesystem only */
+#endif
+/* Drive 0: internal flash. Optional drive 1: removable SD; never auto-format. */
 
 #define FF_STR_VOLUME_ID    0
 /* Disable string volume IDs - not needed */
@@ -115,7 +119,7 @@
 /* Normal buffer configuration - each file has its own buffer */
 
 #define FF_FS_EXFAT     0
-/* Disable exFAT - FAT12/16 is sufficient for our small filesystem */
+/* FAT12/16/32 supported. exFAT is explicitly unsupported; never auto-format SD. */
 
 #define FF_FS_NORTC     1
 /* No RTC - Pico doesn't have one by default */

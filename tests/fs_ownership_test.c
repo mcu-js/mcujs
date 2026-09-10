@@ -18,10 +18,19 @@ static unsigned s_media_changed_calls;
 static bool s_fail_mount;
 static bool s_fail_unmount;
 static FATFS s_test_fs = {.csize = 2};
+static FRESULT sd_mount_result = FR_OK;
+static FRESULT io_result = FR_OK;
+static unsigned sd_mounts;
+static bool last_open_sd;
+static bool fail_dir_read;
+
 
 FRESULT f_mount(FATFS *fs, const char *path, BYTE option) {
-    (void)path;
     (void)option;
+    if (!strcmp(path, "1:")) {
+        if (fs) sd_mounts++;
+        return fs ? sd_mount_result : FR_OK;
+    }
     if (fs == NULL) {
         s_unmount_calls++;
         return s_fail_unmount ? FR_DISK_ERR : FR_OK;
@@ -65,7 +74,10 @@ FRESULT f_getfree(const char *path, DWORD *clusters, FATFS **fs) {
     return FR_OK;
 }
 FRESULT f_open(FIL *file, const char *path, BYTE mode) {
-    assert(strcmp(path, "/open.js") == 0);
+    last_open_sd = !strcmp(path, "1:/asset.json");
+    assert(last_open_sd || !strcmp(path, "/open.js"));
+    observe(path);
+    if (io_result != FR_OK) return io_result;
     (void)mode;
     file->size = 4;
     file->position = 0;
@@ -81,8 +93,8 @@ FSIZE_t f_size(FIL *file) {
 FRESULT f_read(FIL *file, void *buffer, UINT size, UINT *read) {
     (void)file;
     memset(buffer, 0x5a, size);
-    *read = size;
-    return FR_OK;
+    *read = io_result == FR_OK ? size : 0;
+    return io_result;
 }
 FRESULT f_write(FIL *file, const void *buffer, UINT size, UINT *written) {
     (void)file;
@@ -111,7 +123,7 @@ FRESULT f_mkdir(const char *path) {
 FRESULT f_readdir(DIR *dir, FILINFO *info) {
     (void)dir;
     info->fname[0] = '\0';
-    return FR_OK;
+    return fail_dir_read ? FR_DISK_ERR : FR_OK;
 }
 
 uint32_t diskio_get_sector_count(void) {
@@ -270,8 +282,72 @@ static void test_remount_failure_faults_without_format(void) {
     assert(s_format_calls == 0);
 }
 
+#if MCUJS_HAS_SD
+static bool mounts_entry(const fs_entry_t *entry, void *context) {
+    unsigned *index = context;
+    assert(!strcmp(entry->name, (*index)++ == 0 ? "app" : "sd"));
+    return true;
+}
+static void test_sd_mount(void) {
+    assert(fs_init() == FS_OK);
+    unsigned count=0;
+    assert(fs_list_dir("/", mounts_entry, &count) == FS_OK && count == 2);
+    char normalized[FS_PATH_MAX];
+    assert(fs_normalize_path("/sd/x/../asset.json", NULL, normalized, sizeof(normalized)) == FS_OK);
+    assert(!strcmp(normalized, "/sd/asset.json"));
+    assert(fs_normalize_path("./asset.json", "/sd", normalized, sizeof(normalized)) == FS_OK);
+    assert(!strcmp(normalized, "/sd/asset.json"));
+    assert(fs_normalize_path("/sd/../app/x", NULL, normalized, sizeof(normalized)) == FS_ERROR_INVALID);
+    assert(fs_normalize_path("../asset.json", "/sd", normalized, sizeof(normalized)) == FS_ERROR_INVALID);
+    fs_file_t app={0},sd={0}; char b[4]; size_t n=0;
+    assert(fs_open(&app,"open.js",FS_MODE_READ)==FS_OK && !last_open_sd);
+    assert(fs_close(&app)==FS_OK);
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_OK && last_open_sd);
+    assert(sd_mounts==1 && s_format_calls==0);
+    assert(fs_begin_host_access()==FS_OK); /* SD handle must not block app MSC. */
+    assert(fs_read(&sd,b,4,&n)==FS_OK && n==4);
+    assert(fs_open(&app,"/app/open.js",FS_MODE_READ)==FS_ERROR_BUSY);
+    assert(fs_close(&sd)==FS_OK);
+    assert(fs_open(&sd,"//./sd/asset.json",FS_MODE_READ)==FS_OK);
+    assert(fs_close(&sd)==FS_OK);
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_OK);
+    assert(fs_end_host_access()==FS_OK); /* Must preserve outstanding SD handle. */
+    assert(fs_read(&sd,b,4,&n)==FS_OK);
+    assert(fs_close(&sd)==FS_OK);
+    assert(fs_rename("/sd/a","/app/a") != FS_OK);
+    assert(fs_remove("/sd")==FS_ERROR_INVALID);
+    assert(fs_mkdir("/sd")==FS_ERROR_INVALID);
+    assert(fs_open(&sd,"/sd",FS_MODE_READ)==FS_ERROR_INVALID);
+    io_result=FR_DISK_ERR;
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_ERROR_IO);
+    io_result=FR_OK;sd_mount_result=FR_NO_FILESYSTEM;
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)!=FS_OK);
+    assert(s_format_calls==0);
+    sd_mount_result=FR_NOT_READY;
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)!=FS_OK);
+    assert(fs_open(&app,"/app/open.js",FS_MODE_READ)==FS_OK);
+    assert(fs_close(&app)==FS_OK);
+    sd_mount_result=FR_OK;
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_OK);
+    io_result=FR_DISK_ERR;
+    assert(fs_read(&sd,b,4,&n)==FS_ERROR_IO);
+    io_result=FR_OK;
+    assert(fs_read(&sd,b,4,&n)!=FS_OK); /* Failed live handle cannot silently switch cards. */
+    assert(fs_close(&sd)==FS_OK);
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_OK);
+    assert(fs_close(&sd)==FS_OK);
+    fail_dir_read=true;
+    assert(fs_list_dir("/sd",ignore_entry,NULL)==FS_ERROR_IO);
+    assert(s_format_calls==0);
+    puts("SD mount separation, recovery and no-format tests passed");
+}
+#endif
+
 int main(int argc, char **argv) {
     assert(argc == 2);
+#if MCUJS_HAS_SD
+    if (!strcmp(argv[1], "sd")) { test_sd_mount(); return 0; }
+#endif
     if (strcmp(argv[1], "namespace") == 0) {
         test_namespace();
     } else if (strcmp(argv[1], "handoff") == 0) {

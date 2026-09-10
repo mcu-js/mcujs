@@ -19,6 +19,15 @@ backups and an approved restoration plan are required before such updates.
 
 ### Added
 
+- Experimental Canvas pointer input for the configured onboard RP2350 Touch LCD
+  1.69: one-contact down/move/up/cancel events, explicit start/stop, Canvas-local
+  coordinates, exclusive I2C ownership and lifecycle cancellation. Other display
+  profiles report zero touch points. Includes a shared drawing consumer and an
+  explicit browser mouse adapter. Native/host/browser checks pass; physical
+  portrait drawing and basic finger alignment were confirmed on `f349bb4`.
+  Includes STOP-separated CST816 reads fixing report-read failures. See
+  `docs/docs/development/canvas-pointer.md` for subset and ownership limits.
+
 - Sticky AI/Power-button restart: hold for three seconds after releasing the
   button following boot. Short presses cancel; a held-through-boot button
   cannot loop restarts. Main-loop-driven, restart-only; safe boot is unchanged.

@@ -22,7 +22,13 @@ function loadCanvas() {
     open(kind, options) {
       assert.equal(this, native);
       const record = { kind, options, calls: [], closes: 0 };
+      let lifecycle;
       const backend = {
+        maxTouchPoints: 0,
+        setLifecycle(callback) { lifecycle = callback; },
+        startPointer() { const error = new Error('Touch unavailable'); error.code = 'ENXIO'; throw error; },
+        stopPointer() {},
+        samplePointer() { throw new Error('Touch is stopped'); },
         getState() { return record.closes ? 'closed' : 'open'; },
         draw(commands, mode, rgba, lineWidth) {
           assert.equal(this, backend);
@@ -32,6 +38,7 @@ function loadCanvas() {
         close() {
           assert.equal(this, backend);
           record.closes++;
+          if (lifecycle) lifecycle();
         },
       };
       Object.defineProperties(backend, {
@@ -44,6 +51,7 @@ function loadCanvas() {
     stats() { throw new Error('stats are private diagnostics'); },
   };
   const api = loadModule('canvas.js', name => {
+    if (name === 'events') return require('../lib/events.js');
     assert.equal(name, 'mcujs:canvas-native');
     return native;
   });
@@ -188,6 +196,7 @@ test('native driver and option errors propagate unchanged and failed default ope
     },
   };
   const api = loadModule('canvas.js', name => {
+    if (name === 'events') return require('../lib/events.js');
     assert.equal(name, 'mcujs:canvas-native');
     return native;
   });

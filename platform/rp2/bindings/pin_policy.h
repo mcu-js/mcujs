@@ -16,6 +16,7 @@ typedef enum {
     MCUJS_RP2_PIN_OWNER_SPI1,
     MCUJS_RP2_PIN_OWNER_ADC,
     MCUJS_RP2_PIN_OWNER_NEOPIXEL,
+    MCUJS_RP2_PIN_OWNER_TOUCH,
 } mcujs_rp2_pin_owner_t;
 
 static inline bool mcujs_rp2_pin_in_mask(int pin, uint64_t mask) {

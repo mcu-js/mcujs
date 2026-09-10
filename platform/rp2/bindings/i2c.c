@@ -28,6 +28,7 @@ extern void js_register_global(const char *name, jerry_value_t object);
 
 
 static bool s_i2c_initialized[2];
+static bool s_touch_owned;
 static int s_i2c_sda[2] = {-1, -1};
 static int s_i2c_scl[2] = {-1, -1};
 
@@ -150,6 +151,9 @@ static jerry_value_t i2c_init_handler(const jerry_call_info_t *call_info_p,
         return jerry_throw_sz(JERRY_ERROR_RANGE,
                               "Invalid I2C SDA/SCL pin route");
     }
+
+    if (bus == 1 && s_touch_owned)
+        return throw_i2c_busy(bus, "I2C1 is exclusively owned by Canvas touch");
 
     uint32_t clock_frequency = clock_get_hz(clk_sys);
     uint32_t period =
@@ -370,6 +374,79 @@ static jerry_value_t i2c_read_handler(const jerry_call_info_t *call_info_p,
     }
     return array;
 }
+
+/* This first touch slice deliberately owns I2C1 exclusively, including its
+ * onboard IMU route. Keep the lease beside the user driver's initialized state:
+ * never reinitialize a user bus (even on different pins), nor expose touch's bus
+ * to I2C.read/write. No interrupt-level contact inference or shared-bus framework.
+ * Protocol evidence and orientation derivation: docs/docs/development/canvas-pointer.md.
+ */
+#if defined(MCUJS_EXPERIMENTAL_CANVAS) && defined(MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_1_69)
+#include "touch_169.h"
+static const char *touch_error="Touch sample failed";
+const char *mcujs_touch_169_error(void) { return touch_error; }
+#define TOUCH_TIMEOUT_US 5000u
+static const int touch_pins[] = {6, 7, 22};
+static bool touch_read(uint8_t reg, uint8_t *data, size_t size) {
+    /* Match the stable STOP-separated register reads observed on the panel.
+     * This bus is exclusively leased, so no other owner can interleave. */
+    int w=i2c_write_timeout_us(i2c1,0x15,&reg,1,false,TOUCH_TIMEOUT_US);
+    int r=w==1?i2c_read_timeout_us(i2c1,0x15,data,size,false,TOUCH_TIMEOUT_US):-999;
+    if(w!=1) touch_error=w==-2?"Touch register write timed out":"Touch register write failed";
+    else if(r!=(int)size) touch_error=r==-2?"Touch report read timed out":"Touch report read failed";
+    return w==1 && r==(int)size;
+}
+static bool touch_write(uint8_t reg, uint8_t value) {
+    uint8_t data[]={reg,value};
+    return i2c_write_timeout_us(i2c1,0x15,data,2,false,TOUCH_TIMEOUT_US)==2;
+}
+void mcujs_touch_169_close(void) {
+    if (!s_touch_owned) return;
+    s_touch_owned=false;
+    /* Hold only our controller in reset; no teardown I/O can block on a failed bus. */
+    gpio_put(22,false);
+    i2c_deinit(i2c1);
+    for (unsigned i=0;i<sizeof(touch_pins)/sizeof(*touch_pins);i++) {
+        gpio_init((uint)touch_pins[i]);
+        mcujs_rp2_pin_release(touch_pins[i],MCUJS_RP2_PIN_OWNER_TOUCH);
+    }
+}
+int mcujs_touch_169_open(void) {
+    if (s_touch_owned || s_i2c_initialized[1]) return 1;
+    /* Unlike generic peripheral takeover, even a configured GPIO is a conflict. */
+    for (unsigned i=0;i<sizeof(touch_pins)/sizeof(*touch_pins);i++)
+        if (!mcujs_rp2_gpio_pin_allowed(touch_pins[i]) ||
+            mcujs_rp2_pin_owner(touch_pins[i])!=MCUJS_RP2_PIN_OWNER_NONE) return 1;
+    for (unsigned i=0;i<sizeof(touch_pins)/sizeof(*touch_pins);i++)
+        mcujs_rp2_pin_claim(touch_pins[i],MCUJS_RP2_PIN_OWNER_TOUCH);
+    s_touch_owned=true;
+    gpio_init(22);gpio_put(22,false);gpio_set_dir(22,GPIO_OUT);
+    if (i2c_init(i2c1,400000)!=400000) { mcujs_touch_169_close(); return 2; }
+    gpio_set_function(6,GPIO_FUNC_I2C);gpio_set_function(7,GPIO_FUNC_I2C);
+    gpio_pull_up(6);gpio_pull_up(7);
+    sleep_ms(100);gpio_put(22,true);sleep_ms(100);
+    uint8_t id;
+    if (!touch_read(0xa7,&id,1) || id!=0xb5 || !touch_write(0xfe,7) || !touch_write(0xfa,0x60)) {
+        mcujs_touch_169_close(); return 2;
+    }
+    return 0;
+}
+bool mcujs_touch_169_sample(bool horizontal, bool *pressed, int *x, int *y) {
+    uint8_t data[5];
+    if (!s_touch_owned) { touch_error="Touch ownership lost"; return false; }
+    if (!touch_read(2,data,sizeof(data))) return false;
+    /* FingerNum is the contact oracle, never the pulsed INT pin. */
+    if (data[0]>1) { touch_error="Touch contact count invalid"; return false; }
+    *pressed=data[0]==1;
+    if (!*pressed) { *x=*y=0; return true; }
+    int raw_x=((data[1]&15)<<8)|data[2], raw_y=((data[3]&15)<<8)|data[4];
+    if (raw_x>=240 || raw_y>=280) { touch_error="Touch coordinates outside panel"; return false; }
+    /* ST7789 MADCTL 00 portrait / 70 landscape (MV|MX, ML is refresh order).
+     * RAM window offsets of 20 are not touch/Canvas coordinates. */
+    *x=horizontal?raw_y:raw_x; *y=horizontal?239-raw_x:raw_y;
+    return true;
+}
+#endif
 
 /*
  * Create I2C module object

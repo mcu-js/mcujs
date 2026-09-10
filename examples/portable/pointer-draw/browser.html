@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portable pointer drawing — mouse adapter</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 2rem; }
+  /* Scaling is axis-aligned; no canvas padding, border or CSS rotation. */
+  canvas { width: 360px; height: 420px; max-width: 100%; object-fit: fill;
+    border: 0; padding: 0; outline: 1px solid #888; }
+</style>
+<h1>Portable pointer drawing</h1>
+<p id="status">Hold the primary mouse button and draw. Stops after 30 seconds.</p>
+<p>Mouse-only adapter; no touch, pen, gestures, pressure or multitouch support.</p>
+<canvas id="drawing" width="240" height="280" aria-label="Drawing surface"></canvas>
+<script src="draw.js"></script>
+<script src="browser-adapter.js"></script>
+<script src="browser.js"></script>
+</html>

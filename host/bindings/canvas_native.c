@@ -4,6 +4,11 @@
 #include "canvas_display.h"
 #include "validation.h"
 #include <math.h>
+#include <stddef.h>
+#if defined(MCUJS_PLATFORM_RP2) && defined(MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_1_69)
+#include "touch_169.h"
+#define CANVAS_TOUCH_169
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,7 +18,19 @@
 #define MAX_COMMANDS 128
 static canvas_display_t *displays;
 static unsigned presentations, presentation_failures;
-static bool default_unavailable;
+static bool default_unavailable, resetting;
+typedef struct {
+    canvas_display_t display; /* first: backend boundary remains engine-neutral */
+    jerry_value_t lifecycle;
+    bool touch_capable, touch_started, horizontal;
+} native_display_t;
+static void stop_touch(canvas_display_t *d) {
+    native_display_t *n=(native_display_t *)d;
+#ifdef CANVAS_TOUCH_169
+    if (n->touch_started) mcujs_touch_169_close();
+#endif
+    n->touch_started=false;
+}
 
 static jerry_value_t display_error(mcujs_operational_error_t code, const char *message) {
     const mcujs_error_details_t details = {.resource="display"};
@@ -27,12 +44,30 @@ static void close_display(canvas_display_t *d) {
     if (*p) *p=d->next;
     d->closed=true; d->pending=false;
     if (d->is_default) default_unavailable=d->failed;
+    stop_touch(d);
     if (d->release) d->release(d);
 }
 static void free_display(void *ptr, jerry_object_native_info_t *info) {
-    (void)info; close_display(ptr); free(ptr);
+    close_display(ptr); jerry_native_ptr_free(ptr,info); free(ptr);
 }
-static const jerry_object_native_info_t display_type={ .free_cb=free_display };
+static const jerry_object_native_info_t display_type={
+    .free_cb=free_display, .number_of_references=1,
+    .offset_of_references=offsetof(native_display_t,lifecycle)
+};
+/* Only explicit VM-valid paths notify; GC releases native resources silently.
+ * Copy/clear before calling JS: callbacks may close, allocate, or trigger GC. */
+static void close_and_notify(canvas_display_t *d) {
+    if (!d || d->closed) return;
+    native_display_t *n=(native_display_t *)d;
+    jerry_value_t callback=jerry_value_copy(n->lifecycle);
+    jerry_native_ptr_set(&n->lifecycle,jerry_undefined());
+    close_display(d);
+    if (jerry_value_is_function(callback)) {
+        jerry_value_t result=jerry_call(callback,jerry_undefined(),NULL,0);
+        jerry_value_free(result);
+    }
+    jerry_value_free(callback);
+}
 static canvas_display_t *receiver(jerry_value_t value) {
     return jerry_value_is_object(value)?jerry_object_get_native_ptr(value,&display_type):NULL;
 }
@@ -91,14 +126,14 @@ static jerry_value_t close_method(const jerry_call_info_t *info,const jerry_valu
     (void)args; (void)argc;
     canvas_display_t *d=receiver(info->this_value);
     if(!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
-    close_display(d);return jerry_undefined();
+    close_and_notify(d);return jerry_undefined();
 }
 static bool present_display(canvas_display_t *d) {
     if (!d->pending) return true;
     if (d->present(d)) { d->pending=false; presentations++; return true; }
     presentation_failures++;
     d->failed=true;
-    close_display(d);
+    close_and_notify(d);
     return false;
 }
 static jerry_value_t present_method(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
@@ -121,9 +156,61 @@ static jerry_value_t default_state(const jerry_call_info_t *info,const jerry_val
 }
 /* Engine teardown, before Jerry finalizers: invalidate handles, release leases. */
 void js_canvas_reset(void) {
-    while (displays) close_display(displays);
+    if (resetting) return;
+    resetting=true;
+    while (displays) close_and_notify(displays);
+    resetting=false;
     default_unavailable=false;
     presentations=0; presentation_failures=0;
+}
+static jerry_value_t set_lifecycle(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    canvas_display_t *d=receiver(info->this_value);
+    if (!d || argc!=1 || !jerry_value_is_function(args[0]))
+        return jerry_throw_sz(JERRY_ERROR_TYPE,"Expected display and lifecycle callback");
+    if (d->closed) return display_error(MCUJS_ERROR_NO_DEVICE,"Display is closed");
+    jerry_native_ptr_set(&((native_display_t *)d)->lifecycle,args[0]);
+    return jerry_undefined();
+}
+static jerry_value_t stop_pointer(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)args; (void)argc;
+    canvas_display_t *d=receiver(info->this_value);
+    if (!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
+    stop_touch(d); return jerry_undefined();
+}
+static jerry_value_t start_pointer(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)args; (void)argc;
+    canvas_display_t *d=receiver(info->this_value);
+    if (!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
+    native_display_t *n=(native_display_t *)d;
+    if (d->closed || !n->touch_capable) return display_error(MCUJS_ERROR_NO_DEVICE,"Touch unavailable");
+    if (n->touch_started) return jerry_undefined();
+#ifdef CANVAS_TOUCH_169
+    int status=mcujs_touch_169_open();
+    if (status) return display_error(status==1?MCUJS_ERROR_BUSY:MCUJS_ERROR_IO,"Touch initialization failed");
+    n->touch_started=true;
+#endif
+    return jerry_undefined();
+}
+static jerry_value_t sample_pointer(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
+    (void)args; (void)argc;
+    canvas_display_t *d=receiver(info->this_value);
+    if (!d) return jerry_throw_sz(JERRY_ERROR_TYPE,"Invalid display receiver");
+    native_display_t *n=(native_display_t *)d;
+    if (d->closed || !n->touch_started) return display_error(MCUJS_ERROR_NO_DEVICE,"Touch is stopped");
+    bool pressed=false; int x=0,y=0;
+#ifdef CANVAS_TOUCH_169
+    if (!mcujs_touch_169_sample(n->horizontal,&pressed,&x,&y)) {
+        stop_touch(d);
+        return display_error(MCUJS_ERROR_IO,mcujs_touch_169_error());
+    }
+#endif
+    jerry_value_t result=jerry_array(3);
+    jerry_value_t values[]={jerry_boolean(pressed),jerry_number(x),jerry_number(y)};
+    for (unsigned i=0;i<3;i++) {
+        jerry_value_t r=jerry_object_set_index(result,i,values[i]);
+        jerry_value_free(r); jerry_value_free(values[i]);
+    }
+    return result;
 }
 static bool integer_option(jerry_value_t opts,const char *name,int *out,int lo,int hi) {
     jerry_value_t key=jerry_string_sz(name),v=jerry_object_get(opts,key);jerry_value_free(key);
@@ -205,6 +292,7 @@ static bool lcd_options(jerry_value_t opts,canvas_lcd_config_t *c) {
 }
 static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value_t args[],jerry_length_t argc) {
     (void)info;
+    if (resetting) return display_error(MCUJS_ERROR_BUSY,"Canvas reset in progress");
     if(argc!=2 || !jerry_value_is_string(args[0]) || !jerry_value_is_object(args[1]) || jerry_value_is_array(args[1]))
         return jerry_throw_sz(JERRY_ERROR_TYPE,"Expected display kind and options object");
     char kind[16]={0};jerry_size_t n=jerry_string_size(args[0],JERRY_ENCODING_UTF8);
@@ -238,11 +326,12 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
         if (is_default || it->is_default)
             return display_error(MCUJS_ERROR_BUSY,"Configured display requires exclusive Canvas ownership");
     }
-    canvas_display_t *d=calloc(1,sizeof(*d));
+    canvas_display_t *d=calloc(1,sizeof(native_display_t));
     if(!d) {
         if (is_default) default_unavailable=true;
         return display_error(MCUJS_ERROR_RESOURCE_EXHAUSTED,"Out of memory opening display");
     }
+    jerry_native_ptr_init(d,&display_type);
     d->is_default=is_default;
     bool ok=false;
 #ifdef MCUJS_CANVAS_DVI
@@ -262,6 +351,16 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
     }
     if (is_default) default_unavailable=false;
     jerry_value_t result=jerry_object();jerry_object_set_native_ptr(result,&display_type,d);
+    native_display_t *instance=(native_display_t *)d;
+#ifdef CANVAS_TOUCH_169
+    instance->touch_capable=is_default && lcd && cfg.profile==CANVAS_PANEL_WAVESHARE_1_69;
+    instance->horizontal=lcd && cfg.horizontal;
+#endif
+    put(result,"maxTouchPoints",jerry_number(instance->touch_capable?1:0));
+    put(result,"setLifecycle",jerry_function_external(set_lifecycle));
+    put(result,"startPointer",jerry_function_external(start_pointer));
+    put(result,"stopPointer",jerry_function_external(stop_pointer));
+    put(result,"samplePointer",jerry_function_external(sample_pointer));
     d->next=displays;displays=d;
     put(result,"width",jerry_number(d->width));put(result,"height",jerry_number(d->height));
     put(result,"draw",jerry_function_external(draw));put(result,"close",jerry_function_external(close_method));
@@ -269,9 +368,15 @@ static jerry_value_t open_method(const jerry_call_info_t *info,const jerry_value
     return result;
 }
 void js_canvas_present(void) {
-    for(canvas_display_t *d=displays,*next;d;d=next) {
-        next=d->next;
-        if(!d->pending)continue;
+    /* Rescan after callbacks: a listener can close/collect another display.
+     * Bound work to the entry population: failure callbacks may open and dirty
+     * replacements indefinitely. New work can wait for the next engine turn. */
+    size_t budget=0;
+    for (canvas_display_t *d=displays; d; d=d->next) budget++;
+    while (budget--) {
+        canvas_display_t *d=displays;
+        while (d && !d->pending) d=d->next;
+        if (!d) break;
         if(!present_display(d)) printf("Canvas presentation failed; display closed\r\n");
     }
 }

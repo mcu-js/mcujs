@@ -641,6 +641,10 @@ void js_engine_cleanup(void) {
         return;
     }
     
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
+    /* Deliver cancellation while modules, event listeners and timers are valid. */
+    js_canvas_reset();
+#endif
 #if MCUJS_FEATURE_MODULE_LOADER
     js_module_loader_cleanup();
 #endif
@@ -649,9 +653,6 @@ void js_engine_cleanup(void) {
 #endif
 #if MCUJS_FEATURE_TIMERS
     js_timers_cleanup();
-#endif
-#ifdef MCUJS_EXPERIMENTAL_CANVAS
-    js_canvas_reset();
 #endif
     jerry_cleanup();
     s_initialized = false;

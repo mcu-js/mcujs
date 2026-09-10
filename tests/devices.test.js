@@ -15,13 +15,17 @@ function fixture(supported = true) {
       calls.push(['open', kind, options]);
       if (active) { const e = new Error('Display busy'); e.code = 'EBUSY'; throw e; }
       active = true;
-      let state = 'open';
+      let state = 'open', lifecycle;
       return {
-        width: 200, height: 200,
+        width: 200, height: 200, maxTouchPoints: 0,
+        setLifecycle(callback) { lifecycle = callback; },
+        startPointer() { const error = new Error('Touch unavailable'); error.code = 'ENXIO'; throw error; },
+        stopPointer() {},
+        samplePointer() { throw new Error('Touch is stopped'); },
         getState() { return state; },
         draw() { calls.push(['draw']); },
         present() { calls.push(['present']); },
-        close() { calls.push(['close']); active = false; state = 'closed'; },
+        close() { calls.push(['close']); active = false; state = 'closed'; if (lifecycle) lifecycle(); },
       };
     },
   };

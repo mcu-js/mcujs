@@ -13,13 +13,19 @@ function loadCanvas() {
       assert.equal(this, native);
       assert.equal(kind, 'default');
       assert.deepEqual(Object.keys(options), []);
+      let lifecycle, closed = false;
       const backend = {
-        getState() { return 'open'; },
+        maxTouchPoints: 0,
+        setLifecycle(callback) { lifecycle = callback; },
+        startPointer() { const error = new Error('Touch unavailable'); error.code = 'ENXIO'; throw error; },
+        stopPointer() {},
+        samplePointer() { throw new Error('Touch is stopped'); },
+        getState() { return closed ? 'closed' : 'open'; },
         draw(commands, mode, rgba, lineWidth) {
           assert.equal(this, backend);
           calls.push({ commands: Array.from(commands), mode, rgba: Array.from(rgba), lineWidth });
         },
-        close() { assert.equal(this, backend); },
+        close() { assert.equal(this, backend); closed = true; if (lifecycle) lifecycle(); },
       };
       Object.defineProperties(backend, {
         width: { value: 160 },
@@ -33,6 +39,7 @@ function loadCanvas() {
     module,
     exports: module.exports,
     require(name) {
+      if (name === 'events') return require('../lib/events.js');
       assert.equal(name, 'mcujs:canvas-native');
       return native;
     },

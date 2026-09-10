@@ -4,6 +4,20 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- **Breaking:** internal application volumes use logical `/app` on RP2 and ESP32.
+  Boot runs `/app/index.js`; relative filesystem paths start at `/app`, and file
+  entry points now run as CommonJS modules with module-relative imports. No
+  legacy absolute-root aliases, SD support, or automatic file migration.
+- Fixed RP2350 BOOTSEL sampling to use its SDK-defined QSPI input bit rather
+  than the RP2040 input bit, which falsely selected safe mode during autorun QA.
+  Real held-button recovery remains required for hardware acceptance.
+- Added a bounded saved-settings drawing startup example and namespace/backend
+  regression tests. On the 1.69, candidate `c746dd7` passed software-reset autorun
+  and settings persistence; the operator confirmed charger-powered cold-start
+  and visible aqua drawing. Earlier USB-connected touch-read errors remain
+  unresolved, and physical held-BOOTSEL recovery is not yet verified.
+  See [application namespace and upgrade procedure](docs/docs/development/app-namespace.md).
+
 Development work toward the portable API release. **Not a published release or
 qualified release candidate.** `version.txt` still reads `0.1.0`; check the
 installed firmware build ID and `board.apiVersion` before using these APIs.

@@ -22,6 +22,7 @@ cc -std=gnu17 -Wall -Wextra -Werror \
     "${ROOT}/src/filesystem/fs.c" \
     -o "${TMP_ROOT}/fs-ownership-test"
 
+"${TMP_ROOT}/fs-ownership-test" namespace
 "${TMP_ROOT}/fs-ownership-test" handoff
 "${TMP_ROOT}/fs-ownership-test" unmount-failure
 "${TMP_ROOT}/fs-ownership-test" remount-failure
@@ -50,4 +51,22 @@ cc -std=gnu17 -Wall -Wextra -Werror \
     -o "${TMP_ROOT}/esp32-msc-backend-test"
 
 "${TMP_ROOT}/esp32-msc-backend-test"
-node --test "${ROOT}/tests/runtime-registry.test.js"
+# Compile the actual ESP32 path-facing functions against native POSIX stubs.
+# SDK/partition/ownership lifecycle code is deliberately outside this seam.
+python3 - "${ROOT}" "${TMP_ROOT}" <<'PY'
+from pathlib import Path
+import sys
+root, tmp = map(Path, sys.argv[1:])
+source = (root / 'platform/esp32/main/filesystem.c').read_text()
+helpers = source[source.index('static fs_result_t errno_to_fs('):source.index('static fs_result_t ensure_initialized(')]
+operations = source[source.index('fs_result_t fs_open('):]
+(tmp / 'esp-path-functions.inc').write_text(helpers + operations)
+PY
+cc -std=gnu17 -Wall -Wextra -Werror \
+    -DTEST_ESP_PATHS -I"${ROOT}/src/filesystem" -I"${TMP_ROOT}" \
+    "${ROOT}/tests/fs_path_test.c" -o "${TMP_ROOT}/fs-path-test"
+"${TMP_ROOT}/fs-path-test"
+
+if [[ "${1:-}" != "--native-only" ]]; then
+    node --test "${ROOT}/tests/runtime-registry.test.js"
+fi

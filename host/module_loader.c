@@ -113,48 +113,24 @@ js_result_t js_module_resolve(const char *base_path, const char *specifier,
         return JS_ERROR_FILE_NOT_FOUND;
     }
     
-    /* Handle absolute paths */
-    if (specifier[0] == '/') {
-        strncpy(resolved, specifier, resolved_len - 1);
-        resolved[resolved_len - 1] = '\0';
+    char base_dir[MAX_PATH_LENGTH] = FS_APP_ROOT;
+    if (specifier[0]=='.' && base_path != NULL && base_path[0]!='\0') {
+        if(strlen(base_path)>=sizeof(base_dir)) return JS_ERROR_FILE_NOT_FOUND;
+        strcpy(base_dir,base_path);
+        char *slash=strrchr(base_dir,'/');
+        if(!slash) return JS_ERROR_FILE_NOT_FOUND;
+        *slash='\0';
+    } else if (specifier[0]!='/' && specifier[0]!='.') {
+        strcpy(base_dir,FS_APP_ROOT "/lib");
     }
-    /* Handle relative paths */
-    else if (specifier[0] == '.') {
-        if (base_path != NULL && base_path[0] != '\0') {
-            /* Find directory of base path */
-            char base_dir[MAX_PATH_LENGTH];
-            strncpy(base_dir, base_path, sizeof(base_dir) - 1);
-            base_dir[sizeof(base_dir) - 1] = '\0';
-            
-            char *last_slash = strrchr(base_dir, '/');
-            if (last_slash != NULL) {
-                *(last_slash + 1) = '\0';
-            } else {
-                base_dir[0] = '\0';
-            }
-            
-            /* Combine with specifier */
-            snprintf(resolved, resolved_len, "%s%s", base_dir, specifier);
-        } else {
-            /* Relative to root */
-            if (specifier[0] == '.' && specifier[1] == '/') {
-                snprintf(resolved, resolved_len, "/%s", specifier + 2);
-            } else {
-                snprintf(resolved, resolved_len, "/%s", specifier);
-            }
-        }
-    }
-    /* Handle bare specifiers (future: node_modules style) */
-    else {
-        snprintf(resolved, resolved_len, "/%s", specifier);
-    }
-    
+    if(fs_normalize_path(specifier,base_dir,resolved,resolved_len)!=FS_OK ||
+       !strcmp(resolved,"/") || !strcmp(resolved,FS_APP_ROOT)) return JS_ERROR_FILE_NOT_FOUND;
+
     /* Add .js extension if missing */
     size_t len = strlen(resolved);
     if (len < 3 || strcmp(resolved + len - 3, ".js") != 0) {
-        if (len + 3 < resolved_len) {
-            strcat(resolved, ".js");
-        }
+        if (len + 3 >= resolved_len) return JS_ERROR_FILE_NOT_FOUND;
+        strcat(resolved, ".js");
     }
     
     return JS_OK;

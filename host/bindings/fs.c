@@ -50,6 +50,7 @@ static size_t get_path_arg(const jerry_value_t args[], jerry_length_t argc,
         return PATH_ARG_TOO_LONG;
     }
     buffer[length] = '\0';
+    if (strlen(buffer) != length) return 0; /* Reject NUL rather than using a prefix. */
     return (size_t)length;
 }
 

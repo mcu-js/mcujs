@@ -719,23 +719,16 @@ js_result_t js_engine_exec_file(const char *filename) {
         return JS_ERROR_INIT;
     }
     
-#if MCUJS_FEATURE_MODULE_LOADER
-    /* Read file content */
-    char *content = NULL;
-    size_t content_len = 0;
-    
-    js_result_t read_result = js_module_read_file(filename, &content, &content_len);
-    if (read_result != JS_OK) {
-        return read_result;
+#if MCUJS_FEATURE_MODULE_LOADER && MCUJS_FEATURE_REQUIRE
+    jerry_value_t result=js_require_exec_file(filename);
+#if defined(MCUJS_PLATFORM_ESP32) && defined(MCUJS_EXPERIMENTAL_CANVAS)
+    js_canvas_present();
+#endif
+    if (jerry_value_is_exception(result)) {
+        store_error(result);jerry_value_free(result);return JS_ERROR_EXEC;
     }
-    
-    /* Execute the code with filename for stack traces */
-    js_result_t exec_result = js_engine_exec_named(content, content_len, filename, NULL, 0);
-    
-    /* Free file content */
-    js_module_free_file(content);
-    
-    return exec_result;
+    jerry_value_free(result);
+    return JS_OK;
 #else
     (void)filename;
     snprintf(s_error_message, sizeof(s_error_message),

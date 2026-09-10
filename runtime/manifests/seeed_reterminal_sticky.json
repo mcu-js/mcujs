@@ -21,6 +21,7 @@
       "safeMode": true
     },
     "fs": {
+      "appRoot": "/app",
       "implementation": "fat",
       "writable": true,
       "hostTransfer": false

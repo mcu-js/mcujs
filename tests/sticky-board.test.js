@@ -11,7 +11,7 @@ test('Sticky is a conservative UART-bridge board, not a native USB board',()=>{
  assert.equal(d.board.devices.display.width,800);assert.equal(d.board.devices.display.height,480);
  for(const f of ['gpio','spi','i2c','adc','pwm','neopixel','onboardLed','onboardButton','image','screen','graphics']) assert.equal(d.features[f],false);
  assert.deepEqual(d.capabilities.usb.classes,[]);
- assert.deepEqual(d.capabilities.fs,{implementation:'fat',writable:true,hostTransfer:false});
+ assert.deepEqual(d.capabilities.fs,{appRoot:'/app',implementation:'fat',writable:true,hostTransfer:false});
  assert.equal(d.features.safeMode,true);assert.ok(d.modules.includes('fs'));
  assert.ok(!shippingBoardIds.includes('seeed_reterminal_sticky'));
 });

@@ -26,6 +26,12 @@ typedef enum {
     FS_ERROR_BUSY,
 } fs_result_t;
 
+#define FS_APP_ROOT "/app"
+#define FS_BOOT_ENTRY "/app/index.js"
+/* Maximum logical path buffer size, including the terminating NUL. */
+#define FS_PATH_MAX 128
+#include "fs_path.h"
+
 /* File open modes */
 typedef enum {
     FS_MODE_READ = 0x01,

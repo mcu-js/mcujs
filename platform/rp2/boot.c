@@ -13,6 +13,7 @@
 #include "hardware/sync.h"
 #include "hardware/structs/ioqspi.h"
 #include "hardware/structs/sio.h"
+#include "hardware/regs/sio.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,8 +48,14 @@ bool __no_inline_not_in_flash_func(boot_button_pressed)(void) {
     /* Wait a bit for the pin to settle */
     for (volatile int i = 0; i < 1000; i++);
     
-    /* Read the pin state - button pressed = LOW */
-    bool button_pressed = !(sio_hw->gpio_hi_in & (1u << CS_PIN_INDEX));
+    /* The QSPI bank index is 1 on both chips, but the SIO input bit is not:
+     * RP2350 places QSPI CSN at bit 27 (not RP2040's bit 1). */
+#if PICO_RP2350
+    const uint32_t cs_input_mask = SIO_GPIO_HI_IN_QSPI_CSN_BITS;
+#else
+    const uint32_t cs_input_mask = 1u << CS_PIN_INDEX;
+#endif
+    bool button_pressed = !(sio_hw->gpio_hi_in & cs_input_mask);
     
     /* Restore the original state */
     ioqspi_hw->io[CS_PIN_INDEX].ctrl = saved;
@@ -120,14 +127,14 @@ bool boot_run_index_js(void) {
     /* Check for safe mode (BOOTSEL held during boot) */
     if (boot_check_safe_mode()) {
         boot_print("*** SAFE MODE ***\r\n");
-        boot_print("BOOTSEL held - skipping index.js\r\n");
+        boot_print("BOOTSEL held - skipping /app/index.js\r\n");
         boot_print("Release BOOTSEL and reset to run normally.\r\n");
         return false;
     }
     
     /* Check if index.js exists */
     if (!boot_file_exists()) {
-        boot_print("No index.js found. Starting REPL...\r\n");
+        boot_print("No /app/index.js found. Starting REPL...\r\n");
         return false;
     }
     

@@ -161,6 +161,7 @@ size_t js_get_string_arg(const jerry_value_t args[], jerry_length_t argc,
  * Clear the module cache (useful for hot reloading)
  */
 void js_require_clear_cache(void);
+jerry_value_t js_require_exec_file(const char *filename);
 
 /* Release file and built-in module handles before engine teardown. */
 void js_require_cleanup(void);

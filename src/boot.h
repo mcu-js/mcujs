@@ -11,11 +11,11 @@
 /**
  * Default entry point filename
  */
-#define BOOT_INDEX_FILE "/index.js"
+#define BOOT_INDEX_FILE "/app/index.js"
 
 /**
  * Attempt to boot from index.js
- * Looks for /index.js on the filesystem and executes it if found.
+ * Looks for /app/index.js on the filesystem and executes it if found.
  * 
  * @return true if index.js was found and executed (may have had errors)
  *         false if index.js was not found
@@ -34,7 +34,7 @@ bool boot_run_file(const char* filename);
 /**
  * Check if a boot file exists
  * 
- * @return true if /index.js exists on the filesystem
+ * @return true if /app/index.js exists on the filesystem
  */
 bool boot_file_exists(void);
 

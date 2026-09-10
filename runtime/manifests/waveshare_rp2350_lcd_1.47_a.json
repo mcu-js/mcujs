@@ -144,6 +144,7 @@
       }
     },
     "fs": {
+      "appRoot": "/app",
       "implementation": "fat",
       "writable": true,
       "hostTransfer": true

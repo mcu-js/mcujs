@@ -409,43 +409,43 @@ def main() -> int:
         )
         evaluate(
             port,
-            "if(!m3fs.existsSync('/m3'))m3fs.mkdirSync('/m3');"
-            "m3fs.writeFileSync('/m3/persist.txt','alpha');"
-            "m3fs.appendFileSync('/m3/persist.txt','-beta');"
-            "m3fs.readFileSync('/m3/persist.txt')",
+            "if(!m3fs.existsSync('/app/m3'))m3fs.mkdirSync('/app/m3');"
+            "m3fs.writeFileSync('/app/m3/persist.txt','alpha');"
+            "m3fs.appendFileSync('/app/m3/persist.txt','-beta');"
+            "m3fs.readFileSync('/app/m3/persist.txt')",
             "'alpha-beta'",
         )
         evaluate(
             port,
-            "var m3stat=m3fs.statSync('/m3/persist.txt');"
+            "var m3stat=m3fs.statSync('/app/m3/persist.txt');"
             "m3stat.isFile===true&&m3stat.isDirectory===false&&m3stat.size===10",
             "true",
         )
         evaluate(
             port,
-            "m3fs.writeFileSync('/m3/rename.tmp','rename');"
-            "m3fs.renameSync('/m3/rename.tmp','/m3/renamed.txt');"
-            "m3fs.readdirSync('/m3').indexOf('renamed.txt')>=0",
+            "m3fs.writeFileSync('/app/m3/rename.tmp','rename');"
+            "m3fs.renameSync('/app/m3/rename.tmp','/app/m3/renamed.txt');"
+            "m3fs.readdirSync('/app/m3').indexOf('renamed.txt')>=0",
             "true",
         )
         evaluate(
             port,
-            "m3fs.unlinkSync('/m3/renamed.txt');!m3fs.existsSync('/m3/renamed.txt')",
+            "m3fs.unlinkSync('/app/m3/renamed.txt');!m3fs.existsSync('/app/m3/renamed.txt')",
             "true",
         )
         evaluate(
             port,
-            "if(!m3fs.existsSync('/lib'))m3fs.mkdirSync('/lib');"
-            "m3fs.writeFileSync('/lib/m3-module.js','module.exports={answer:42};');"
-            "require('/lib/m3-module').answer",
+            "if(!m3fs.existsSync('/app/lib'))m3fs.mkdirSync('/app/lib');"
+            "m3fs.writeFileSync('/app/lib/m3-module.js','module.exports={answer:42};');"
+            "require('/app/lib/m3-module').answer",
             "42",
         )
         evaluate(
             port,
-            "m3fs.writeFileSync('/lib/m3-child.js','exports.answer=17;');"
-            "m3fs.writeFileSync('/lib/m3-deferred.js',"
+            "m3fs.writeFileSync('/app/lib/m3-child.js','exports.answer=17;');"
+            "m3fs.writeFileSync('/app/lib/m3-deferred.js',"
             "\"exports.load=function(){return require('./m3-child').answer;};\");"
-            "require('/lib/m3-deferred').load()",
+            "require('/app/lib/m3-deferred').load()",
             "17",
         )
         evaluate(
@@ -455,7 +455,7 @@ def main() -> int:
         )
         evaluate(
             port,
-            "var guardPath='/'+('g'.repeat(62));m3fs.writeFileSync(guardPath,'guard');"
+            "var guardPath='/app'+('g'.repeat(62));m3fs.writeFileSync(guardPath,'guard');"
             "var longRejected=false;try{m3fs.unlinkSync(guardPath+'x')}"
             "catch(e){longRejected=e.code==='ENAMETOOLONG'};"
             "longRejected&&m3fs.existsSync(guardPath)",
@@ -479,7 +479,7 @@ def main() -> int:
             eject_storage(disk_path)
             time.sleep(0.2)
             evaluate(port, "2 + 2", "4")
-            evaluate(port, "require('fs').readFileSync('/m3/persist.txt')", "'alpha-beta'")
+            evaluate(port, "require('fs').readFileSync('/app/m3/persist.txt')", "'alpha-beta'")
             print(
                 f"PASS: reset/reconnect cycle {index + 1} restarted uptime "
                 f"({uptime_before} -> {uptime_after})"

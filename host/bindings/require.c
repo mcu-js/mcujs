@@ -275,58 +275,18 @@ static bool resolve_module_path(const char *specifier, const char *from_path,
         return false;
     }
     
-    /* Absolute path */
-    if (specifier[0] == '/') {
-        if (!join_path(resolved, resolved_len, "", specifier)) {
-            return false;
-        }
+    char base_dir[MAX_MODULE_PATH] = FS_APP_ROOT;
+    if (specifier[0] == '.' && from_path != NULL && from_path[0] != '\0') {
+        if (!join_path(base_dir,sizeof(base_dir),"",from_path)) return false;
+        char *slash=strrchr(base_dir,'/');
+        if (!slash) return false;
+        *slash='\0';
+    } else if (specifier[0] != '/' && specifier[0] != '.') {
+        if (!join_path(base_dir,sizeof(base_dir),FS_APP_ROOT,"/lib")) return false;
     }
-    /* Relative path: ./ or ../ */
-    else if (specifier[0] == '.') {
-        /* Get directory of current module */
-        char base_dir[MAX_MODULE_PATH] = "/";
-        
-        if (from_path != NULL && from_path[0] != '\0') {
-            strncpy(base_dir, from_path, sizeof(base_dir) - 1);
-            base_dir[sizeof(base_dir) - 1] = '\0';
-            
-            /* Find last slash and truncate */
-            char *last_slash = strrchr(base_dir, '/');
-            if (last_slash != NULL) {
-                *(last_slash + 1) = '\0';
-            }
-        }
-        
-        /* Handle ./ prefix */
-        const char *rel_path = specifier;
-        if (specifier[0] == '.' && specifier[1] == '/') {
-            rel_path = specifier + 2;
-        }
-        /* Handle ../ prefix (simplified - just go up one level) */
-        else if (specifier[0] == '.' && specifier[1] == '.' && specifier[2] == '/') {
-            /* Remove trailing slash, then remove one path component */
-            size_t len = strlen(base_dir);
-            if (len > 1 && base_dir[len-1] == '/') {
-                base_dir[len-1] = '\0';
-            }
-            char *slash = strrchr(base_dir, '/');
-            if (slash != NULL) {
-                *(slash + 1) = '\0';
-            }
-            rel_path = specifier + 3;
-        }
-        
-        if (!join_path(resolved, resolved_len, base_dir, rel_path)) {
-            return false;
-        }
-    }
-    /* Bare specifier - search in /lib/ */
-    else {
-        if (!join_path(resolved, resolved_len, "/lib/", specifier)) {
-            return false;
-        }
-    }
-    
+    if (fs_normalize_path(specifier,base_dir,resolved,resolved_len)!=FS_OK ||
+        !strcmp(resolved,"/") || !strcmp(resolved,FS_APP_ROOT)) return false;
+
     /* Add extension if missing - try .js first, then .json */
     size_t len = strlen(resolved);
     bool has_js_ext = ends_with(resolved, ".js");
@@ -360,9 +320,9 @@ static bool resolve_module_path(const char *specifier, const char *from_path,
 /*
  * Load and execute a module, returning its exports
  */
-static jerry_value_t load_module(const char *resolved_path) {
-    /* Check cache first */
-    cached_module_t *cached = find_cached_module(resolved_path);
+static jerry_value_t load_module(const char *resolved_path, bool use_cache) {
+    /* Entry execution reruns its body; require() retains canonical caching. */
+    cached_module_t *cached = use_cache ? find_cached_module(resolved_path) : NULL;
     if (cached != NULL) {
         return jerry_value_copy(cached->exports);
     }
@@ -448,7 +408,7 @@ static jerry_value_t load_module(const char *resolved_path) {
         }
         
         /* Cache and return the parsed JSON */
-        cache_module(resolved_path, parsed);
+        if (use_cache) cache_module(resolved_path, parsed);
         return parsed;
     }
     
@@ -571,7 +531,7 @@ static jerry_value_t load_module(const char *resolved_path) {
     jerry_value_free(exports_obj);
     
     /* Cache the module */
-    cache_module(resolved_path, final_exports);
+    if (use_cache) cache_module(resolved_path, final_exports);
     
     return final_exports;
 }
@@ -774,6 +734,7 @@ static jerry_value_t require_handler(const jerry_call_info_t *call_info,
     jerry_string_to_buffer(args[0], JERRY_ENCODING_UTF8, 
                            (jerry_char_t *)specifier, len);
     specifier[len] = '\0';
+    if (strlen(specifier)!=len) return jerry_throw_sz(JERRY_ERROR_TYPE,"Module path contains NUL");
     
     /* Check for built-in modules first (bare specifiers like 'fs', 'process') */
     if (specifier[0] != '.' && specifier[0] != '/') {
@@ -798,7 +759,18 @@ static jerry_value_t require_handler(const jerry_call_info_t *call_info,
     }
     
     /* Load the module */
-    return load_module(resolved);
+    return load_module(resolved, true);
+}
+
+/* Boot and .run execute a CommonJS entry without caching the entry itself.
+ * Its own require closure keeps module-relative imports valid in callbacks. */
+jerry_value_t js_require_exec_file(const char *filename) {
+    if (fs_access_status()==FS_ERROR_BUSY) return throw_filesystem_busy();
+    char resolved[MAX_MODULE_PATH];
+    if (fs_normalize_path(filename,FS_APP_ROOT,resolved,sizeof(resolved))!=FS_OK ||
+        !strcmp(resolved,"/") || !strcmp(resolved,FS_APP_ROOT))
+        return jerry_throw_sz(JERRY_ERROR_COMMON,"Invalid application file path");
+    return load_module(resolved,false);
 }
 
 /*

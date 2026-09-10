@@ -149,42 +149,23 @@ static fs_result_t errno_to_fs(int error) {
     }
 }
 
-static bool path_has_parent_segment(const char *path) {
-    const char *cursor = path;
-    while (*cursor != '\0') {
-        while (*cursor == '/') {
-            cursor++;
-        }
-        const char *segment = cursor;
-        while (*cursor != '\0' && *cursor != '/') {
-            cursor++;
-        }
-        if ((cursor - segment) == 2 && segment[0] == '.' && segment[1] == '.') {
-            return true;
-        }
+/* Normalize once, then map /app onto the existing VFS volume root.
+ * An empty private path represents synthetic '/', never a backend path. */
+static fs_result_t translate_path(const char *path, char *translated, size_t translated_size) {
+    char logical[FS_PATH_MAX];
+    fs_result_t result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
+    if (result != FS_OK) return result;
+    if (!translated || !translated_size) return FS_ERROR_INVALID;
+    if (strcmp(logical, "/") == 0) {
+        translated[0] = '\0';
+        return FS_OK;
     }
-    return false;
+    int written = snprintf(translated, translated_size, "%s%s", MCUJS_FS_BASE_PATH, logical + 4);
+    return written < 0 || (size_t)written >= translated_size ? FS_ERROR_INVALID : FS_OK;
 }
 
-static fs_result_t translate_path(const char *path, char *translated, size_t translated_size) {
-    if (path == NULL || translated == NULL || translated_size == 0 ||
-        path[0] == '\0' || strchr(path, '\\') != NULL || path_has_parent_segment(path)) {
-        return FS_ERROR_INVALID;
-    }
-
-    int written;
-    if (strcmp(path, "/") == 0) {
-        written = snprintf(translated, translated_size, "%s", MCUJS_FS_BASE_PATH);
-    } else if (path[0] == '/') {
-        written = snprintf(translated, translated_size, "%s%s", MCUJS_FS_BASE_PATH, path);
-    } else {
-        written = snprintf(translated, translated_size, "%s/%s", MCUJS_FS_BASE_PATH, path);
-    }
-
-    if (written < 0 || (size_t)written >= translated_size) {
-        return FS_ERROR_INVALID;
-    }
-    return FS_OK;
+static bool is_root_path(const char *translated) {
+    return !translated[0] || strcmp(translated, MCUJS_FS_BASE_PATH) == 0;
 }
 
 static fs_result_t ensure_initialized(void) {
@@ -588,6 +569,8 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
         return path_result;
     }
 
+    if (is_root_path(translated)) return FS_ERROR_INVALID;
+
     const char *open_mode = "rb";
     if (mode & FS_MODE_APPEND) {
         open_mode = "ab+";
@@ -715,6 +698,7 @@ fs_result_t fs_exists(const char *path) {
     if (path_result != FS_OK) {
         return path_result;
     }
+    if (is_root_path(translated)) return FS_OK;
     struct stat stats;
     return stat(translated, &stats) == 0 ? FS_OK : errno_to_fs(errno);
 }
@@ -726,7 +710,8 @@ fs_result_t fs_remove(const char *path) {
     }
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t path_result = translate_path(path, translated, sizeof(translated));
-    if (path_result != FS_OK || strcmp(translated, MCUJS_FS_BASE_PATH) == 0) {
+    if (path_result != FS_OK) return path_result;
+    if (is_root_path(translated)) {
         return FS_ERROR_INVALID;
     }
     struct stat stats;
@@ -746,9 +731,9 @@ fs_result_t fs_rename(const char *old_path, const char *new_path) {
     char new_translated[MCUJS_FS_PATH_MAX];
     fs_result_t old_result = translate_path(old_path, old_translated, sizeof(old_translated));
     fs_result_t new_result = translate_path(new_path, new_translated, sizeof(new_translated));
-    if (old_result != FS_OK || new_result != FS_OK ||
-        strcmp(old_translated, MCUJS_FS_BASE_PATH) == 0 ||
-        strcmp(new_translated, MCUJS_FS_BASE_PATH) == 0) {
+    if (old_result != FS_OK) return old_result;
+    if (new_result != FS_OK) return new_result;
+    if (is_root_path(old_translated) || is_root_path(new_translated)) {
         return FS_ERROR_INVALID;
     }
     return rename(old_translated, new_translated) == 0 ? FS_OK : errno_to_fs(errno);
@@ -761,7 +746,8 @@ fs_result_t fs_mkdir(const char *path) {
     }
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t path_result = translate_path(path, translated, sizeof(translated));
-    if (path_result != FS_OK || strcmp(translated, MCUJS_FS_BASE_PATH) == 0) {
+    if (path_result != FS_OK) return path_result;
+    if (is_root_path(translated)) {
         return FS_ERROR_INVALID;
     }
     return mkdir(translated, 0777) == 0 ? FS_OK : errno_to_fs(errno);
@@ -781,6 +767,11 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
         return path_result;
     }
 
+    if (!translated[0]) {
+        const fs_entry_t app = {.name = "app", .size = 0, .is_dir = true};
+        (void)callback(&app, user_data);
+        return FS_OK;
+    }
     DIR *directory = opendir(translated);
     if (directory == NULL) {
         return errno_to_fs(errno);

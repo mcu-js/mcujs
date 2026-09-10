@@ -41,12 +41,24 @@ jerry_value_t js_create_mouse_module(void) { return stub_module(); }
 #endif
 
 static fs_result_t s_fs_operation_result = FS_ERROR_NOT_FOUND;
+static const struct { const char *path, *source; } app_files[] = {
+    {"/app/settings.json", "{\"color\":\"white\"}"},
+    {"/app/lib/helper.js", "module.exports={ok:true};"},
+    {"/app/nested/main.js", "exports.filename=__filename;exports.dirname=__dirname;exports.later=function(){return require('../settings.json').color;};"},
+    {"/app/index.js", "globalThis.appRuns=(globalThis.appRuns||0)+1;globalThis.appEntry=require('./nested/main');"},
+};
+static const char *app_source(const char *path) {
+    for (size_t i=0;i<sizeof(app_files)/sizeof(app_files[0]);i++)
+        if (!strcmp(path,app_files[i].path)) return app_files[i].source;
+    return NULL;
+}
 
 fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
-    (void)file;
-    (void)path;
     (void)mode;
-    return s_fs_operation_result;
+    if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
+    const char *source=app_source(path);
+    if (!source) return FS_ERROR_NOT_FOUND;
+    file->internal=(void *)source; file->is_open=true; return FS_OK;
 }
 
 fs_result_t fs_close(fs_file_t *file) {
@@ -55,9 +67,10 @@ fs_result_t fs_close(fs_file_t *file) {
 }
 
 fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_read) {
-    (void)file;
-    (void)buffer;
-    (void)size;
+    if (s_fs_operation_result==FS_OK && file->is_open) {
+        size_t n=strlen(file->internal);if(n>size)n=size;
+        memcpy(buffer,file->internal,n);*bytes_read=n;return FS_OK;
+    }
     if (bytes_read != NULL) *bytes_read = 0;
     return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
 }
@@ -71,13 +84,13 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
 }
 
 fs_result_t fs_size(fs_file_t *file, size_t *size) {
-    (void)file;
+    if (s_fs_operation_result==FS_OK && file->is_open) {*size=strlen(file->internal);return FS_OK;}
     if (size != NULL) *size = 0;
     return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
 }
 
 fs_result_t fs_exists(const char *path) {
-    (void)path;
+    if (s_fs_operation_result==FS_OK) return app_source(path)?FS_OK:FS_ERROR_NOT_FOUND;
     return s_fs_operation_result;
 }
 
@@ -398,6 +411,16 @@ int main(void) {
     jerry_value_free(jobs);
     assert(eval_source("if(cancelled !== 'cancelled') throw new Error('abort rejection not completed');"));
     assert(eval_source(s_test_source));
+    s_fs_operation_result = FS_OK;
+    assert(eval_source("var appMain=require('./nested/main');if(appMain.filename!=='/app/nested/main.js'||appMain.dirname!=='/app/nested'||appMain.later()!=='white')throw Error('module-relative app paths');"));
+    assert(eval_source("if(require('/app/nested/./main.js')!==appMain||require('/app/nested/../nested/main')!==appMain||!require('helper').ok)throw Error('canonical app cache and library');"));
+    assert(eval_source("['/index.js','/sd/settings.json','../settings.json','/app/../app/settings.json'].forEach(function(p){var denied=false;try{require(p);}catch(e){denied=true;}if(!denied)throw Error('namespace escape accepted');});"));
+    jerry_value_t entry=js_require_exec_file("/app/index.js");
+    assert(!jerry_value_is_exception(entry));jerry_value_free(entry);
+    entry=js_require_exec_file("index.js");
+    assert(!jerry_value_is_exception(entry));jerry_value_free(entry);
+    assert(eval_source("if(appRuns!==2||appEntry.later()!=='white'||appEntry.filename!=='/app/nested/main.js')throw Error('entry rerun and callback import');"));
+    js_require_clear_cache();
     s_fs_operation_result = FS_ERROR_BUSY;
     assert(eval_source(s_busy_test_source));
     assert(eval_source("globalThis.eventsBeforeClear = require('events');"));

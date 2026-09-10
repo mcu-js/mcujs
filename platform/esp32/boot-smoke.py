@@ -37,24 +37,24 @@ def main() -> int:
         evaluate(
             port,
             "var bootfs=require('fs');"
-            "bootfs.writeFileSync('/boot-count.txt','0');"
-            "bootfs.writeFileSync('/index.js',"
-            "\"var fs=require('fs');var n=Number(fs.readFileSync('/boot-count.txt'));\"+"
-            "\"fs.writeFileSync('/boot-count.txt',String(n+1));\");true",
+            "bootfs.writeFileSync('/app/boot-count.txt','0');"
+            "bootfs.writeFileSync('/app/index.js',"
+            "\"var fs=require('fs');var n=Number(fs.readFileSync('/app/boot-count.txt'));\"+"
+            "\"fs.writeFileSync('/app/boot-count.txt',String(n+1));\");true",
             "true",
         )
         port = reset_and_reconnect(port, path)
         time.sleep(6.0)
-        evaluate(port, "require('fs').readFileSync('/boot-count.txt')", "'1'")
+        evaluate(port, "require('fs').readFileSync('/app/boot-count.txt')", "'1'")
         port = reset_and_reconnect(port, path)
         time.sleep(6.0)
-        evaluate(port, "require('fs').readFileSync('/boot-count.txt')", "'2'")
+        evaluate(port, "require('fs').readFileSync('/app/boot-count.txt')", "'2'")
         evaluate(port, "board.safeMode()", "false")
-        print("PASS: healthy /index.js persisted and passed the qualification window")
+        print("PASS: healthy /app/index.js persisted and passed the qualification window")
 
         # A syntax failure leaves the attempt pending; the following reset must
         # skip the broken script and expose a working REPL in persistent safe mode.
-        evaluate(port, "require('fs').writeFileSync('/index.js','function (');true", "true")
+        evaluate(port, "require('fs').writeFileSync('/app/index.js','function (');true", "true")
         evaluate(port, "board.safeMode(false);true", "true")
         port = reset_and_reconnect(port, path)
         evaluate(port, "2+2", "4")
@@ -62,11 +62,11 @@ def main() -> int:
         port = reset_and_reconnect(port, path)
         evaluate(port, "board.safeMode()", "true")
         evaluate(port, "2+2", "4")
-        print("PASS: malformed /index.js entered persistent safe mode on next reset")
+        print("PASS: malformed /app/index.js entered persistent safe mode on next reset")
 
         evaluate(
             port,
-            "require('fs').unlinkSync('/index.js');board.safeMode(false);true",
+            "require('fs').unlinkSync('/app/index.js');board.safeMode(false);true",
             "true",
         )
         port = reset_and_reconnect(port, path)
@@ -76,20 +76,20 @@ def main() -> int:
         evaluate(
             port,
             "var fs2=require('fs');"
-            "if(fs2.existsSync('/explicit-ran.txt'))fs2.unlinkSync('/explicit-ran.txt');"
-            "fs2.writeFileSync('/index.js',"
-            "\"require('fs').writeFileSync('/explicit-ran.txt','bad');\");"
+            "if(fs2.existsSync('/app/explicit-ran.txt'))fs2.unlinkSync('/app/explicit-ran.txt');"
+            "fs2.writeFileSync('/app/index.js',"
+            "\"require('fs').writeFileSync('/app/explicit-ran.txt','bad');\");"
             "board.safeMode(true);true",
             "true",
         )
         port = reset_and_reconnect(port, path)
         evaluate(port, "board.safeMode()", "true")
-        evaluate(port, "require('fs').existsSync('/explicit-ran.txt')", "false")
-        print("PASS: explicit persistent safe mode skipped /index.js")
+        evaluate(port, "require('fs').existsSync('/app/explicit-ran.txt')", "false")
+        print("PASS: explicit persistent safe mode skipped /app/index.js")
 
         evaluate(
             port,
-            "require('fs').unlinkSync('/index.js');board.safeMode(false);true",
+            "require('fs').unlinkSync('/app/index.js');board.safeMode(false);true",
             "true",
         )
         port = reset_and_reconnect(port, path)
@@ -97,7 +97,7 @@ def main() -> int:
         # A boot script cannot clear its own pending marker to evade recovery.
         evaluate(
             port,
-            "require('fs').writeFileSync('/index.js',"
+            "require('fs').writeFileSync('/app/index.js',"
             "'board.safeMode(false);while(true){}');true",
             "true",
         )
@@ -105,10 +105,10 @@ def main() -> int:
         evaluate(port, "2+2", "4")
         port = reset_and_reconnect(port, path)
         evaluate(port, "board.safeMode()", "true")
-        print("PASS: /index.js could not clear its own pending recovery marker")
+        print("PASS: /app/index.js could not clear its own pending recovery marker")
         evaluate(
             port,
-            "require('fs').unlinkSync('/index.js');board.safeMode(false);true",
+            "require('fs').unlinkSync('/app/index.js');board.safeMode(false);true",
             "true",
         )
         port = reset_and_reconnect(port, path)
@@ -117,18 +117,18 @@ def main() -> int:
         # watchdog, not merely by starving the idle task.
         evaluate(
             port,
-            "require('fs').writeFileSync('/index.js','while(true){board.delay(1)}');true",
+            "require('fs').writeFileSync('/app/index.js','while(true){board.delay(1)}');true",
             "true",
         )
         evaluate(port, "board.safeMode(false);true", "true")
         port = reset_and_reconnect(port, path)
         evaluate(port, "board.safeMode()", "true", timeout=5.0)
         evaluate(port, "2+2", "4")
-        print("PASS: yielding looping /index.js recovered automatically into safe mode")
+        print("PASS: yielding looping /app/index.js recovered automatically into safe mode")
 
         evaluate(
             port,
-            "require('fs').unlinkSync('/index.js');board.safeMode(false);true",
+            "require('fs').unlinkSync('/app/index.js');board.safeMode(false);true",
             "true",
         )
         port = reset_and_reconnect(port, path)
@@ -137,7 +137,7 @@ def main() -> int:
         # recover from the persisted watchdog reset reason.
         evaluate(
             port,
-            "require('fs').writeFileSync('/index.js',"
+            "require('fs').writeFileSync('/app/index.js',"
             "'setTimeout(function(){while(true){board.delay(1)}},6000);');true",
             "true",
         )
@@ -154,8 +154,8 @@ def main() -> int:
 
         evaluate(
             port,
-            "var fs3=require('fs');fs3.unlinkSync('/index.js');"
-            "if(fs3.existsSync('/boot-count.txt'))fs3.unlinkSync('/boot-count.txt');"
+            "var fs3=require('fs');fs3.unlinkSync('/app/index.js');"
+            "if(fs3.existsSync('/app/boot-count.txt'))fs3.unlinkSync('/app/boot-count.txt');"
             "board.safeMode(false);true",
             "true",
         )

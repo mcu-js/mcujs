@@ -69,6 +69,11 @@ static fs_result_t ensure_initialized(void) {
     return fs_init();
 }
 
+/* Map a normalized /app path to the existing physical volume root. */
+static const char *physical_path(const char *logical) {
+    return logical[4] ? logical + 4 : "/";
+}
+
 /*
  * Convert fs_mode_t to FatFs mode flags
  */
@@ -471,6 +476,12 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
         return ready;
     }
     
+    char logical[FS_PATH_MAX];
+    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
+    if (path_result != FS_OK) return path_result;
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0)
+        return FS_ERROR_INVALID;
+
     /* Find free file slot */
     int slot = -1;
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
@@ -486,7 +497,7 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     
     /* Open the file */
     BYTE fa_mode = mode_to_fatfs(mode);
-    FRESULT fr = f_open(&s_fil_pool[slot], path, fa_mode);
+    FRESULT fr = f_open(&s_fil_pool[slot], physical_path(logical), fa_mode);
     
     if (fr != FR_OK) {
         return fresult_to_fs(fr);
@@ -632,8 +643,12 @@ fs_result_t fs_exists(const char *path) {
         return ready;
     }
 
+    char logical[FS_PATH_MAX];
+    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
+    if (path_result != FS_OK) return path_result;
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0) return FS_OK;
     FILINFO finfo;
-    return fresult_to_fs(f_stat(path, &finfo));
+    return fresult_to_fs(f_stat(physical_path(logical), &finfo));
 }
 
 /*
@@ -648,7 +663,12 @@ fs_result_t fs_remove(const char *path) {
     if (ready != FS_OK) {
         return ready;
     }
-    return fresult_to_fs(f_unlink(path));
+    char logical[FS_PATH_MAX];
+    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
+    if (path_result != FS_OK) return path_result;
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0)
+        return FS_ERROR_INVALID;
+    return fresult_to_fs(f_unlink(physical_path(logical)));
 }
 
 /*
@@ -663,7 +683,15 @@ fs_result_t fs_rename(const char *old_path, const char *new_path) {
     if (ready != FS_OK) {
         return ready;
     }
-    return fresult_to_fs(f_rename(old_path, new_path));
+    char old_logical[FS_PATH_MAX], new_logical[FS_PATH_MAX];
+    fs_result_t result = fs_normalize_path(old_path, FS_APP_ROOT, old_logical, sizeof(old_logical));
+    if (result != FS_OK) return result;
+    result = fs_normalize_path(new_path, FS_APP_ROOT, new_logical, sizeof(new_logical));
+    if (result != FS_OK) return result;
+    if (strcmp(old_logical, "/") == 0 || strcmp(old_logical, FS_APP_ROOT) == 0 ||
+        strcmp(new_logical, "/") == 0 || strcmp(new_logical, FS_APP_ROOT) == 0)
+        return FS_ERROR_INVALID;
+    return fresult_to_fs(f_rename(physical_path(old_logical), physical_path(new_logical)));
 }
 
 /*
@@ -678,7 +706,12 @@ fs_result_t fs_mkdir(const char *path) {
     if (ready != FS_OK) {
         return ready;
     }
-    return fresult_to_fs(f_mkdir(path));
+    char logical[FS_PATH_MAX];
+    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
+    if (path_result != FS_OK) return path_result;
+    if (strcmp(logical, "/") == 0 || strcmp(logical, FS_APP_ROOT) == 0)
+        return FS_ERROR_INVALID;
+    return fresult_to_fs(f_mkdir(physical_path(logical)));
 }
 
 /*
@@ -698,8 +731,15 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
     FILINFO finfo;
     fs_entry_t entry;
     
-    /* Use root if path is NULL or empty */
-    const char *dir_path = (path == NULL || path[0] == '\0') ? "/" : path;
+    char logical[FS_PATH_MAX];
+    fs_result_t path_result = fs_normalize_path(path, FS_APP_ROOT, logical, sizeof(logical));
+    if (path_result != FS_OK) return path_result;
+    if (strcmp(logical, "/") == 0) {
+        const fs_entry_t app = {.name = "app", .is_dir = true, .size = 0};
+        (void)callback(&app, user_data);
+        return FS_OK;
+    }
+    const char *dir_path = physical_path(logical);
     
     FRESULT fr = f_opendir(&dir, dir_path);
     if (fr != FR_OK) {

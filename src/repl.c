@@ -749,6 +749,11 @@ static void repl_register_identifiers(const char *source, size_t length) {
 }
 
 static void repl_paste_start(const char *path) {
+    if (path && (strlen(path) >= sizeof(repl_state.paste_path) ||
+                 strlen(path) >= FS_PATH_MAX)) {
+        usb_cdc_puts("File path too long; multi-line input not started.\r\n");
+        return;
+    }
     repl_state.paste_mode = true;
     repl_state.paste_len = 0;
     repl_state.paste_buffer[0] = '\0';
@@ -955,7 +960,7 @@ static void repl_handle_command(const char* cmd) {
     else if (strcmp(cmd, "ls") == 0) {
         fs_invalidate();  /* Refresh to see USB changes */
         usb_cdc_puts("Files on device:\r\n");
-        fs_result_t result = fs_list_dir("/", repl_ls_callback, NULL);
+        fs_result_t result = fs_list_dir(FS_APP_ROOT, repl_ls_callback, NULL);
         if (result != FS_OK) {
             usb_cdc_puts("Error reading directory\r\n");
         }

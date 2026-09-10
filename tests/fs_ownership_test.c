@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+static char observed[256], second[256];
+static unsigned path_calls;
+static void observe(const char *path) { path_calls++; strcpy(observed, path); }
 static unsigned s_mount_calls;
 static unsigned s_unmount_calls;
 static unsigned s_format_calls;
@@ -28,7 +31,7 @@ FRESULT f_mount(FATFS *fs, const char *path, BYTE option) {
 }
 FRESULT f_opendir(DIR *dir, const char *path) {
     (void)dir;
-    (void)path;
+    observe(path);
     return FR_OK;
 }
 FRESULT f_closedir(DIR *dir) {
@@ -62,7 +65,7 @@ FRESULT f_getfree(const char *path, DWORD *clusters, FATFS **fs) {
     return FR_OK;
 }
 FRESULT f_open(FIL *file, const char *path, BYTE mode) {
-    (void)path;
+    assert(strcmp(path, "/open.js") == 0);
     (void)mode;
     file->size = 4;
     file->position = 0;
@@ -88,21 +91,21 @@ FRESULT f_write(FIL *file, const void *buffer, UINT size, UINT *written) {
     return FR_OK;
 }
 FRESULT f_stat(const char *path, FILINFO *info) {
-    (void)path;
+    observe(path);
     if (info != NULL) memset(info, 0, sizeof(*info));
     return FR_OK;
 }
 FRESULT f_unlink(const char *path) {
-    (void)path;
+    observe(path);
     return FR_OK;
 }
 FRESULT f_rename(const char *old_path, const char *new_path) {
-    (void)old_path;
-    (void)new_path;
+    observe(old_path);
+    strcpy(second, new_path);
     return FR_OK;
 }
 FRESULT f_mkdir(const char *path) {
-    (void)path;
+    observe(path);
     return FR_OK;
 }
 FRESULT f_readdir(DIR *dir, FILINFO *info) {
@@ -168,13 +171,60 @@ static void expect_busy_application_surface(void) {
     assert(fs_list_dir("/", ignore_entry, NULL) == FS_ERROR_BUSY);
 }
 
+static bool app_entry(const fs_entry_t *entry, void *context) {
+    assert(!strcmp(entry->name, "app") && entry->is_dir && entry->size == 0);
+    (*(unsigned *)context)++;
+    return false;
+}
+
+static void test_namespace(void) {
+    assert(fs_init() == FS_OK);
+    assert(!strcmp(observed, "/")); /* Internal volume validation is physical. */
+    fs_file_t file = {0};
+    assert(fs_open(&file, "a/../open.js", FS_MODE_READ) == FS_OK);
+    assert(fs_close(&file) == FS_OK);
+    assert(fs_exists("/app/app/x") == FS_OK && !strcmp(observed, "/app/x"));
+    assert(fs_remove("settings.json") == FS_OK && !strcmp(observed, "/settings.json"));
+    assert(fs_mkdir("/app/lib") == FS_OK && !strcmp(observed, "/lib"));
+    assert(fs_rename("lib/a", "/app/lib/b") == FS_OK);
+    assert(!strcmp(observed, "/lib/a") && !strcmp(second, "/lib/b"));
+    assert(fs_list_dir("/app", ignore_entry, NULL) == FS_OK && !strcmp(observed, "/"));
+    unsigned before = path_calls, entries = 0;
+    assert(fs_list_dir("/", app_entry, &entries) == FS_OK && entries == 1);
+    assert(fs_exists("/") == FS_OK && fs_exists("/app") == FS_OK);
+    const char *roots[] = {"/", "/app", "/app/a/.."};
+    for (unsigned i = 0; i < 3; i++) {
+        assert(fs_open(&file, roots[i], FS_MODE_READ) == FS_ERROR_INVALID);
+        assert(fs_remove(roots[i]) == FS_ERROR_INVALID);
+        assert(fs_mkdir(roots[i]) == FS_ERROR_INVALID);
+        assert(fs_rename(roots[i], "x") == FS_ERROR_INVALID);
+        assert(fs_rename("x", roots[i]) == FS_ERROR_INVALID);
+    }
+    assert(fs_exists("/index.js") == FS_ERROR_NOT_FOUND);
+    assert(fs_remove("/sd/x") == FS_ERROR_NOT_FOUND);
+    assert(fs_rename("x", "/lib/x") == FS_ERROR_NOT_FOUND);
+    assert(fs_list_dir("", ignore_entry, NULL) == FS_ERROR_INVALID);
+    assert(fs_exists("0:/x") == FS_ERROR_INVALID);
+    assert(fs_remove("/app/../app") == FS_ERROR_INVALID);
+    assert(fs_mkdir("../x") == FS_ERROR_INVALID);
+    assert(path_calls == before && s_format_calls == 0);
+    assert(fs_begin_host_access() == FS_OK);
+    assert(fs_exists("/") == FS_ERROR_BUSY);
+    assert(fs_exists("/app") == FS_ERROR_BUSY);
+    assert(fs_remove("/app") == FS_ERROR_BUSY);
+    assert(fs_mkdir("/") == FS_ERROR_BUSY);
+    assert(fs_list_dir("/", app_entry, &entries) == FS_ERROR_BUSY);
+    assert(entries == 1);
+    puts("RP2 filesystem namespace native FatFs tests passed");
+}
+
 static void test_handoff_and_ebusy(void) {
     assert(fs_init() == FS_OK);
     assert(fs_storage_ready());
     assert(!fs_host_owned());
 
     fs_file_t file = {0};
-    assert(fs_open(&file, "/open.js", FS_MODE_READ) == FS_OK);
+    assert(fs_open(&file, "/app/open.js", FS_MODE_READ) == FS_OK);
     assert(fs_begin_host_access() == FS_ERROR_BUSY);
     assert(s_disk_sync_calls == 0);
     assert(fs_close(&file) == FS_OK);
@@ -222,7 +272,9 @@ static void test_remount_failure_faults_without_format(void) {
 
 int main(int argc, char **argv) {
     assert(argc == 2);
-    if (strcmp(argv[1], "handoff") == 0) {
+    if (strcmp(argv[1], "namespace") == 0) {
+        test_namespace();
+    } else if (strcmp(argv[1], "handoff") == 0) {
         test_handoff_and_ebusy();
     } else if (strcmp(argv[1], "unmount-failure") == 0) {
         test_unmount_failure_faults_without_format();

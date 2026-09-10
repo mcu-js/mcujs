@@ -1,4 +1,4 @@
-/* Persistent safe boot and /index.js startup for MCU.js on ESP32-S3. */
+/* Persistent safe boot and /app/index.js startup for MCU.js on ESP32-S3. */
 
 #include "boot.h"
 
@@ -18,7 +18,7 @@
 #include <stdio.h>
 
 #define MCUJS_BOOT_NAMESPACE "mcujs_boot"
-#define MCUJS_BOOT_INDEX "/index.js"
+#define MCUJS_BOOT_INDEX "/app/index.js"
 #define MCUJS_BOOT_HEALTHY_DELAY_US (5LL * 1000LL * 1000LL)
 
 static const char *TAG = "mcujs_boot";
@@ -135,7 +135,7 @@ void mcujs_boot_execute_index(void) {
         return;
     }
     if (s_safe_mode) {
-        usb_cdc_puts("Safe mode active; /index.js skipped.\r\n");
+        usb_cdc_puts("Safe mode active; /app/index.js skipped.\r\n");
         return;
     }
     if (fs_exists(MCUJS_BOOT_INDEX) != FS_OK) {
@@ -143,19 +143,19 @@ void mcujs_boot_execute_index(void) {
     }
     if (!nvs_write_state(0, 1, 0)) {
         s_safe_mode = true;
-        usb_cdc_puts("Boot state unavailable; /index.js skipped.\r\n");
+        usb_cdc_puts("Boot state unavailable; /app/index.js skipped.\r\n");
         return;
     }
 
     s_boot_attempt_active = true;
-    usb_cdc_puts("Running /index.js\r\n");
+    usb_cdc_puts("Running /app/index.js\r\n");
     js_result_t result = js_engine_exec_file(MCUJS_BOOT_INDEX);
     if (result != JS_OK) {
         s_boot_attempt_active = false;
         char error[512] = {0};
         js_engine_get_error(error, sizeof(error));
-        ESP_LOGE(TAG, "/index.js failed: %s", error);
-        usb_cdc_puts("/index.js failed; reset will enter safe mode.\r\n");
+        ESP_LOGE(TAG, "/app/index.js failed: %s", error);
+        usb_cdc_puts("/app/index.js failed; reset will enter safe mode.\r\n");
         return;
     }
 
@@ -176,7 +176,7 @@ void mcujs_boot_task(void) {
         ESP_LOGE(TAG, "Failed to mark boot healthy; next reset will be safe");
         s_safe_mode = true;
     } else {
-        ESP_LOGI(TAG, "/index.js passed the healthy-loop window");
+        ESP_LOGI(TAG, "/app/index.js passed the healthy-loop window");
     }
     s_boot_attempt_active = false;
     s_health_pending = false;

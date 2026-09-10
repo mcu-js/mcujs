@@ -125,7 +125,7 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
 fs_result_t fs_remove(const char *path) { (void)path; return FS_OK; }
 fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback,
                         void *user_data) {
-    (void)path;
+    assert(strcmp(path, "/app") == 0);
     fs_entry_t hidden = {.name = ".Trash-1000", .size = 0, .is_dir = true};
     fs_entry_t visible = {.name = "index.js", .size = 123, .is_dir = false};
     callback(&hidden, user_data);
@@ -336,7 +336,21 @@ static void test_ls_hides_dot_entries(void) {
     assert(strstr(s_output, ".Trash-1000") == NULL);
 }
 
+static void test_multiline_rejects_long_filename(void) {
+    reset_io();
+    repl_init();
+    char command[190] = ".multiline /app/";
+    size_t prefix = strlen(command);
+    memset(command + prefix, 'a', 140);
+    strcpy(command + prefix + 140, "\r\n4+4\r\n");
+    feed_bytes(command);
+    assert(strstr(s_output, "File path too long") != NULL);
+    assert(s_exec_count == 1);
+    assert(strcmp(s_executed, "4+4") == 0);
+}
+
 int main(void) {
+    test_multiline_rejects_long_filename();
     test_crlf_is_one_enter();
     test_tab_completion_with_crlf();
     test_lf_only_client();

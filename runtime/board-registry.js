@@ -287,7 +287,7 @@ function rpDescriptor({
   const capabilities = {
     ...(features.gpio ? { gpio: gpioCapability(gpioPins, gpioOutputPins) } : {}),
     ...(features.pwm ? { pwm: pwmCapability(pwmPins, chip) } : {}),
-    fs: { implementation: "fat", writable: true, hostTransfer: true },
+    fs: { appRoot: "/app", implementation: "fat", writable: true, hostTransfer: true },
     usb: usbCapability(rpUsbClasses.filter((name) =>
       name === "keyboardHid" ? features.keyboard : name === "mouseHid" ? features.mouse : true)),
   };
@@ -473,7 +473,7 @@ boardDescriptors.seeed_xiao_esp32s3 = {
       dma: false, maxHz: 40000000, maxTransferBytes: 64,
     }),
     neopixel: neopixelCapability(pinsBetween(1, 9)),
-    fs: { implementation: "fat", writable: true, hostTransfer: true },
+    fs: { appRoot: "/app", implementation: "fat", writable: true, hostTransfer: true },
     usb: usbCapability(espUsbClasses),
   },
 };
@@ -483,13 +483,13 @@ boardDescriptors["waveshare_esp32s3_epaper_1.54_v2"] = {
  board: {name:"waveshare_esp32s3_epaper_1.54_v2", chip:"ESP32-S3", firmwareVersion,
  exposedPins:[], pins:{}, devices:{display:{type:"epaper",controller:"Waveshare-1.54-V2",width:200,height:200}}},
  features:epaperFeatures, modules:modulesFor(epaperFeatures),
- capabilities:{boot:{safeMode:true}, fs:{implementation:"fat",writable:true,hostTransfer:true},usb:usbCapability(espUsbClasses)}
+ capabilities:{boot:{safeMode:true}, fs:{appRoot:"/app",implementation:"fat",writable:true,hostTransfer:true},usb:usbCapability(espUsbClasses)}
 };
 boardDescriptors.seeed_reterminal_sticky = {
  board:{name:"seeed_reterminal_sticky",chip:"ESP32-S3",firmwareVersion,
  exposedPins:[],pins:{},devices:{display:{type:"epaper",controller:"SSD1677",width:800,height:480}}},
  features:epaperFeatures,modules:modulesFor(epaperFeatures),
- capabilities:{boot:{safeMode:true},fs:{implementation:"fat",writable:true,hostTransfer:false},usb:usbCapability([])}
+ capabilities:{boot:{safeMode:true},fs:{appRoot:"/app",implementation:"fat",writable:true,hostTransfer:false},usb:usbCapability([])}
 };
 for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];

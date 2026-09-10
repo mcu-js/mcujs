@@ -14,7 +14,7 @@ const featureNames = Object.freeze([
 const moduleOrder = Object.freeze([
   "board", "fs", "process", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
   "image", "keyboard", "mouse", "graphics", "screen", "dvi",
-  "mcujs:module", "node:module",
+  "events", "devices", "mcujs:button", "mcujs:module", "node:module",
 ]);
 
 const boardPresentation = Object.freeze({
@@ -217,7 +217,8 @@ function usbCapability(classes) {
 function modulesFor(features) {
   return moduleOrder.filter((name) => {
     if (name === "board") return features.board;
-    if (name === "mcujs:module" || name === "node:module") return features.require;
+    if (name === "mcujs:button") return Boolean(features.onboardButton && features.board && features.timers && features.require);
+    if (name === "events" || name === "devices" || name === "mcujs:module" || name === "node:module") return features.require;
     return features[featureModule[name]];
   });
 }
@@ -494,6 +495,11 @@ for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];
   if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
   descriptor.presentation = Object.freeze({ ...presentation });
+  if (descriptor.features.onboardButton && descriptor.features.board && descriptor.features.timers && descriptor.features.require) {
+    descriptor.capabilities.devices = { button: {
+      interface: 'button-events', readOnly: true, maxOpenHandles: 1, pollIntervalMs: 10, debounceMs: 30,
+    } };
+  }
 }
 for (const boardId of Object.keys(boardPresentation)) {
   if (!boardDescriptors[boardId]) throw new Error(`Presentation metadata names unknown MCU.js board: ${boardId}`);
@@ -504,18 +510,23 @@ const shippingBoardIds = Object.freeze(Object.keys(boardDescriptors).filter(
   (id) => id !== "waveshare_esp32s3_epaper_1.54_v2" && id !== "seeed_reterminal_sticky",
 ));
 
-function manifestFor(boardId) {
+// Report an explicitly selected build profile; never select or enable a driver.
+const configuredDeviceCapabilities = Object.freeze({
+  display: Object.freeze({ interface: "canvas-2d-subset", maxOpenHandles: 1 }),
+});
+function manifestFor(boardId, { configuredDisplay = false } = {}) {
   const descriptor = boardDescriptors[boardId];
   if (!descriptor) throw new Error(`Unknown MCU.js board: ${boardId}`);
   return structuredClone({
     formatVersion: 1,
     apiVersion: "0.2",
     board: descriptor.board,
-    capabilities: descriptor.capabilities,
+    capabilities: configuredDisplay ? { ...descriptor.capabilities, devices: { ...descriptor.capabilities.devices, ...configuredDeviceCapabilities } } : descriptor.capabilities,
   });
 }
 
 module.exports = {
+  configuredDeviceCapabilities,
   boardDescriptors: Object.freeze(boardDescriptors),
   featureNames,
   shippingBoardIds,

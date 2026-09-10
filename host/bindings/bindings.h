@@ -38,6 +38,7 @@ void js_bind_timers(void);
  * Returns true if there are still pending timers
  */
 bool js_timers_process(void);
+void js_timers_cleanup(void);
 
 /*
  * Register PWM bindings
@@ -160,6 +161,9 @@ size_t js_get_string_arg(const jerry_value_t args[], jerry_length_t argc,
  * Clear the module cache (useful for hot reloading)
  */
 void js_require_clear_cache(void);
+
+/* Release file and built-in module handles before engine teardown. */
+void js_require_cleanup(void);
 
 /*
  * Register graphics bindings

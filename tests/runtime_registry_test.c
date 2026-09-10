@@ -26,6 +26,7 @@ int main(void) {
     assert(mcujs_runtime_has_module("mcujs:module"));
     assert(mcujs_runtime_has_module("node:module"));
     assert(!mcujs_runtime_has_module("not-a-module"));
+    assert(mcujs_runtime_has_module("mcujs:button") == (MCUJS_HAS_CONFIGURED_BUTTON != 0));
     const mcujs_runtime_capability_t *boot = mcujs_runtime_find_capability("boot");
     assert(registry->safe_mode ==
            (boot != NULL && strstr(boot->json, "\"safeMode\":true") != NULL));

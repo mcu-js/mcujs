@@ -35,9 +35,12 @@ ctx.lineWidth = 2;
 ctx.stroke();
 ```
 
-No device constructor, bus configuration, pointer, framebuffer, or explicit
-`present()`/`flush()` call is exposed to application code. Installation and native
-module availability are integration prerequisites, not application drawing steps.
+Drawing code needs no bus configuration, pointer or framebuffer access.
+The later [configured display handle slice](./device-display-handles.md) adds
+explicit ownership and optional `display.present()` before release. Automatic
+main-loop presentation remains available; neither `present()` nor `flush()` is
+part of the Canvas 2D context. Installation and native module availability are
+integration prerequisites, not application drawing steps.
 
 ## Supported surface
 

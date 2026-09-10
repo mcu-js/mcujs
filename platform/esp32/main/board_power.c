@@ -4,7 +4,13 @@
 #include "board_power.h"
 #ifdef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
 #include "driver/gpio.h"
+#include "esp_system.h"
+#include "esp_timer.h"
+/* Vendor PIN_BTN_OK / AI-Power: GPIO4, active low. Restart only. */
+static bool restart_enabled, restart_armed;
+static int64_t released_at, pressed_at;
 bool mcujs_board_power_init(void) {
+ restart_enabled=false;restart_armed=false;released_at=-1;pressed_at=-1;
  /* Seeed Sticky_dashboard_demo board.cpp: hold and lock high.
   * Unused SD/touch/microphone/buzzer rails stay off; charger is untouched. */
  const int pins[]={45,46,10,38,41,42,47,48};
@@ -18,9 +24,29 @@ bool mcujs_board_power_init(void) {
   mask|=1ULL<<pins[i];
  }
  gpio_config_t outputs={.pin_bit_mask=mask,.mode=GPIO_MODE_OUTPUT};
- return gpio_config(&outputs)==0;
+ if(gpio_config(&outputs)!=0)return false;
+ gpio_config_t input={.pin_bit_mask=1ULL<<4,.mode=GPIO_MODE_INPUT,.pull_up_en=GPIO_PULLUP_ENABLE};
+ if(gpio_config(&input)!=0)return false;
+ restart_enabled=true;
+ return true;
 }
-void mcujs_board_power_task(void) {}
+void mcujs_board_power_task(void) {
+ if(!restart_enabled)return;
+ int64_t now=esp_timer_get_time();
+ if(gpio_get_level(4)) {
+  pressed_at=-1;
+  if(released_at<0)released_at=now;
+  if(now-released_at>=50000)restart_armed=true;
+  return;
+ }
+ released_at=-1;
+ if(!restart_armed)return; /* Release after boot before accepting a hold. */
+ if(pressed_at<0)pressed_at=now;
+ if(now-pressed_at>=3000000) {
+  restart_enabled=false;
+  esp_restart(); /* Keep existing safe-boot bookkeeping intact. */
+ }
+}
 #elif defined(MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2)
 #include "driver/gpio.h"
 #include "esp_timer.h"

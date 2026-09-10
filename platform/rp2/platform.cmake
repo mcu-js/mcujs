@@ -60,6 +60,16 @@ if(MCUJS_HAS_DVI)
          ${CMAKE_CURRENT_LIST_DIR}/bindings/dvi.c)
 endif()
 
+# Preserve Canvas source order while keeping Pico-only drivers in this backend.
+set(MCUJS_PLATFORM_CANVAS_BINDING_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/bindings/canvas_display_st7789.c
+    ${CMAKE_CURRENT_LIST_DIR}/bindings/canvas_spi.c
+)
+if(MCUJS_HAS_DVI)
+    list(APPEND MCUJS_PLATFORM_CANVAS_BINDING_SOURCES
+         ${CMAKE_CURRENT_LIST_DIR}/bindings/canvas_display_dvi.c)
+endif()
+
 set(MCUJS_PLATFORM_INCLUDE_DIRS
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/bindings

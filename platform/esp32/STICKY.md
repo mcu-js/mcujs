@@ -23,9 +23,17 @@ audio, SD, Wi-Fi or BLE implementation is advertised in this first slice.
 
 ## Memory and display
 
-Sticky uses a 128KiB JavaScript heap (the 64KiB bring-up heap exhausted on the
-full artwork with live runtime bindings) and a configured 240MHz CPU. Other
-boards keep their existing JS heap and CPU settings.
+Sticky declares a 256KiB PSRAM-backed JavaScript heap in
+`board/seeed_reterminal_sticky/board_config.cmake` and retains its configured
+240MHz CPU. XIAO ESP32-S3 and Waveshare ePaper V2 declare the same heap policy;
+RP2040/RP2350 heaps and all CPU settings are unchanged. See the backend
+[JS memory policy](README.md#javascript-memory-policy) for configuration and
+failure behavior.
+
+The earlier physical artwork/startup acceptance used a 128KiB internal heap
+(the initial 64KiB heap exhausted on the complete scene). The new PSRAM-backed
+JS heap is a separate qualification: host engine tests are not proof of live
+PSRAM/cache behavior, filesystem writes or on-device responsiveness.
 
 One 768000-byte RGB565 surface is explicitly allocated from PSRAM. No fallback
 into insufficient internal SRAM. PSRAM must initialize successfully. The ctx
@@ -39,6 +47,15 @@ surface is never passed to DMA. No partial/grayscale promise in this target.
 Timeout/transport errors close the display and remove its rail.
 
 ## Serial, boot and recovery
+
+Hold the AI/Power button (GPIO4, active low) continuously for three seconds
+while the main loop is running to restart. A stable 50ms release after boot
+arms the gesture; a short press/release cancels the hold. Holding through boot
+does not cause a reboot loop. This is a private restart control, not
+`devices.button`, shutdown, or deep sleep. It cannot recover a blocked main
+loop; the bottom-edge Reset pinhole remains the hardware recovery control.
+The existing safe-boot window is unchanged: wait at least seven seconds after
+startup rendering before deliberately restarting.
 
 The onboard bridge uses UART0 TX43/RX44 at 115200. The private console ABI is
 implemented by `serial_uart.c`; TinyUSB CDC/MSC are disabled and never started

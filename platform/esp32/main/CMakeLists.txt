@@ -8,6 +8,19 @@ if(NOT EXISTS "${JERRY_ROOT}/tools/build.py")
     message(FATAL_ERROR "Set JERRYSCRIPT_PATH to the pinned JerryScript v3.0.0 checkout")
 endif()
 
+# Requirement discovery runs on the host first; only stage for the target pass.
+if(CMAKE_CROSSCOMPILING)
+    execute_process(
+        COMMAND ${PYTHON} ${MCUJS_ROOT}/scripts/prepare-jerry-jobs.py
+            ${JERRY_ROOT} ${CMAKE_BINARY_DIR}/jerry-source
+        RESULT_VARIABLE MCUJS_JERRY_PREPARE_RESULT
+    )
+    if(NOT MCUJS_JERRY_PREPARE_RESULT EQUAL 0)
+        message(FATAL_ERROR "Unable to stage the pinned JerryScript job-queue extension")
+    endif()
+    set(JERRY_ROOT "${CMAKE_BINARY_DIR}/jerry-source")
+endif()
+
 set(MCUJS_SOURCES
     board_power.c
     main.c
@@ -43,6 +56,7 @@ set(MCUJS_SOURCES
     ${MCUJS_ROOT}/host/bindings/console.c
     ${MCUJS_ROOT}/host/bindings/fs.c
     ${MCUJS_ROOT}/host/bindings/require.c
+    ${MCUJS_ROOT}/host/bindings/builtin_modules.c
 )
 
 # Unqualified public buses are absent, not compiled with zero-sized buffers.
@@ -62,14 +76,8 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
  if(NOT CTX_HEADER_SHA256 STREQUAL "bf2b18bcea31bf191f7e82c9beef98bd717bd5ccd635908f07ab8a8cf1698bb3")
   message(FATAL_ERROR "Canvas requires pinned ctx 0.1.18")
  endif()
- foreach(module canvas displays/st7789)
-  get_filename_component(name "${module}" NAME)
-  file(READ "${MCUJS_ROOT}/lib/${module}.js" source_hex HEX)
-  string(REGEX REPLACE "(..)" "0x\\1," source_bytes "${source_hex}")
-  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}_source.h" "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
- endforeach()
  list(APPEND MCUJS_SOURCES ${MCUJS_ROOT}/host/bindings/canvas_native.c
-  ${MCUJS_ROOT}/host/bindings/canvas_renderer.c ${MCUJS_ROOT}/host/bindings/canvas_module.c)
+  ${MCUJS_ROOT}/host/bindings/canvas_renderer.c)
  if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
   list(APPEND MCUJS_SOURCES canvas_display_sticky.c)
  else()
@@ -77,9 +85,33 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
  endif()
 endif()
 
+# IDF requirement discovery has no target board/profile variables yet.
+if(CMAKE_CROSSCOMPILING)
+include("${MCUJS_ROOT}/cmake/capability-manifest.cmake")
+set(MCUJS_CONFIGURED_DISPLAY OFF)
+if(MCUJS_EXPERIMENTAL_CANVAS AND CMAKE_CROSSCOMPILING)
+ set(MCUJS_CONFIGURED_DISPLAY ON)
+endif()
+mcujs_write_capability_manifest("${MCUJS_ROOT}" "${MCUJS_BOARD}"
+ "${CMAKE_BINARY_DIR}/mcujs-${MCUJS_VERSION}-${MCUJS_BOARD}.capabilities.json" "${MCUJS_CONFIGURED_DISPLAY}")
+endif()
+
+set(MCUJS_PACKAGED_MODULES events devices button)
+if(MCUJS_EXPERIMENTAL_CANVAS)
+ list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
+endif()
+foreach(module ${MCUJS_PACKAGED_MODULES})
+ get_filename_component(name "${module}" NAME)
+ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${MCUJS_ROOT}/lib/${module}.js")
+ file(READ "${MCUJS_ROOT}/lib/${module}.js" source_hex HEX)
+ string(REGEX REPLACE "(..)" "0x\\1," source_bytes "${source_hex}")
+ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}_source.h" "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
+endforeach()
+
 idf_component_register(
     SRCS ${MCUJS_SOURCES}
     INCLUDE_DIRS
+        ${CMAKE_CURRENT_BINARY_DIR}
         .
         bindings
         ${MCUJS_ROOT}/host
@@ -121,12 +153,7 @@ set(JERRY_REPRO_COMPILE_FLAGS
 )
 string(REPLACE ";" " " JERRY_COMPILE_FLAGS
        "${COMPILE_OPTIONS};${C_COMPILE_OPTIONS};${JERRY_REPRO_COMPILE_FLAGS}")
-# Sticky's larger artwork exhausted the initial 64KiB JS heap on hardware.
-# Keep the other boards' budget unchanged; the pixel surface stays in PSRAM.
-set(MCUJS_JERRY_HEAP_KB 64)
-if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
- set(MCUJS_JERRY_HEAP_KB 128)
-endif()
+# Board policy is resolved by ../js-memory.cmake for both engine and port.
 execute_process(
     COMMAND ${PYTHON} ${JERRY_ROOT}/tools/build.py
         --clean
@@ -138,7 +165,9 @@ execute_process(
         --jerry-math=OFF
         --jerry-port=OFF
         --amalgam=ON
-        --mem-heap=${MCUJS_JERRY_HEAP_KB}
+        --mem-heap=${MCUJS_JS_HEAP_KIB}
+        --external-context=${MCUJS_JERRY_EXTERNAL_CONTEXT}
+        --cpointer-32bit=OFF
         --profile=es.next
         --error-messages=ON
         --line-info=ON
@@ -172,5 +201,7 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE
     ${MCUJS_BOARD_DEFINE}=1
     MCUJS_PLATFORM_NAME="esp32"
     MCUJS_PLATFORM_ESP32=1
+    MCUJS_JS_HEAP_KIB=${MCUJS_JS_HEAP_KIB}
+    MCUJS_JS_HEAP_EXTERNAL=${MCUJS_JS_HEAP_EXTERNAL}
     JERRYSCRIPT_VERSION="3.0.0"
 )

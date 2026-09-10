@@ -6,7 +6,7 @@
 typedef struct canvas_display canvas_display_t;
 struct canvas_display {
     int width, height;
-    bool pending, closed;
+    bool pending, closed, failed, is_default;
     void *state;
     uint16_t *(*acquire)(canvas_display_t *);
     bool (*present)(canvas_display_t *);

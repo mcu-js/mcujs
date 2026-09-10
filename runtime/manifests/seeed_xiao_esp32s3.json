@@ -308,6 +308,15 @@
         "cdc",
         "msc"
       ]
+    },
+    "devices": {
+      "button": {
+        "interface": "button-events",
+        "readOnly": true,
+        "maxOpenHandles": 1,
+        "pollIntervalMs": 10,
+        "debounceMs": 30
+      }
     }
   }
 }

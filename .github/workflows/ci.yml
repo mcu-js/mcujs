@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, master, development]
   pull_request:
-    branches: [main, master, development]
+    branches: [main, master, development, 'feat/**']
 
 permissions:
   contents: read
@@ -38,7 +38,15 @@ jobs:
           git -C "${RUNNER_TEMP}/jerryscript" fetch --depth 1 origin 50200152feb724a74a5f64e44d7885151537cfad
           git -C "${RUNNER_TEMP}/jerryscript" checkout --detach FETCH_HEAD
 
+      - name: Fetch pinned Canvas test dependency
+        run: |
+          curl -fsSL https://ctx.graphics/ctx-0.1.18.tar.bz2 -o "${RUNNER_TEMP}/ctx.tar.bz2"
+          printf '%s  %s\n' 5e22f1f983edda8f416c20b555e8da49c07ae9ecda0e69ad75146b990517b80c "${RUNNER_TEMP}/ctx.tar.bz2" | sha256sum -c -
+          mkdir -p "${RUNNER_TEMP}/ctx"
+          tar -xjf "${RUNNER_TEMP}/ctx.tar.bz2" --strip-components=1 -C "${RUNNER_TEMP}/ctx"
+
       - name: Verify release metadata and scripts
         env:
           JERRYSCRIPT_PATH: ${{ runner.temp }}/jerryscript
+          CTX_PATH: ${{ runner.temp }}/ctx
         run: scripts/verify-release.sh

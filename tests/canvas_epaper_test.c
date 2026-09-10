@@ -31,6 +31,7 @@ int spi_device_polling_transmit(spi_device_handle_t s,spi_transaction_t *t){
 #define free tracked_free
 #include "../platform/esp32/main/canvas_display_epaper154.c"
 #undef free
+#ifndef MCUJS_CANVAS_FIXTURE_ONLY
 int main(void){
  canvas_display_t d={0};assert(canvas_display_epaper154_init(&d));assert(d.width==200&&d.height==200&&pins[6]==1&&command_count==0&&live==1);
  canvas_display_t second={0};assert(!canvas_display_epaper154_init(&second));
@@ -51,3 +52,4 @@ int main(void){
  assert(canvas_display_epaper154_init(&d));fail_spi=1;assert(!d.present(&d));assert(pins[6]==1);d.release(&d);assert(live==0&&bus_owned==0);
  puts("PASS ePaper: no refresh on open, RGB565 threshold/bit order, full frame, BUSY wait/timeout, sleep/power-off, transfer failure, ownership and release");
 }
+#endif

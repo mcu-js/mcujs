@@ -8,7 +8,58 @@ Development work toward the portable API release. **Not a published release or
 qualified release candidate.** `version.txt` still reads `0.1.0`; check the
 installed firmware build ID and `board.apiVersion` before using these APIs.
 
+Bounded hardware acceptance: Sticky PSRAM/display/restart and vanilla Pico
+non-PSRAM scheduling/events/button checks passed on candidate `d7cfa41`.
+The integration includes the required eight-byte PSRAM arena alignment fix.
+See [hardware acceptance](docs/docs/development/runtime-foundation-acceptance.md)
+for exact evidence and exclusions. Other boards' builds are not physical
+qualification; PiZero flash-readback investigation is tracked separately in #18.
+RP2 upgrades can relocate the filesystem when firmware size changes: verified
+backups and an approved restoration plan are required before such updates.
+
 ### Added
+
+- Sticky AI/Power-button restart: hold for three seconds after releasing the
+  button following boot. Short presses cancel; a held-through-boot button
+  cannot loop restarts. Main-loop-driven, restart-only; safe boot is unchanged.
+
+- Configured, read-only button handles for Pico BOOTSEL and XIAO BOOT through
+  `devices.button`: debounced press/release events, readable state, exclusive
+  polling ownership, cancellation cleanup, error recovery and VM-safe timers.
+  Unsupported/reset/power controls remain absent; touch is not included.
+- `EventTarget.clear(target)` lifecycle extension removes current registrations
+  and signal links; it does not close devices or abort signals.
+
+- First configured-display device slice: lazy `require('devices')` discovery
+  backed by compiled capabilities, absent unsupported displays, stable frozen
+  descriptors, exclusive native ownership, live state and repeatable cleanup.
+  Owned Canvas handles gain explicit `present()` (show before close), native
+  failure state, and stable EBUSY/EIO/ENXIO errors. Profile-specific build
+  manifests report the same support as runtime discovery. No new peripherals,
+  device queue, generic pin/SD arbiter or compatibility aliases. Physical
+  acceptance is limited to the checkpoint above; see
+  `docs/docs/development/device-display-handles.md`.
+
+- Lazy `require('events')` with bounded, synchronous `Event`/`EventTarget` and
+  `AbortController`/`AbortSignal` subsets. Signal cancellation removes attached
+  listeners before abort notification; dispatch is safe under mutation and
+  reentrancy. Native 64KiB Jerry tests check limits, repeated-workload heap use,
+  Promise rejection, file-cache clearing and fresh-VM reuse. Engine teardown
+  now releases built-in and file-module cache handles. This is not Node's
+  EventEmitter, a DOM implementation, a device event queue or hardware I/O
+  cancellation. See `docs/docs/development/bounded-events.md`; bounded Pico
+  hardware acceptance passed as recorded above.
+
+- Cooperative Promise-job processing on RP and ESP: up to 16 jobs before and
+  after each timer pass, preserving queued work while yielding between batches.
+  Adds a pinned, build-local JerryScript bounded-job extension without changing
+  upstream `jerry_run_jobs()` or the SDK cache. Native tests cover completion,
+  rejection handlers, async/await, ordering, sustained chains and lifecycle.
+  Fixes RP callback timer-slot reuse and releases timer refs before engine
+  teardown on both backends. This is not browser/Node microtask ordering,
+  callback preemption, queue backpressure or unhandled-rejection reporting.
+  See `docs/docs/development/promise-jobs.md`; bounded Pico hardware acceptance
+  passed as recorded above.
 
 - Experimental Seeed reTerminal Sticky target: 800×480 Canvas in 8MB PSRAM,
   SSD1677 full monochrome refresh and native UART console through the onboard
@@ -84,9 +135,18 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Changed / breaking
 
-- Sticky alone uses a measured 128KiB JavaScript heap for the complete artwork
-  and an explicit 240MHz CPU setting. Other boards retain their existing heap
-  and CPU budgets.
+- ESP32-S3 JavaScript heaps are declared in each target's
+  `board/<board-id>/board_config.cmake`: 256KiB in PSRAM for XIAO ESP32-S3,
+  Waveshare ePaper 1.54 V2 and reTerminal Sticky. JerryScript's external context
+  keeps the managed heap out of internal SRAM without enabling 32-bit compressed
+  pointers. Missing PSRAM fails explicitly; there is no internal fallback.
+  Host tests exercise the real engine/ESP port with a simulated PSRAM allocator,
+  including a live object graph that exhausts the previous 128KiB heap, GC,
+  cleanup/reinitialization and allocation failure. This configuration still
+  needs on-device PSRAM, storage and responsiveness qualification on each board.
+  RP2040/RP2350 heap settings and all CPU budgets are unchanged.
+- Sticky retains its explicit 240MHz CPU setting. Its earlier on-device artwork
+  acceptance used a 128KiB internal JS heap, not the new PSRAM-backed heap.
 - Canvas presentation is batched after a JavaScript drawing task, rather than
   after individual drawing calls. Applications need no hardware-specific
   `show()` or `present()` call. Each display owns its surface and drawing state;
@@ -134,6 +194,10 @@ installed firmware build ID and `board.apiVersion` before using these APIs.
 
 ### Fixed
 
+- Request explicit 8-byte alignment for the ESP32-S3 PSRAM JavaScript arena.
+  Ordinary ESP-IDF allocation may be only 4-byte aligned, corrupting Jerry's
+  compressed pointers during startup. Native allocator tests now exercise
+  that weaker alignment guarantee, named parsing and exception handling.
 - Isolated PiZero Canvas stack storage from Core 1 and TMDS memory, kept the
   Core 1 stack independently sized, and distinguished requested USB resets
   from Canvas watchdog recovery.

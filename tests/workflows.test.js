@@ -40,6 +40,16 @@ test('Pages artifacts and deployment are limited to release-branch pushes', () =
   assert.match(w.concurrency.group, /github\.ref/);
 });
 
+test('stacked feature PRs run checks without enabling feature-branch deployment', () => {
+  for (const name of ['ci.yml', 'docs.yml']) {
+    assert.ok(workflow(name).on.pull_request.branches.includes('feat/**'));
+  }
+  const w = workflow('docs.yml');
+  for (const gate of [w.jobs.build.steps.find(s => s.uses?.startsWith('actions/upload-pages-artifact@')).if, w.jobs.deploy.if]) {
+    assert.equal(runInNewContext(gate, {github: {event_name: 'pull_request', ref: 'refs/heads/feat/esp32-psram-heap'}}, {timeout: 100}), false);
+  }
+});
+
 test('development pushes cannot trigger the release workflow', () => {
   const w = workflow('release.yml');
   assert.equal(w.on.push.branches, undefined);

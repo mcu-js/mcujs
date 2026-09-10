@@ -64,6 +64,7 @@ int spi_device_polling_transmit(spi_device_handle_t s,spi_transaction_t *t) {
 #define free tracked_free
 #include "../platform/esp32/main/canvas_display_sticky.c"
 #undef free
+#ifndef MCUJS_CANVAS_FIXTURE_ONLY
 int main(void) {
  canvas_display_t d={0}, second={0};
  assert(canvas_display_sticky_init(&d));assert(d.width==800 && d.height==480 && pins[47]==0 && live==1 && transfers==0);
@@ -92,3 +93,4 @@ int main(void) {
  fail_spi=0;d.release(&d);assert(!live && !bus_owned);
  puts("PASS Sticky: 800x480 PSRAM, full dual-plane pixels/orientation, <=64-byte SPI, BUSY timeout, watchdog service, sleep/power-off, all SPI failure positions, init unwind and reopen");
 }
+#endif

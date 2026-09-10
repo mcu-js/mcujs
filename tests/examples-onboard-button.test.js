@@ -13,7 +13,22 @@ function demo(boardId) {
   let now = 0;
   let pressed = false;
   let nextId = 1;
-  const board = { devices: boardDescriptors[boardId].board.devices };
+  const board = { devices: boardDescriptors[boardId].board.devices,
+    capability: name => boardDescriptors[boardId].capabilities[name], millis: () => now >>> 0 };
+  const modules = {};
+  function requireModule(name) {
+    if (name === 'board') return board;
+    if (!modules[name]) {
+      const module = {};
+      const filename = name === 'mcujs:button' ? 'button' : name;
+      vm.runInNewContext(readFileSync(join(__dirname, '../lib/' + filename + '.js'), 'utf8'), {
+        module, require: requireModule, console: { error(...parts) { logs.push(parts.join(' ')); } },
+        setInterval: (fn, delay) => timer(fn, delay, true), clearInterval: id => timers.delete(id),
+      });
+      modules[name] = module.exports;
+    }
+    return modules[name];
+  }
   if (board.devices.button) board.buttonPressed = function () {
     assert.equal(arguments.length, 0);
     return pressed;
@@ -33,7 +48,7 @@ function demo(boardId) {
     press(value) { pressed = value; },
     run() {
       vm.runInNewContext(readFileSync(join(__dirname, "../examples/onboard-button/index.js"), "utf8"), {
-        require(name) { assert.equal(name, "board"); return board; },
+        require: requireModule,
         console: { log(...parts) { logs.push(parts.join(" ")); } },
         setInterval: (fn, delay) => timer(fn, delay, true),
         setTimeout: (fn, delay) => timer(fn, delay, false),

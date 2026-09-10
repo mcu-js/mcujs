@@ -14,6 +14,7 @@ set(BINDINGS_SOURCES
     fs.c
     process.c
     require.c
+    builtin_modules.c
     graphics.c
     image.c
     ${MCUJS_PLATFORM_USB_BINDING_SOURCES}
@@ -30,20 +31,21 @@ endif()
 
 # JavaScript API bindings library
 add_library(mcujs_bindings STATIC ${BINDINGS_SOURCES})
+set(MCUJS_PACKAGED_MODULES events devices button)
 if(MCUJS_EXPERIMENTAL_CANVAS)
-    foreach(module canvas displays/st7789)
-        get_filename_component(name "${module}" NAME)
-        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/lib/${module}.js")
-        file(READ "${CMAKE_SOURCE_DIR}/lib/${module}.js" source_hex HEX)
-        string(REGEX REPLACE "(..)" "0x\\1," source_bytes "${source_hex}")
-        file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}_source.h"
-            "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
-    endforeach()
-    target_sources(mcujs_bindings PRIVATE canvas_native.c canvas_renderer.c canvas_module.c
-                   canvas_display_st7789.c canvas_spi.c)
-    if(MCUJS_HAS_DVI)
-        target_sources(mcujs_bindings PRIVATE canvas_display_dvi.c)
-    endif()
+    list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
+endif()
+foreach(module ${MCUJS_PACKAGED_MODULES})
+    get_filename_component(name "${module}" NAME)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/lib/${module}.js")
+    file(READ "${CMAKE_SOURCE_DIR}/lib/${module}.js" source_hex HEX)
+    string(REGEX REPLACE "(..)" "0x\\1," source_bytes "${source_hex}")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${name}_source.h"
+        "static const jerry_char_t ${name}_source[] = {${source_bytes}};\n")
+endforeach()
+if(MCUJS_EXPERIMENTAL_CANVAS)
+    target_sources(mcujs_bindings PRIVATE canvas_native.c canvas_renderer.c
+                   ${MCUJS_PLATFORM_CANVAS_BINDING_SOURCES})
     target_include_directories(mcujs_bindings PRIVATE $ENV{CTX_PATH})
 endif()
 

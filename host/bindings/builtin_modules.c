@@ -1,7 +1,12 @@
-/* Firmware-packaged JavaScript API. Hardware remains in canvas_native.c. */
+/* Lazy firmware-packaged CommonJS modules; cached by the production loader. */
 #include "jerryscript.h"
+#include "events_source.h"
+#include "devices_source.h"
+#include "button_source.h"
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
 #include "canvas_source.h"
 #include "st7789_source.h"
+#endif
 
 static jerry_value_t load(const jerry_char_t *source,size_t length) {
     jerry_value_t parameters = jerry_string_sz("require,module");
@@ -32,5 +37,10 @@ static jerry_value_t load(const jerry_char_t *source,size_t length) {
     return result;
 }
 
+jerry_value_t js_create_button_module(void) { return load(button_source,sizeof(button_source)); }
+jerry_value_t js_create_devices_module(void) { return load(devices_source,sizeof(devices_source)); }
+jerry_value_t js_create_events_module(void) { return load(events_source,sizeof(events_source)); }
+#ifdef MCUJS_EXPERIMENTAL_CANVAS
 jerry_value_t js_create_canvas_module(void) { return load(canvas_source,sizeof(canvas_source)); }
 jerry_value_t js_create_st7789_module(void) { return load(st7789_source,sizeof(st7789_source)); }
+#endif

@@ -24,6 +24,9 @@
 #include "../module_loader.h"
 #include "../runtime_features.h"
 #include "../runtime_registry.h"
+jerry_value_t js_create_events_module(void);
+jerry_value_t js_create_devices_module(void);
+jerry_value_t js_create_button_module(void);
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
 jerry_value_t js_create_canvas_native_module(void);
 jerry_value_t js_create_canvas_module(void);
@@ -711,6 +714,11 @@ static const builtin_module_t s_builtin_modules[] = {
     {"displays/st7789", js_create_st7789_module},
 #endif
 #endif
+    {"events", js_create_events_module},
+    {"devices", js_create_devices_module},
+#if MCUJS_HAS_CONFIGURED_BUTTON
+    {"mcujs:button", js_create_button_module},
+#endif
     {"mcujs:module", create_module_module},
     {NULL, NULL}
 };
@@ -834,6 +842,18 @@ void js_require_clear_cache(void) {
         }
     }
     s_cache_count = 0;
+}
+
+/* Release all VM-owned handles before jerry_cleanup(). File-module hot
+ * reload deliberately leaves built-ins alone so live instances keep their brand. */
+void js_require_cleanup(void) {
+    js_require_clear_cache();
+    for (size_t i = 0; i < BUILTIN_CACHE_SIZE; i++) {
+        if (s_builtin_cached[i]) {
+            jerry_value_free(s_builtin_cache[i]);
+            s_builtin_cached[i] = false;
+        }
+    }
 }
 
 /*

@@ -57,6 +57,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Initialize the selected platform SDK (must be after project())
 mcujs_platform_sdk_init()
+include(${CMAKE_CURRENT_LIST_DIR}/cmake/capability-manifest.cmake)
+mcujs_write_capability_manifest("${CMAKE_CURRENT_LIST_DIR}" "${BOARD}"
+    "${CMAKE_BINARY_DIR}/mcujs-${MCUJS_VERSION}-${BOARD}.capabilities.json" "${MCUJS_EXPERIMENTAL_CANVAS}")
 
 # Docker snapshots of linked worktrees cannot resolve their external .git file,
 # so the host passes its already-validated source SHA into the container.

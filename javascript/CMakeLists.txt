@@ -11,6 +11,18 @@ else()
     set(JERRYSCRIPT_PATH ${CMAKE_CURRENT_LIST_DIR}/jerryscript)
 endif()
 
+# Stage the pinned bounded-job extension in this build, never in the SDK cache.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+execute_process(
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/../scripts/prepare-jerry-jobs.py
+        ${JERRYSCRIPT_PATH} ${CMAKE_CURRENT_BINARY_DIR}/jerry-source
+    RESULT_VARIABLE MCUJS_JERRY_PREPARE_RESULT
+)
+if(NOT MCUJS_JERRY_PREPARE_RESULT EQUAL 0)
+    message(FATAL_ERROR "Unable to stage the pinned JerryScript job-queue extension")
+endif()
+set(JERRYSCRIPT_PATH ${CMAKE_CURRENT_BINARY_DIR}/jerry-source)
+
 # Check if we have amalgamated sources or need to build from full source
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/jerryscript-core/jerryscript.c")
     # Use pre-generated amalgamated sources
@@ -23,6 +35,7 @@ endif()
 
 # JerryScript core library (without port - port goes directly into executable)
 if(JERRY_AMALGAM)
+    message(FATAL_ERROR "Pre-generated JerryScript is not qualified for bounded jobs; use the pinned source build")
     add_library(mcujs_jerry STATIC
         ${JERRY_CORE_SRC}/jerryscript.c
     )

@@ -60,7 +60,7 @@ build_board() {
     make -j"$(nproc)"
 
     # Publish only the completed artifacts, owned by the caller's numeric UID/GID.
-    for ext in uf2 bin elf elf.map; do
+    for ext in uf2 bin elf elf.map capabilities.json; do
         install -m 0644 "${ROOT}/cmake-build-${board}/mcujs-${VERSION}-${board}.${ext}" /output/
     done
 

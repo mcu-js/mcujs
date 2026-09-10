@@ -45,6 +45,20 @@ fi
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/mcujs-runtime-bindings.XXXXXX")"
 trap 'rm -rf "${TMP_ROOT}"' EXIT
 JERRY_BUILD="${TMP_ROOT}/jerry"
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+from pathlib import Path
+import sys
+root, out = map(Path, sys.argv[1:])
+for name in ['events', 'devices', 'button']:
+ source = (root/('lib/'+name+'.js')).read_bytes()
+ (out/(name+'_source.h')).write_text('static const jerry_char_t '+name+'_source[] = {' + ','.join(str(b) for b in source) + '};\n')
+tests = (root/'tests/events.test.js').read_text()
+imports = "const test = require('node:test');\nconst assert = require('node:assert/strict');\n"
+assert tests.startswith(imports)
+tests = tests[len(imports):].replace("require('../lib/events.js')", "require('events')")
+script = '(function(){\n' + (root/'tests/events_native_harness.js').read_text() + tests + '\nassert.equal(completedEventTests, 12);\n})();'
+(out/'events_test_source.h').write_text('static const char events_test_source[] = {' + ','.join(str(b) for b in script.encode()+b'\0') + '};\n')
+PY
 
 python3 "${JERRY_ROOT}/tools/build.py" \
     --builddir="${JERRY_BUILD}" \
@@ -75,9 +89,11 @@ compile_binding_test() {
     cc -std=gnu17 -Wall -Wextra -Werror \
         -ffunction-sections -fdata-sections \
         "$@" \
+        -I"${TMP_ROOT}" \
         -I"${ROOT}/host" \
         -I"${ROOT}/host/bindings" \
         -I"${ROOT}/src/filesystem" \
+        -I"${ROOT}/src/usb" \
         -I"${ROOT}/tests" \
         -I"${JERRY_ROOT}/jerry-core/include" \
         "${ROOT}/tests/runtime_bindings_test.c" \
@@ -91,6 +107,8 @@ compile_binding_test() {
         "${ROOT}/host/bindings/board_registry.c" \
         "${ROOT}/host/bindings/fs.c" \
         "${ROOT}/host/bindings/require.c" \
+        "${ROOT}/host/bindings/builtin_modules.c" \
+        "${ROOT}/host/bindings/console.c" \
         "${display_sources[@]}" \
         "${ROOT}/${backend}/bindings/pin_policy.c" \
         "${ROOT}/${backend}/bindings/gpio.c" \
@@ -153,3 +171,8 @@ for factory in graphics screen; do
     fi
 done
 "${CONSTRAINED}"
+
+JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
+    bash "${ROOT}/tests/run-devices-display-tests.sh"
+JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
+    bash "${ROOT}/tests/run-buttons-tests.sh"

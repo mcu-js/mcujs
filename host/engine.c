@@ -654,6 +654,9 @@ void js_engine_cleanup(void) {
 #if MCUJS_FEATURE_TIMERS
     js_timers_cleanup();
 #endif
+#if MCUJS_FEATURE_FS
+    js_fs_cleanup();
+#endif
     jerry_cleanup();
     s_initialized = false;
 }

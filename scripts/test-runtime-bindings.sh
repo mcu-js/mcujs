@@ -53,6 +53,8 @@ for name in ['events', 'devices', 'button']:
  source = (root/('lib/'+name+'.js')).read_bytes()
  (out/(name+'_source.h')).write_text('static const jerry_char_t '+name+'_source[] = {' + ','.join(str(b) for b in source) + '};\n')
 tests = (root/'tests/events.test.js').read_text()
+script = (root/'tests/fs_binary_native.js').read_bytes() + b'\0'
+(out/'fs_binary_test_source.h').write_text('static const char fs_binary_test_source[] = {' + ','.join(str(b) for b in script) + '};\n')
 imports = "const test = require('node:test');\nconst assert = require('node:assert/strict');\n"
 assert tests.startswith(imports)
 tests = tests[len(imports):].replace("require('../lib/events.js')", "require('events')")

@@ -288,7 +288,7 @@ function rpDescriptor({
   const capabilities = {
     ...(features.gpio ? { gpio: gpioCapability(gpioPins, gpioOutputPins) } : {}),
     ...(features.pwm ? { pwm: pwmCapability(pwmPins, chip) } : {}),
-    fs: { appRoot: "/app", implementation: "fat", writable: true, hostTransfer: true },
+    fs: { appRoot: "/app", binary: { buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096, maxPosition: 2147483647, flags: ["r", "w"] }, implementation: "fat", writable: true, hostTransfer: true },
     usb: usbCapability(rpUsbClasses.filter((name) =>
       name === "keyboardHid" ? features.keyboard : name === "mouseHid" ? features.mouse : true)),
   };
@@ -477,7 +477,7 @@ boardDescriptors.seeed_xiao_esp32s3 = {
       dma: false, maxHz: 40000000, maxTransferBytes: 64,
     }),
     neopixel: neopixelCapability(pinsBetween(1, 9)),
-    fs: { appRoot: "/app", implementation: "fat", writable: true, hostTransfer: true },
+    fs: { appRoot: "/app", binary: { buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096, maxPosition: 2147483647, flags: ["r", "w"] }, implementation: "fat", writable: true, hostTransfer: true },
     usb: usbCapability(espUsbClasses),
   },
 };

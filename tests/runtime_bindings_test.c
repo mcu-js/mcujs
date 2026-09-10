@@ -3,6 +3,8 @@
 #include "runtime_features.h"
 #include "runtime_registry.h"
 #include "events_test_source.h"
+#include "fs_binary_test_source.h"
+#include <unistd.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -53,40 +55,80 @@ static const char *app_source(const char *path) {
     return NULL;
 }
 
-fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
-    (void)mode;
-    if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
-    const char *source=app_source(path);
-    if (!source) return FS_ERROR_NOT_FOUND;
-    file->internal=(void *)source; file->is_open=true; return FS_OK;
-}
+/* Real temporary binary storage behind the existing backend seam; failures can
+ * be injected without relying on an SD card or changing production backends. */
+static char s_binary_path[] = "/tmp/mcujs-binary-XXXXXX";
+static unsigned s_open_files, s_io_calls;
+static size_t s_largest_transfer;
+static fs_result_t s_io_result = FS_OK, s_close_result = FS_OK;
+static bool s_short_write;
+static unsigned s_seek_fail_after;
 
-fs_result_t fs_close(fs_file_t *file) {
-    (void)file;
+fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
+    if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
+    FILE *stream;
+    if (!strcmp(path, "/app/binary.bin") || !strcmp(path, "/sd/binary.bin")) {
+        stream = fopen(s_binary_path, mode & FS_MODE_TRUNCATE ? "wb+" : "rb");
+    } else {
+        const char *source = app_source(path);
+        if (!source) return FS_ERROR_NOT_FOUND;
+        stream = tmpfile();
+        assert(stream);
+        assert(fwrite(source, 1, strlen(source), stream) == strlen(source));
+        rewind(stream);
+    }
+    if (!stream) return FS_ERROR_IO;
+    file->internal = stream;
+    file->is_open = true;
+    s_open_files++;
     return FS_OK;
 }
 
+fs_result_t fs_close(fs_file_t *file) {
+    assert(file->is_open && file->internal && s_open_files);
+    assert(fclose(file->internal) == 0);
+    file->internal = NULL;
+    file->is_open = false;
+    s_open_files--;
+    return s_close_result;
+}
+
 fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_read) {
-    if (s_fs_operation_result==FS_OK && file->is_open) {
-        size_t n=strlen(file->internal);if(n>size)n=size;
-        memcpy(buffer,file->internal,n);*bytes_read=n;return FS_OK;
-    }
-    if (bytes_read != NULL) *bytes_read = 0;
-    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
+    s_io_calls++;
+    if (size > s_largest_transfer) s_largest_transfer = size;
+    *bytes_read = 0;
+    if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
+    if (s_io_result != FS_OK) return s_io_result;
+    *bytes_read = fread(buffer, 1, size, file->internal);
+    return ferror(file->internal) ? FS_ERROR_IO : FS_OK;
 }
 
 fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
                      size_t *bytes_written) {
-    (void)file;
-    (void)buffer;
-    if (bytes_written != NULL) *bytes_written = size;
-    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
+    s_io_calls++;
+    if (size > s_largest_transfer) s_largest_transfer = size;
+    *bytes_written = 0;
+    if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
+    if (s_io_result != FS_OK) return s_io_result;
+    *bytes_written = fwrite(buffer, 1, s_short_write && size ? size - 1 : size, file->internal);
+    return ferror(file->internal) ? FS_ERROR_IO : FS_OK;
+}
+
+fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
+    if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
+    if (s_seek_fail_after && --s_seek_fail_after == 0) return FS_ERROR_IO;
+    return fseek(file->internal, offset, SEEK_SET) == 0 ? FS_OK : FS_ERROR_IO;
 }
 
 fs_result_t fs_size(fs_file_t *file, size_t *size) {
-    if (s_fs_operation_result==FS_OK && file->is_open) {*size=strlen(file->internal);return FS_OK;}
-    if (size != NULL) *size = 0;
-    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_ERROR_IO;
+    if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
+    FILE *stream = file->internal;
+    long position = ftell(stream);
+    assert(position >= 0 && fseek(stream, 0, SEEK_END) == 0);
+    long end = ftell(stream);
+    assert(end >= 0 && fseek(stream, position, SEEK_SET) == 0);
+    *size = (size_t)end;
+    return FS_OK;
 }
 
 fs_result_t fs_exists(const char *path) {
@@ -412,6 +454,21 @@ int main(void) {
     assert(eval_source("if(cancelled !== 'cancelled') throw new Error('abort rejection not completed');"));
     assert(eval_source(s_test_source));
     s_fs_operation_result = FS_OK;
+    assert(eval_source("(function(){var f=require('fs');var fd=f.openSync('/app/settings.json','r');if(typeof fd!=='number')throw Error('numeric file handle');f.closeSync(fd);})()"));
+    puts("binary handles open/close: PASS");
+    int temporary = mkstemp(s_binary_path);
+    assert(temporary >= 0 && close(temporary) == 0);
+    assert(eval_source(fs_binary_test_source));
+    assert(s_open_files == 0);
+    s_short_write=true;
+    assert(eval_source("(function(){var f=require('fs'),h=f.openSync('/app/binary.bin','w');try{f.writeSync(h,new Uint8Array([0,128,255,1]),0,4);throw Error('short write accepted');}catch(e){if(e.code!=='ENOSPC'||e.bytesWritten!==3)throw e;}finally{f.closeSync(h);}})()"));
+    s_short_write=false;
+    assert(eval_source("var abandoned=require('fs').openSync('/app/binary.bin','r');"));
+    assert(s_open_files==1);js_fs_cleanup();assert(s_open_files==0);
+    assert(eval_source("try{require('fs').readSync(abandoned,new Uint8Array(1),0,1);throw Error('stale cleanup handle');}catch(e){if(e.code!=='EBADF')throw e;}"));
+    assert(unlink(s_binary_path) == 0);
+    puts("binary handles roundtrip: PASS");
+    assert(eval_source("(function(){var f=require('fs'),fd=f.openSync('/app/settings.json','r'),b=new Uint8Array(4);if(f.readSync(fd,b,1,2)!==2||b[0]!==0||b[1]!==123||b[2]!==34||b[3]!==0)throw Error('binary read count and slice');f.closeSync(fd);})()"));
     assert(eval_source("var appMain=require('./nested/main');if(appMain.filename!=='/app/nested/main.js'||appMain.dirname!=='/app/nested'||appMain.later()!=='white')throw Error('module-relative app paths');"));
     assert(eval_source("if(require('/app/nested/./main.js')!==appMain||require('/app/nested/../nested/main')!==appMain||!require('helper').ok)throw Error('canonical app cache and library');"));
     assert(eval_source("['/index.js','/sd/settings.json','../settings.json','/app/../app/settings.json'].forEach(function(p){var denied=false;try{require(p);}catch(e){denied=true;}if(!denied)throw Error('namespace escape accepted');});"));

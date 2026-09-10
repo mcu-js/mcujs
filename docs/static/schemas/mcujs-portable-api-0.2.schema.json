@@ -1235,14 +1235,67 @@
         "sd": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["root", "implementation", "writable", "hostTransfer", "removable", "formats"],
+          "required": [
+            "root",
+            "implementation",
+            "writable",
+            "hostTransfer",
+            "removable",
+            "formats"
+          ],
           "properties": {
-            "root": {"const": "/sd"},
-            "implementation": {"const": "fat"},
-            "writable": {"const": true},
-            "hostTransfer": {"const": false},
-            "removable": {"const": true},
-            "formats": {"const": ["fat16", "fat32"]}
+            "root": {
+              "const": "/sd"
+            },
+            "implementation": {
+              "const": "fat"
+            },
+            "writable": {
+              "const": true
+            },
+            "hostTransfer": {
+              "const": false
+            },
+            "removable": {
+              "const": true
+            },
+            "formats": {
+              "const": [
+                "fat16",
+                "fat32"
+              ]
+            }
+          }
+        },
+        "binary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "buffer",
+            "maxOpenFiles",
+            "maxTransferBytes",
+            "maxPosition",
+            "flags"
+          ],
+          "properties": {
+            "buffer": {
+              "const": "Uint8Array"
+            },
+            "maxOpenFiles": {
+              "const": 4
+            },
+            "maxTransferBytes": {
+              "const": 4096
+            },
+            "maxPosition": {
+              "const": 2147483647
+            },
+            "flags": {
+              "const": [
+                "r",
+                "w"
+              ]
+            }
           }
         }
       }

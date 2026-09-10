@@ -114,6 +114,7 @@ jerry_value_t js_create_neopixel_module(void);
  * fs.readFileSync(), fs.writeFileSync(), fs.existsSync(), etc.
  */
 void js_bind_fs(void);
+void js_fs_cleanup(void);
 
 /*
  * Create filesystem module object

@@ -4,6 +4,13 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Bounded binary file handles on `/app` and configured `/sd`: Uint8Array
+  `openSync`/`readSync`/`writeSync`/`closeSync`, explicit ownership/error handling,
+  four-handle and 4096-byte-transfer limits, and cleanup on VM teardown.
+  Added chunked copy and row-wise 24-bit BMP examples. The initial SD write
+  error did not recur in a bounded create/rewrite probe and remains unexplained.
+  See [bounded binary assets](docs/docs/development/binary-file-assets.md).
+
 - Experimental optional `/sd` on the RP2350 LCD 1.47 A: separate lazy FAT mount,
   bounded SPI block I/O, no SD auto-format or USB export, unchanged `/app`
   startup, mount-boundary checks and explicit media errors. A bounded JSON pixel

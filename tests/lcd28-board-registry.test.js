@@ -18,7 +18,7 @@ test("LCD 2.8 first port advertises only qualified core runtime and USB storage"
     ["moduleLoader", "console", "timers", "board", "process", "require", "fs"]);
   assert.deepEqual(descriptor.modules, ["board", "fs", "process", "events", "devices", "mcujs:module", "node:module"]);
   assert.deepEqual(descriptor.capabilities, {
-    fs: { appRoot: "/app", implementation: "fat", writable: true, hostTransfer: true },
+    fs: { appRoot: "/app", binary: { buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096, maxPosition: 2147483647, flags: ["r", "w"] }, implementation: "fat", writable: true, hostTransfer: true },
     usb: { classes: ["cdc", "msc"] },
   });
 });

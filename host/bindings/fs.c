@@ -18,6 +18,7 @@
 #include "fs.h"
 #include "validation.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,6 +106,162 @@ static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
             return create_error("ENAMETOOLONG", "path is too long"); \
         } \
     } while (0)
+
+/* Bounded native handles: never retain a JS value or borrowed byte pointer. */
+#define BINARY_MAX_HANDLES 4
+#define BINARY_MAX_TRANSFER 4096
+
+typedef struct {
+    fs_file_t file;
+    uint32_t id;
+    uint32_t position;
+    bool writable;
+} binary_handle_t;
+static binary_handle_t s_binary_handles[BINARY_MAX_HANDLES];
+/* Never recycle IDs, including across VM restarts. Exhaustion fails closed. */
+static uint32_t s_binary_next_id = 1;
+
+static bool binary_uint(jerry_value_t value, uint32_t *out) {
+    if (!jerry_value_is_number(value)) return false;
+    double number = jerry_value_as_number(value);
+    if (!isfinite(number) || number < 0 || number > UINT32_MAX || floor(number) != number)
+        return false;
+    *out = (uint32_t)number;
+    return true;
+}
+
+static binary_handle_t *binary_handle(jerry_value_t value) {
+    uint32_t id;
+    if (!binary_uint(value, &id) || id == 0) return NULL;
+    for (unsigned i = 0; i < BINARY_MAX_HANDLES; i++)
+        if (s_binary_handles[i].id == id) return &s_binary_handles[i];
+    return NULL;
+}
+
+void js_fs_cleanup(void) {
+    for (unsigned i = 0; i < BINARY_MAX_HANDLES; i++) {
+        if (s_binary_handles[i].id) {
+            (void)fs_close(&s_binary_handles[i].file);
+            memset(&s_binary_handles[i], 0, sizeof(s_binary_handles[i]));
+        }
+    }
+}
+
+static jerry_value_t fs_open_sync(const jerry_call_info_t *info,
+                                 const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    char path[FS_PATH_MAX], flags[2];
+    size_t length = get_path_arg(args, argc, 0, path, sizeof(path));
+    RETURN_IF_PATH_TOO_LONG(length);
+    if (!length) return create_error("ERR_INVALID_ARG_TYPE", "path must be a nonempty string without NUL");
+    if (get_path_arg(args, argc, 1, flags, sizeof(flags)) != 1 ||
+        (flags[0] != 'r' && flags[0] != 'w'))
+        return create_error("ERR_INVALID_ARG_VALUE", "flags must be 'r' or 'w'");
+    binary_handle_t *handle = NULL;
+    for (unsigned i = 0; i < BINARY_MAX_HANDLES; i++)
+        if (!s_binary_handles[i].id) { handle = &s_binary_handles[i]; break; }
+    if (!handle || !s_binary_next_id) return create_error("EMFILE", "binary file handle limit reached");
+    bool writable = flags[0] == 'w';
+    fs_result_t result = fs_open(&handle->file, path, writable ?
+        FS_MODE_WRITE | FS_MODE_CREATE | FS_MODE_TRUNCATE : FS_MODE_READ);
+    if (result == FS_ERROR_NOT_FOUND) return create_error("ENOENT", "no such file or directory");
+    if (result != FS_OK) return CREATE_FS_ERROR(result, "failed to open file");
+    handle->id = s_binary_next_id++;
+    handle->position = 0;
+    handle->writable = writable;
+    return jerry_number(handle->id);
+}
+
+static jerry_value_t fs_close_sync(const jerry_call_info_t *info,
+                                  const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    binary_handle_t *handle = argc ? binary_handle(args[0]) : NULL;
+    if (!handle) return create_error("EBADF", "invalid or closed file handle");
+    fs_result_t result = fs_close(&handle->file);
+    /* The backend releases its slot even when flushing/closing fails. */
+    memset(handle, 0, sizeof(*handle));
+    if (result != FS_OK) return CREATE_FS_ERROR(result, "failed to close file");
+    return jerry_undefined();
+}
+
+/* Common 32-bit signed seek range also fits ESP32's fseek(long). */
+#define BINARY_MAX_POSITION INT32_MAX
+static uint8_t s_binary_scratch[BINARY_MAX_TRANSFER];
+
+static jerry_value_t binary_transfer(const jerry_value_t args[], jerry_length_t argc, bool writing) {
+    binary_handle_t *handle = argc ? binary_handle(args[0]) : NULL;
+    if (!handle || handle->writable != writing) return create_error("EBADF", "invalid handle or access mode");
+    if (argc < 4 || !jerry_value_is_typedarray(args[1]) ||
+        jerry_typedarray_type(args[1]) != JERRY_TYPEDARRAY_UINT8)
+        return create_error("ERR_INVALID_ARG_TYPE", "buffer must be a Uint8Array; offset and length are required");
+    uint32_t offset, length, position = handle->position;
+    bool positioned = argc > 4 && !jerry_value_is_null(args[4]) && !jerry_value_is_undefined(args[4]);
+    if (!binary_uint(args[2], &offset) || !binary_uint(args[3], &length) ||
+        (positioned && !binary_uint(args[4], &position)))
+        return create_error("ERR_OUT_OF_RANGE", "offset, length and position must be nonnegative integers");
+    jerry_length_t view_length = jerry_typedarray_length(args[1]);
+    if (length > BINARY_MAX_TRANSFER || offset > view_length || length > view_length - offset ||
+        position > BINARY_MAX_POSITION || length > BINARY_MAX_POSITION - position)
+        return create_error("ERR_OUT_OF_RANGE", "buffer slice, transfer limit or file position exceeded");
+    jerry_size_t byte_offset, byte_length;
+    jerry_value_t buffer = jerry_typedarray_buffer(args[1], &byte_offset, &byte_length);
+    if (jerry_value_is_exception(buffer)) return buffer;
+    if (!jerry_arraybuffer_is_detachable(buffer)) {
+        jerry_value_free(buffer);
+        return create_error("ERR_INVALID_ARG_TYPE", "buffer is detached");
+    }
+    if (writing && length && jerry_arraybuffer_read(buffer, byte_offset + offset, s_binary_scratch, length) != length) {
+        jerry_value_free(buffer);
+        return create_error("ERR_INVALID_ARG_TYPE", "buffer is unavailable");
+    }
+    size_t file_size = 0, count = 0;
+    /* Size checks preserve backend ownership/media checks even at EOF/zero length.
+     * FatFs read seeks clamp at EOF, so don't mistake a beyond-EOF seek for success. */
+    fs_result_t result = fs_size(&handle->file, &file_size);
+    /* FatFs does not promise zero-filled sparse gaps; do not expose them. */
+    if (result == FS_OK && writing && length && position > file_size) result = FS_ERROR_INVALID;
+    if (result == FS_OK && length && (writing || position < file_size)) {
+        result = fs_seek(&handle->file, position);
+        if (result == FS_OK) result = writing ?
+            fs_write(&handle->file, s_binary_scratch, length, &count) :
+            fs_read(&handle->file, s_binary_scratch, length, &count);
+        if (writing && result == FS_OK && count < length) result = FS_ERROR_NO_SPACE;
+        if (count > length) { count = 0; result = FS_ERROR_IO; }
+        if (positioned) {
+            fs_result_t restored = fs_seek(&handle->file, handle->position);
+            if (restored != FS_OK) {
+                (void)fs_close(&handle->file);
+                memset(handle, 0, sizeof(*handle));
+                result = restored;
+            }
+        } else {
+            handle->position += (uint32_t)count;
+        }
+    }
+    if (!writing && count && jerry_arraybuffer_write(buffer, byte_offset + offset, s_binary_scratch, count) != count)
+        result = FS_ERROR_IO;
+    jerry_value_free(buffer);
+    if (result != FS_OK) {
+        jerry_value_t error = CREATE_FS_ERROR(result, writing ? "failed to write file" : "failed to read file");
+        jerry_value_t object = jerry_exception_value(error, false);
+        js_set_number(object, writing ? "bytesWritten" : "bytesRead", count);
+        jerry_value_free(object);
+        return error;
+    }
+    return jerry_number(count);
+}
+
+static jerry_value_t fs_read_sync(const jerry_call_info_t *info,
+                                 const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    return binary_transfer(args, argc, false);
+}
+
+static jerry_value_t fs_write_sync(const jerry_call_info_t *info,
+                                  const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    return binary_transfer(args, argc, true);
+}
 
 /*
  * fs.readFileSync(path[, encoding])
@@ -682,6 +839,10 @@ static jerry_value_t fs_rename_sync(const jerry_call_info_t *call_info_p,
 jerry_value_t js_create_fs_module(void) {
     jerry_value_t fs = jerry_object();
 
+    js_set_function(fs, "openSync", fs_open_sync);
+    js_set_function(fs, "readSync", fs_read_sync);
+    js_set_function(fs, "writeSync", fs_write_sync);
+    js_set_function(fs, "closeSync", fs_close_sync);
     js_set_function(fs, "readFileSync", fs_read_file_sync);
     js_set_function(fs, "writeFileSync", fs_write_file_sync);
     js_set_function(fs, "appendFileSync", fs_append_file_sync);

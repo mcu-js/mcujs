@@ -48,8 +48,9 @@ internal application startup. Other boards do not advertise this adapter.
 
 The existing synchronous file size and memory limits still apply. The current
 JS API is string-based; the demonstration uses a small ASCII JSON pixel asset,
-not arbitrary binary data. Binary buffers, file-handle streaming, asynchronous
-I/O, capacity/status APIs and other board adapters remain follow-up work under
+not arbitrary binary data. [Bounded binary file handles](./binary-file-assets.md)
+now provide explicit Uint8Array transfers. Streams, asynchronous I/O,
+capacity/status APIs and other board adapters remain follow-up work under
 [issue #7](https://github.com/mcu-js/mcujs/issues/7). Writes are not power-loss
 atomic; keep backups and do not unplug during a write.
 

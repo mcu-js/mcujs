@@ -192,6 +192,16 @@
     },
     "fs": {
       "appRoot": "/app",
+      "binary": {
+        "buffer": "Uint8Array",
+        "maxOpenFiles": 4,
+        "maxTransferBytes": 4096,
+        "maxPosition": 2147483647,
+        "flags": [
+          "r",
+          "w"
+        ]
+      },
       "implementation": "fat",
       "writable": true,
       "hostTransfer": true

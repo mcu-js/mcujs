@@ -14,7 +14,7 @@ const featureNames = Object.freeze([
 const moduleOrder = Object.freeze([
   "board", "fs", "process", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
   "image", "keyboard", "mouse", "graphics", "screen", "dvi",
-  "events", "devices", "mcujs:button", "mcujs:module", "node:module",
+  "events", "devices", "mcujs:buzzer", "mcujs:buzzer-native", "mcujs:button", "mcujs:module", "node:module",
 ]);
 
 const boardPresentation = Object.freeze({
@@ -217,6 +217,7 @@ function usbCapability(classes) {
 function modulesFor(features) {
   return moduleOrder.filter((name) => {
     if (name === "board") return features.board;
+    if (name === "mcujs:buzzer" || name === "mcujs:buzzer-native") return false; // qualified board appends below
     if (name === "mcujs:button") return Boolean(features.onboardButton && features.board && features.timers && features.require);
     if (name === "events" || name === "devices" || name === "mcujs:module" || name === "node:module") return features.require;
     return features[featureModule[name]];
@@ -499,6 +500,14 @@ for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];
   if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
   descriptor.presentation = Object.freeze({ ...presentation });
+  if (boardId === 'waveshare_rp2350_touch_lcd_1.69') {
+    descriptor.modules.push('mcujs:buzzer', 'mcujs:buzzer-native');
+    descriptor.capabilities.gpio.pins = descriptor.capabilities.gpio.pins.filter(pin => pin !== 2);
+    descriptor.capabilities.gpio.outputPins = descriptor.capabilities.gpio.outputPins.filter(pin => pin !== 2);
+    descriptor.capabilities.devices = { buzzer: {interface: 'tone', maxOpenHandles: 1, maxConcurrentTones: 1,
+      frequency: {minHz: 500, maxHz: 4000, representation: 'exact-only'},
+      duration: {minMs: 1, maxMs: 1000}, waveform: 'square', duty: 0.5, shutdown: 'native-alarm'} };
+  }
   if (descriptor.features.onboardButton && descriptor.features.board && descriptor.features.timers && descriptor.features.require) {
     descriptor.capabilities.devices = { button: {
       interface: 'button-events', readOnly: true, maxOpenHandles: 1, pollIntervalMs: 10, debounceMs: 30,

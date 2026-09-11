@@ -85,7 +85,6 @@
       "pins": [
         0,
         1,
-        2,
         4,
         5,
         6,
@@ -114,7 +113,6 @@
       "outputPins": [
         0,
         1,
-        2,
         4,
         5,
         6,
@@ -448,6 +446,25 @@
           "init"
         ],
         "externalBuffer": true
+      }
+    },
+    "devices": {
+      "buzzer": {
+        "interface": "tone",
+        "maxOpenHandles": 1,
+        "maxConcurrentTones": 1,
+        "frequency": {
+          "minHz": 500,
+          "maxHz": 4000,
+          "representation": "exact-only"
+        },
+        "duration": {
+          "minMs": 1,
+          "maxMs": 1000
+        },
+        "waveform": "square",
+        "duty": 0.5,
+        "shutdown": "native-alarm"
       }
     }
   }

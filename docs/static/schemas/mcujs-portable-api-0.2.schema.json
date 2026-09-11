@@ -280,6 +280,76 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "buzzer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interface",
+            "maxOpenHandles",
+            "maxConcurrentTones",
+            "frequency",
+            "duration",
+            "waveform",
+            "duty",
+            "shutdown"
+          ],
+          "properties": {
+            "interface": {
+              "const": "tone"
+            },
+            "maxOpenHandles": {
+              "const": 1
+            },
+            "maxConcurrentTones": {
+              "const": 1
+            },
+            "frequency": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "minHz",
+                "maxHz",
+                "representation"
+              ],
+              "properties": {
+                "minHz": {
+                  "const": 500
+                },
+                "maxHz": {
+                  "const": 4000
+                },
+                "representation": {
+                  "const": "exact-only"
+                }
+              }
+            },
+            "duration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "minMs",
+                "maxMs"
+              ],
+              "properties": {
+                "minMs": {
+                  "const": 1
+                },
+                "maxMs": {
+                  "const": 1000
+                }
+              }
+            },
+            "waveform": {
+              "const": "square"
+            },
+            "duty": {
+              "const": 0.5
+            },
+            "shutdown": {
+              "const": "native-alarm"
+            }
+          }
+        },
         "display": {
           "type": "object",
           "additionalProperties": false,

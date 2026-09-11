@@ -21,6 +21,10 @@ extern void js_register_global(const char *name, jerry_value_t object);
 
 #define PWM_SLICE_STORAGE ((NUM_BANK0_GPIOS + 1u) / 2u)
 
+#if MCUJS_HAS_CONFIGURED_BUZZER
+#include "board_config.h"
+static bool s_buzzer_open;
+#endif
 static bool s_pwm_initialized[NUM_BANK0_GPIOS];
 static uint16_t s_pwm_slice_references[PWM_SLICE_STORAGE];
 static uint32_t s_pwm_slice_frequency[PWM_SLICE_STORAGE];
@@ -108,6 +112,10 @@ static jerry_value_t pwm_init_handler(const jerry_call_info_t *call_info_p,
         return throw_pwm_error(MCUJS_ERROR_NOT_SUPPORTED, pin,
                                "PWM pin cannot be mapped to a timer");
     }
+#if MCUJS_HAS_CONFIGURED_BUZZER
+    if (s_buzzer_open && slice == pwm_gpio_to_slice_num(MCUJS_BUZZER_PIN))
+        return throw_pwm_error(MCUJS_ERROR_BUSY, pin, "PWM slice belongs to configured buzzer");
+#endif
     uint8_t output_owner = s_pwm_output_owners[slice][channel];
     if (output_owner != 0 && output_owner != (uint8_t)(pin + 1)) {
         return throw_pwm_error(MCUJS_ERROR_BUSY, pin,
@@ -235,3 +243,117 @@ void js_bind_pwm(void) {
     js_register_global("PWM", pwm);
     jerry_value_free(pwm);
 }
+
+#if MCUJS_HAS_CONFIGURED_BUZZER
+#include "board_config.h"
+#include "pico/time.h"
+#include "hardware/sync.h"
+#if !defined(MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_1_69) || MCUJS_BUZZER_PIN != 2
+#error Unqualified configured buzzer adapter
+#endif
+static volatile bool s_buzzer_playing;
+static volatile alarm_id_t s_buzzer_alarm;
+static int s_buzzer_generation;
+static void buzzer_silence(void) {
+    pwm_set_enabled(pwm_gpio_to_slice_num(MCUJS_BUZZER_PIN), false);
+    gpio_set_function(MCUJS_BUZZER_PIN, GPIO_FUNC_SIO);
+    gpio_init(MCUJS_BUZZER_PIN);
+    gpio_put(MCUJS_BUZZER_PIN, false);
+    gpio_set_dir(MCUJS_BUZZER_PIN, GPIO_OUT);
+    s_buzzer_playing = false;
+}
+static int64_t buzzer_deadline(alarm_id_t id, void *data) {
+    (void)data;
+    if (id == s_buzzer_alarm) { buzzer_silence(); s_buzzer_alarm = 0; }
+    return 0;
+}
+static void buzzer_stop(void) {
+    uint32_t irq = save_and_disable_interrupts();
+    alarm_id_t alarm = s_buzzer_alarm;
+    s_buzzer_alarm = 0;
+    if (alarm > 0) cancel_alarm(alarm);
+    if (s_buzzer_open) buzzer_silence();
+    restore_interrupts(irq);
+}
+void js_buzzer_cleanup(void) {
+    buzzer_stop();
+    s_buzzer_open = false;
+}
+static jerry_value_t buzzer_error(mcujs_operational_error_t code, const char *message) {
+    const mcujs_error_details_t details = {.resource = "buzzer"};
+    return mcujs_throw_operational_error(code, message, &details);
+}
+static bool buzzer_valid(const jerry_value_t args[], jerry_length_t argc) {
+    int token;
+    return s_buzzer_open && mcujs_get_integer(args, argc, 0, &token) == MCUJS_ARG_OK && token == s_buzzer_generation;
+}
+static jerry_value_t buzzer_open_handler(const jerry_call_info_t *info, const jerry_value_t args[], jerry_length_t argc) {
+    (void)info; (void)args;
+    if (argc) return jerry_throw_sz(JERRY_ERROR_TYPE, "Buzzer open takes no arguments");
+    if (s_buzzer_open || s_pwm_slice_references[pwm_gpio_to_slice_num(MCUJS_BUZZER_PIN)])
+        return buzzer_error(MCUJS_ERROR_BUSY, "Buzzer PWM slice is owned");
+    if (s_buzzer_generation == INT32_MAX) return buzzer_error(MCUJS_ERROR_RESOURCE_EXHAUSTED, "Buzzer handle tokens exhausted");
+    s_buzzer_open = true;
+    buzzer_silence();
+    return jerry_number(++s_buzzer_generation);
+}
+static jerry_value_t buzzer_start_handler(const jerry_call_info_t *info, const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    if (!buzzer_valid(args, argc)) return buzzer_error(MCUJS_ERROR_NO_DEVICE, "Stale buzzer handle");
+    int frequency, duration;
+    if (argc != 3 || mcujs_get_integer(args, argc, 1, &frequency) != MCUJS_ARG_OK ||
+        mcujs_get_integer(args, argc, 2, &duration) != MCUJS_ARG_OK)
+        return jerry_throw_sz(JERRY_ERROR_TYPE, "Buzzer expects integer frequency and duration");
+    if (frequency < 500 || frequency > 4000 || duration < 1 || duration > 1000)
+        return jerry_throw_sz(JERRY_ERROR_RANGE, "Buzzer tone outside capability");
+    if (s_buzzer_playing) return buzzer_error(MCUJS_ERROR_BUSY, "Buzzer is playing");
+    mcujs_pwm_rp_frequency_config_t config;
+    if (!mcujs_pwm_rp_find_exact_frequency(clock_get_hz(clk_sys), frequency, &config) || ((config.wrap + 1u) & 1u))
+        return buzzer_error(MCUJS_ERROR_NOT_SUPPORTED, "Tone frequency or 50% duty cannot be represented exactly");
+    uint32_t irq = save_and_disable_interrupts();
+    s_buzzer_alarm = add_alarm_in_ms(duration, buzzer_deadline, NULL, false);
+    if (s_buzzer_alarm <= 0) {
+        s_buzzer_alarm = 0;
+        restore_interrupts(irq);
+        return buzzer_error(MCUJS_ERROR_RESOURCE_EXHAUSTED, "No buzzer safety alarm available");
+    }
+    uint slice = pwm_gpio_to_slice_num(MCUJS_BUZZER_PIN);
+    pwm_set_clkdiv_int_frac(slice, config.divider_scaled >> 4u, config.divider_scaled & 15u);
+    pwm_set_wrap(slice, config.wrap);
+    pwm_set_gpio_level(MCUJS_BUZZER_PIN, (config.wrap + 1u) / 2u);
+    gpio_set_function(MCUJS_BUZZER_PIN, GPIO_FUNC_PWM);
+    s_buzzer_playing = true;
+    pwm_set_enabled(slice, true);
+    restore_interrupts(irq);
+    return jerry_number(frequency);
+}
+static jerry_value_t buzzer_stop_handler(const jerry_call_info_t *info, const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    if (!buzzer_valid(args, argc)) return buzzer_error(MCUJS_ERROR_NO_DEVICE, "Stale buzzer handle");
+    buzzer_stop(); return jerry_undefined();
+}
+static jerry_value_t buzzer_close_handler(const jerry_call_info_t *info, const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    if (!buzzer_valid(args, argc)) return buzzer_error(MCUJS_ERROR_NO_DEVICE, "Stale buzzer handle");
+    js_buzzer_cleanup(); return jerry_undefined();
+}
+static jerry_value_t buzzer_playing_handler(const jerry_call_info_t *info, const jerry_value_t args[], jerry_length_t argc) {
+    (void)info;
+    if (!buzzer_valid(args, argc)) return buzzer_error(MCUJS_ERROR_NO_DEVICE, "Stale buzzer handle");
+    return jerry_boolean(s_buzzer_playing);
+}
+static jerry_value_t buzzer_state_handler(const jerry_call_info_t *info, const jerry_value_t args[], jerry_length_t argc) {
+    (void)info; (void)args; (void)argc;
+    return jerry_string_sz(s_buzzer_open || s_pwm_slice_references[pwm_gpio_to_slice_num(MCUJS_BUZZER_PIN)] ? "busy" : "idle");
+}
+jerry_value_t js_create_buzzer_native_module(void) {
+    jerry_value_t module = jerry_object();
+    js_set_function(module, "open", buzzer_open_handler);
+    js_set_function(module, "start", buzzer_start_handler);
+    js_set_function(module, "stop", buzzer_stop_handler);
+    js_set_function(module, "close", buzzer_close_handler);
+    js_set_function(module, "playing", buzzer_playing_handler);
+    js_set_function(module, "state", buzzer_state_handler);
+    return module;
+}
+#endif

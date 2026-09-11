@@ -10,7 +10,7 @@ python3 - "$ROOT" "$TMP" <<'PY'
 from pathlib import Path
 import sys
 root,out=map(Path,sys.argv[1:])
-for name,source in [('events','events'),('devices','devices'),('button','button'),('canvas','canvas'),('st7789','displays/st7789')]:
+for name,source in [('events','events'),('devices','devices'),('button','button'),('buzzer','buzzer'),('canvas','canvas'),('st7789','displays/st7789')]:
  data=(root/('lib/'+source+'.js')).read_bytes()
  (out/(name+'_source.h')).write_text('static const jerry_char_t '+name+'_source[]={'+','.join(map(str,data))+'};\n')
 PY

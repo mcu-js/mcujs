@@ -6,6 +6,10 @@
 
 #include "bindings.h"
 #include "jerryscript.h"
+#include "runtime_features.h"
+#if MCUJS_HAS_CONFIGURED_BUZZER
+extern void js_buzzer_cleanup(void);
+#endif
 
 #include "pico/stdlib.h"
 #include "hardware/timer.h"
@@ -210,6 +214,9 @@ bool js_timers_process(void) {
  */
 /* Release retained callbacks while their JerryScript context is still alive. */
 void js_timers_cleanup(void) {
+#if MCUJS_HAS_CONFIGURED_BUZZER
+    js_buzzer_cleanup();
+#endif
     for (size_t i = 0; i < MAX_TIMERS; i++) {
         if (s_timers[i].active) {
             jerry_value_free(s_timers[i].callback);

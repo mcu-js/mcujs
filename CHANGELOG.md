@@ -4,6 +4,15 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Added `devices.buzzer` on RP2350 Touch LCD 1.69: one exclusive tone handle,
+  bounded exact-representable frequencies and durations, Promise completion,
+  AbortSignal cancellation, stop/close and native-alarm shutdown independent of
+  JavaScript servicing. Other boards omit this capability; no speaker/mic API.
+  GPIO2 is now reserved from generic GPIO access. `events.AbortSignal.subscribe`
+  provides bounded cancellation callbacks independent of event propagation.
+  See [buzzer contract](docs/docs/buzzer.md) for limits and hardware qualification.
+
+
 - Bounded binary file handles on `/app` and configured `/sd`: Uint8Array
   `openSync`/`readSync`/`writeSync`/`closeSync`, explicit ownership/error handling,
   four-handle and 4096-byte-transfer limits, and cleanup on VM teardown.

@@ -180,3 +180,5 @@ JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-buttons-tests.sh"
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-canvas-pointer-tests.sh"
+JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
+    bash "${ROOT}/tests/run-buzzer-tests.sh"

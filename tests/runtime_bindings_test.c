@@ -25,6 +25,10 @@ static jerry_value_t stub_handler(const jerry_call_info_t *call_info,
 jerry_value_t js_create_spi_module(void) { return stub_module(); }
 jerry_value_t js_create_adc_module(void) { return stub_module(); }
 #if MCUJS_FEATURE_IMAGE
+/* Registry/production-loader wiring only. Real codec behavior has its own fixture. */
+jerry_value_t js_create_jpeg_module(void) {
+    jerry_value_t module=stub_module();js_set_function(module,"open",stub_handler);return module;
+}
 jerry_value_t js_create_image_module(void) {
     jerry_value_t module = stub_module();
     js_set_function(module, "info", stub_handler);
@@ -290,7 +294,7 @@ static const char s_test_source[] =
     "    assert(modules.has(name) === true, name + ' missing from has()');\n"
     "    assert(require(name) !== undefined, name + ' cannot be required');\n"
     "  });\n"
-    "  var knownModules = ['board', 'fs', 'process', 'gpio', 'pwm', 'i2c', 'spi', 'adc', 'neopixel', 'image', 'keyboard', 'mouse', 'graphics', 'screen', 'dvi', 'display', 'mcujs:module', 'node:module'];\n"
+    "  var knownModules = ['board', 'fs', 'process', 'gpio', 'pwm', 'i2c', 'spi', 'adc', 'neopixel', 'image', 'jpeg', 'keyboard', 'mouse', 'graphics', 'screen', 'dvi', 'display', 'mcujs:module', 'node:module'];\n"
     "  knownModules.forEach(function (name) {\n"
     "    var listed = modules.builtinModules.indexOf(name) !== -1;\n"
     "    assert(modules.has(name) === listed, name + ' has()/list mismatch');\n"
@@ -301,7 +305,7 @@ static const char s_test_source[] =
     "    pwm: ['init', 'setDuty', 'stop'],\n"
     "    i2c: ['init', 'write', 'read'],\n"
     "    neopixel: ['init', 'setPixel', 'show', 'clear'],\n"
-    "    image: ['info', 'decodeJPEG', 'decodeBMP', 'drawJPEG', 'drawBMP'],\n"
+    "    image: ['info', 'decodeJPEG', 'decodeBMP', 'drawJPEG', 'drawBMP'], jpeg: ['open'],\n"
     "    graphics: ['createBuffer', 'freeBuffer', 'getBufferInfo', 'getPointer', 'fill', 'setPixel', 'fillRect', 'color565'],\n"
     "    screen: ['init', 'fill', 'setPixel', 'fillRect', 'drawLine', 'drawCircle', 'fillCircle', 'drawText', 'rgb', 'color', 'show', 'getWidth', 'getHeight', 'getBufferHandle', 'getByteOrder', 'BLACK', 'WHITE', 'RED', 'GREEN', 'BLUE', 'CYAN', 'MAGENTA', 'YELLOW', 'ORANGE', 'GRAY']\n"
     "  };\n"
@@ -343,7 +347,7 @@ static const char s_test_source[] =
     "  assertFrozenTree(capabilities, 'board.capabilities()');\n"
     "  attackFrozenTree(capabilities, 'board.capabilities()');\n"
     "  assert(JSON.stringify(capabilities.gpio) === JSON.stringify(gpioCapability), 'singular and snapshot capabilities diverged');\n"
-    "  var moduleCapabilities = {fs: 'fs', gpio: 'gpio', pwm: 'pwm', i2c: 'i2c', spi: 'spi', adc: 'adc', neopixel: 'neopixel', image: 'image', graphics: 'graphics', screen: 'screen', dvi: 'dvi'};\n"
+    "  var moduleCapabilities = {fs: 'fs', gpio: 'gpio', pwm: 'pwm', i2c: 'i2c', spi: 'spi', adc: 'adc', neopixel: 'neopixel', image: 'image', jpeg: 'jpeg', graphics: 'graphics', screen: 'screen', dvi: 'dvi'};\n"
     "  Object.keys(moduleCapabilities).forEach(function (name) {\n"
     "    var capabilityName = moduleCapabilities[name];\n"
     "    assert(modules.has(name) === (board.capability(capabilityName) !== undefined), name + ' module/capability mismatch');\n"

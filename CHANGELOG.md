@@ -4,6 +4,13 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Added a bounded baseline JPEG reader and portable Canvas example: a native
+  snapshot up to 16 KiB, dimensions up to 320x320, and one RGB block per read.
+  The existing picojpeg decoder is reused without display ownership, raw
+  graphics handles or a second full-frame pixel buffer. Legacy methods remain
+  until their remaining callers migrate. New firmware is required; see
+  [limits and qualification](docs/docs/development/binary-file-assets.md#baseline-jpeg-example).
+
 - Extended the row-wise Canvas BMP example to explicit 16-bit RGB565 bitfields
   and 32-bit BI_RGB (unused fourth byte ignored). Input stays bounded; mask,
   truncation and cleanup tests accompany real format fixtures. Corrected the

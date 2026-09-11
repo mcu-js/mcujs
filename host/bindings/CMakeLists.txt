@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 # Base source files for JavaScript API bindings
+set(MCUJS_PICOJPEG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/picojpeg.c")
 set(BINDINGS_SOURCES
     bindings.c
     validation.c
@@ -17,16 +18,29 @@ set(BINDINGS_SOURCES
     builtin_modules.c
     graphics.c
     image.c
+    jpeg.c
     ${MCUJS_PLATFORM_USB_BINDING_SOURCES}
     screen.c
-    $ENV{PICOJPEG_PATH}/picojpeg.c
+    ${MCUJS_PICOJPEG_SOURCE}
     ${MCUJS_PLATFORM_OPTIONAL_BINDING_SOURCES}
 )
 
 # This first RP2350 2.8 port intentionally omits the legacy image API.
 # image.c enforces its registry gate at compile time (no unavailable stub).
 if(BOARD STREQUAL "waveshare_rp2350_touch_lcd_2.8")
-    list(REMOVE_ITEM BINDINGS_SOURCES image.c $ENV{PICOJPEG_PATH}/picojpeg.c)
+    list(REMOVE_ITEM BINDINGS_SOURCES image.c jpeg.c ${MCUJS_PICOJPEG_SOURCE})
+else()
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        "${CMAKE_SOURCE_DIR}/scripts/prepare-picojpeg.py"
+        "$ENV{PICOJPEG_PATH}/picojpeg.c" "$ENV{PICOJPEG_PATH}/picojpeg.h")
+    execute_process(COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/prepare-picojpeg.py"
+        "$ENV{PICOJPEG_PATH}/picojpeg.c" "${MCUJS_PICOJPEG_SOURCE}"
+        RESULT_VARIABLE MCUJS_PICOJPEG_RESULT)
+    if(NOT MCUJS_PICOJPEG_RESULT EQUAL 0)
+        message(FATAL_ERROR "Pinned picojpeg preparation failed")
+    endif()
 endif()
 
 # JavaScript API bindings library

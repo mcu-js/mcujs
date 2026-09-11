@@ -13,7 +13,7 @@ const featureNames = Object.freeze([
 
 const moduleOrder = Object.freeze([
   "board", "fs", "process", "gpio", "pwm", "i2c", "spi", "adc", "neopixel",
-  "image", "keyboard", "mouse", "graphics", "screen", "dvi",
+  "image", "jpeg", "keyboard", "mouse", "graphics", "screen", "dvi",
   "events", "devices", "mcujs:buzzer", "mcujs:buzzer-native", "mcujs:button", "mcujs:module", "node:module",
 ]);
 
@@ -35,7 +35,7 @@ const boardPresentation = Object.freeze({
 
 const featureModule = Object.freeze({
   fs: "fs", process: "process", gpio: "gpio", pwm: "pwm", i2c: "i2c",
-  spi: "spi", adc: "adc", neopixel: "neopixel", image: "image",
+  spi: "spi", adc: "adc", neopixel: "neopixel", image: "image", jpeg: "image",
   keyboard: "keyboard", mouse: "mouse", graphics: "graphics", screen: "screen",
   dvi: "dvi",
 });
@@ -299,7 +299,14 @@ function rpDescriptor({
   if (features.i2c) capabilities.i2c = i2cCapability(i2cRoutes, i2cDefaultBus);
   if (features.spi) capabilities.spi = spiCapability(spiRoutes, spiDefaultBus, { dma: true });
   if (features.neopixel) capabilities.neopixel = neopixelCapability(neopixelPins);
-  if (features.image) capabilities.image = imageCapability(chip);
+  if (features.image) {
+    capabilities.image = imageCapability(chip);
+    capabilities.jpeg = {
+      methods: ["open"], profiles: ["baseline"], scans: "single",
+      maxInputBytes: 16384, maxWidth: 320, maxHeight: 320, maxOpenHandles: 1,
+      block: {maxWidth: 16, maxHeight: 16, bufferBytes: 768, pixelFormat: "rgb888"},
+    };
+  }
   if (features.graphics) capabilities.graphics = graphicsCapability();
   if (features.screen) capabilities.screen = screenCapability();
   if (features.dvi) capabilities.dvi = dviCapability();

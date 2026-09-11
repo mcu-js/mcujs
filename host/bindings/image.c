@@ -18,38 +18,11 @@
 
 #include <string.h>
 #include <stdio.h>
+#include "jpeg.h"
 
 /*
  * JPEG Decoding using picojpeg
  */
-
-/* Context for picojpeg callback */
-typedef struct {
-    const uint8_t *data;
-    size_t data_len;
-    size_t data_pos;
-} jpeg_stream_t;
-
-/* picojpeg byte callback */
-static unsigned char jpeg_need_bytes_callback(
-    unsigned char *buf,
-    unsigned char buf_size,
-    unsigned char *bytes_read,
-    void *callback_data)
-{
-    jpeg_stream_t *stream = (jpeg_stream_t *)callback_data;
-    
-    size_t remaining = stream->data_len - stream->data_pos;
-    size_t to_read = (remaining < buf_size) ? remaining : buf_size;
-    
-    if (to_read > 0) {
-        memcpy(buf, stream->data + stream->data_pos, to_read);
-        stream->data_pos += to_read;
-    }
-    
-    *bytes_read = (unsigned char)to_read;
-    return 0;  /* Success */
-}
 
 /* Convert RGB888 to byte-swapped RGB565 for SPI displays */
 static inline uint16_t rgb_to_565_swapped(uint8_t r, uint8_t g, uint8_t b) {
@@ -74,6 +47,7 @@ int image_decode_jpeg_ex(graphics_buffer_handle_t handle,
                          int16_t dest_x, int16_t dest_y,
                          image_byte_order_t byte_order)
 {
+    if (jpeg_decoder_busy()) return IMAGE_JPEG_ERR_BUSY;
     if (!graphics_buffer_valid(handle) || data == NULL || data_len == 0) {
         return -1;
     }

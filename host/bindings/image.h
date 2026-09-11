@@ -63,6 +63,9 @@ int image_decode_bmp(graphics_buffer_handle_t handle,
                      const uint8_t *data, size_t data_len,
                      int16_t x, int16_t y);
 
+/* Legacy JPEG cannot reset picojpeg while a pull reader is active. */
+#define IMAGE_JPEG_ERR_BUSY (-4)
+
 /* BMP decode error codes */
 #define IMAGE_BMP_OK              0
 #define IMAGE_BMP_ERR_INVALID    -1  /* Not a valid BMP file */

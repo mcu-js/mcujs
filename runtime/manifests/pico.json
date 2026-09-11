@@ -431,6 +431,25 @@
         ]
       }
     },
+    "jpeg": {
+      "methods": [
+        "open"
+      ],
+      "profiles": [
+        "baseline"
+      ],
+      "scans": "single",
+      "maxInputBytes": 16384,
+      "maxWidth": 320,
+      "maxHeight": 320,
+      "maxOpenHandles": 1,
+      "block": {
+        "maxWidth": 16,
+        "maxHeight": 16,
+        "bufferBytes": 768,
+        "pixelFormat": "rgb888"
+      }
+    },
     "graphics": {
       "methods": [
         "createBuffer",

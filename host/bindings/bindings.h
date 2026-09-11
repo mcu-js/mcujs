@@ -182,6 +182,7 @@ jerry_value_t js_create_graphics_module(void);
  * Create image module object
  */
 jerry_value_t js_create_image_module(void);
+jerry_value_t js_create_jpeg_module(void);
 
 /*
  * Create keyboard module object (USB HID keyboard)

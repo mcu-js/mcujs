@@ -663,6 +663,7 @@ static const builtin_module_t s_builtin_modules[] = {
 #endif
 #if MCUJS_FEATURE_IMAGE
     {"image", js_create_image_module},
+    {"jpeg", js_create_jpeg_module},
 #endif
 #if MCUJS_FEATURE_KEYBOARD
     {"keyboard", js_create_keyboard_module},

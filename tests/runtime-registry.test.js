@@ -43,6 +43,7 @@ const moduleCapability = {
   adc: "adc",
   neopixel: "neopixel",
   image: "image",
+  jpeg: "jpeg",
   graphics: "graphics",
   screen: "screen",
   dvi: "dvi",

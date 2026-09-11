@@ -273,6 +273,9 @@
         },
         "devices": {
           "$ref": "#/$defs/devicesCapability"
+        },
+        "jpeg": {
+          "$ref": "#/$defs/jpegCapability"
         }
       }
     },
@@ -1497,6 +1500,55 @@
           }
         }
       }
+    },
+    "jpegCapability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "methods",
+        "profiles",
+        "scans",
+        "maxInputBytes",
+        "maxWidth",
+        "maxHeight",
+        "maxOpenHandles",
+        "block"
+      ],
+      "properties": {
+        "methods": {
+          "const": [
+            "open"
+          ]
+        },
+        "profiles": {
+          "const": [
+            "baseline"
+          ]
+        },
+        "scans": {
+          "const": "single"
+        },
+        "maxInputBytes": {
+          "const": 16384
+        },
+        "maxWidth": {
+          "const": 320
+        },
+        "maxHeight": {
+          "const": 320
+        },
+        "maxOpenHandles": {
+          "const": 1
+        },
+        "block": {
+          "const": {
+            "maxWidth": 16,
+            "maxHeight": 16,
+            "bufferBytes": 768,
+            "pixelFormat": "rgb888"
+          }
+        }
+      }
     }
   },
   "x-mcujs-contract": {
@@ -2085,6 +2137,11 @@
         "schema": "#/$defs/devicesCapability",
         "scope": "configuredDevice",
         "dynamic": false
+      },
+      "jpeg": {
+        "schema": "#/$defs/jpegCapability",
+        "dynamic": false,
+        "scope": "decoder"
       }
     },
     "onboardDevices": {

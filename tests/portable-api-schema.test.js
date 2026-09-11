@@ -1325,7 +1325,7 @@ test("capability descriptors are static and onboard inventory stays separate", (
   const contract = schema["x-mcujs-contract"];
   const capabilityMap = schema.$defs.capabilityMap;
   const expectedCapabilities = [
-    "adc", "boot", "devices", "dvi", "fs", "gpio", "graphics", "i2c", "image",
+    "adc", "boot", "devices", "dvi", "fs", "gpio", "graphics", "i2c", "image", "jpeg",
     "neopixel", "pwm", "screen", "spi", "usb",
   ];
   const dynamicNames = /^(available|busy|connected|current|mounted|occupied|owner|ready|state|status)$/i;

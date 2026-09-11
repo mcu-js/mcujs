@@ -52,6 +52,17 @@ function expectedImageCapability(maxInputBytes) {
   };
 }
 
+test("JPEG reader is independently advertised only on compiled picojpeg lanes", () => {
+  for (const descriptor of Object.values(boardDescriptors)) {
+    assert.equal(descriptor.modules.includes("jpeg"), descriptor.features.image);
+    assert.deepEqual(descriptor.capabilities.jpeg, descriptor.features.image ? {
+      methods: ["open"], profiles: ["baseline"], scans: "single",
+      maxInputBytes: 16384, maxWidth: 320, maxHeight: 320, maxOpenHandles: 1,
+      block: {maxWidth: 16, maxHeight: 16, bufferBytes: 768, pixelFormat: "rgb888"},
+    } : undefined);
+  }
+});
+
 test("shipping image capability exactly matches compiled current-image support", () => {
   assert.equal(shippingBoardIds.length, 11);
   for (const boardId of shippingBoardIds) {

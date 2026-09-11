@@ -68,9 +68,105 @@ test('exports a fixed hardware canvas and one opaque 2D context', () => {
   assert.equal(ctx.strokeStyle, '#000000');
   assert.equal(ctx.lineWidth, 1);
   assert.deepEqual(calls, []);
-  for (const unsupported of ['drawImage', 'fillText', 'translate', 'rotate', 'scale', 'present']) {
+  for (const unsupported of ['drawImage', 'strokeText', 'translate', 'rotate', 'scale', 'present']) {
     assert.equal(ctx[unsupported], undefined);
   }
+});
+
+test('fillText draws the built-in A glyph at a left alphabetic baseline without changing the path', () => {
+  const { canvas, calls } = loadCanvas();
+  const ctx = canvas.getContext('2d');
+  ctx.moveTo(1, 2);
+  ctx.lineTo(3, 4);
+  ctx.fillStyle = 'red';
+  assert.equal(ctx.fillText('A', 0, 7), undefined);
+  // Independent 5-by-7 bitmap specification, not production font data.
+  const expected = ['.###.', '#...#', '#...#', '#...#', '#####', '#...#', '#...#'];
+  const pixels = Array.from({ length: 7 }, () => Array(5).fill('.'));
+  for (const call of calls) {
+    assert.equal(call.mode, 'fill');
+    assert.deepEqual(call.rgba, [1, 0, 0, 1]);
+    for (let i = 0; i < call.commands.length; i += 5) {
+      const [op, x, y, w, h] = call.commands.slice(i, i + 5);
+      assert.equal(op, 4);
+      for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) pixels[y + dy][x + dx] = '#';
+    }
+  }
+  assert.deepEqual(pixels.map(row => row.join('')), expected);
+  ctx.stroke();
+  assert.deepEqual(calls.at(-1).commands, [1, 1, 2, 2, 3, 4]);
+});
+
+test('text has bounded bitmap font sizes, width measurement and saved font state', () => {
+  const { canvas, calls } = loadCanvas();
+  const ctx = canvas.getContext('2d');
+  assert.equal(ctx.font, '8px monospace');
+  assert.equal(ctx.measureText('Hello 123!').width, 60);
+  ctx.save();
+  ctx.font = '16px monospace';
+  assert.equal(ctx.measureText('A A').width, 36);
+  ctx.fillText('!', 10, 20);
+  assert.deepEqual(calls.map(c => c.commands), [[4, 14, 6, 2, 10, 4, 14, 18, 2, 2]]);
+  for (const invalid of ['0px monospace', '9px monospace', '40px monospace', '16px serif', 'bold 16px monospace', null]) {
+    ctx.font = invalid;
+    assert.equal(ctx.font, '16px monospace');
+  }
+  ctx.font = '32px monospace';
+  assert.equal(ctx.measureText('12').width, 48);
+  ctx.restore();
+  assert.equal(ctx.font, '8px monospace');
+  assert.equal(ctx.measureText('').width, 0);
+  assert.deepEqual(Object.keys(ctx.measureText('A')), ['width']);
+});
+
+test('text validates before drawing, bounds work and normalizes Canvas whitespace', () => {
+  const { canvas, calls } = loadCanvas();
+  const ctx = canvas.getContext('2d');
+  for (const text of ['oké', 'ok\x00', 'ok\x7f', 'A'.repeat(129)]) {
+    assert.throws(() => ctx.fillText(text, 0, 7), { name: 'RangeError' });
+    assert.throws(() => ctx.measureText(text), { name: 'RangeError' });
+  }
+  assert.throws(() => ctx.fillText('A'), { name: 'TypeError' });
+  assert.throws(() => ctx.measureText(), { name: 'TypeError' });
+  assert.throws(() => ctx.fillText(Symbol(), 0, 7), { name: 'TypeError' });
+  assert.throws(() => ctx.fillText('A', 0n, 7), { name: 'TypeError' });
+  assert.throws(() => ctx.fillText('A', 0, 7, 100), { name: 'RangeError' });
+  ctx.fillText('A', NaN, 7);
+  ctx.fillText('A', 0, Infinity);
+  assert.deepEqual(calls, []);
+  assert.equal(ctx.measureText({ toString: () => '12' }).width, 12);
+  assert.equal(ctx.measureText(' \t\r\n\f').width, 30);
+  assert.equal(ctx.measureText('A'.repeat(128)).width, 768);
+  ctx.fillText(' \t\r\n\f', 0, 7);
+  assert.deepEqual(calls, []);
+  ctx.fillText('A\nA', '0', '7');
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].commands[1], 12);
+  assert.equal(calls[1].commands[2], 1);
+  assert.ok(calls.every(c => c.commands.length <= 128));
+  canvas.getContext('2d');
+});
+
+test('text clips scaled runs at all edges and skips fully offscreen work', () => {
+  const { canvas, calls } = loadCanvas();
+  const ctx = canvas.getContext('2d');
+  ctx.font = '16px monospace';
+  ctx.lineWidth = 1000; // Text fill must not depend on stroke width.
+  ctx.fillText('!', -5, 3);
+  assert.deepEqual(calls.map(c => c.commands), [[4, 0, 1, 1, 2]]);
+  assert.equal(calls[0].lineWidth, 1);
+  calls.length = 0;
+  ctx.fillText('!', 155, 130);
+  assert.deepEqual(calls.map(c => c.commands), [[4, 159, 116, 1, 4]]);
+  calls.length = 0;
+  ctx.fillText('A', 1e100, 0);
+  ctx.fillText('A', -1e100, 0);
+  ctx.fillText('A', 0, -1e100);
+  ctx.fillText('A', 0, 1e100);
+  assert.deepEqual(calls, []);
+  ctx.font = '8px monospace';
+  ctx.fillText('!', -1.5, 7.5);
+  assert.deepEqual(calls.map(c => c.commands), [[4, 0.5, 0.5, 1, 5, 4, 0.5, 6.5, 1, 1]]);
 });
 
 test('retains paths across fill/stroke, with standard subpath starts and closure', () => {

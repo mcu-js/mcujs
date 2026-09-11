@@ -4,6 +4,11 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Added bounded Canvas bitmap text: `fillText`, width-only `measureText`, and
+  1x–4x `monospace` fonts with saved state, clipping and printable ASCII limits.
+  No new native interface or legacy binding removal. Newlines become spaces;
+  multiline labels use separate calls. See the [text contract](docs/docs/development/display-canvas.md#bounded-bitmap-text).
+
 - Made `devices` + `display.canvas` the documented default for drawing. The
   existing `display-canvas-demo.js` is now directly runnable (not an exported
   helper), closes after 20 seconds, and passed repeat/close checks with visible

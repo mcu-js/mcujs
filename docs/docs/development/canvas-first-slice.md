@@ -181,7 +181,8 @@ degenerate rectangles and current-point behavior after close/rect.
 
 ## Explicit exclusions
 
-There is no DOM, event handling, canvas resizing, font/text API, image API,
+The original slice had no text API; see the current [bounded bitmap text](display-canvas.md#bounded-bitmap-text) contract.
+There is no DOM, canvas resizing, image API,
 `Path2D`, transforms, curves/arcs, clipping API, gradients/patterns, pixel access,
 compositing controls, global alpha, or configurable caps/joins/dashes. Unsupported
 methods are absent. Adding arbitrary properties to the plain JS context does not

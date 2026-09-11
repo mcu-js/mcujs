@@ -298,6 +298,40 @@ static void failures_and_recovery(void) {
         "h=null;old=null;c=null;direct=null;");
     assert_frame(); assert_released();
 }
+static void canvas_text_pixels(void) {
+    phase = "bounded Canvas text / real rasterizer and packed SPI pixels";
+    evaluate("h=desc.open();var t=h.canvas.getContext('2d');"
+             "eq(t.font,'8px monospace','default bitmap font');"
+             "eq(t.measureText('MCU.js 123').width,60,'literal width');"
+             "t.clearRect(0,0,h.canvas.width,h.canvas.height);"
+             "t.fillStyle='white';t.fillText('A',0,7);t.save();"
+             "t.font='16px monospace';t.fillText('!',20,20);"
+             "t.fillText('!',h.canvas.width-5,h.canvas.height+10);"
+             "t.restore();eq(t.font,'8px monospace','restored font');h.present();");
+    static const char *glyph[7] = {".###.","#...#","#...#","#...#","#####","#...#","#...#"};
+    assert(ram_len == sizeof(ram));
+    for (int y=0; y<EXPECTED_HEIGHT; y++) for (int x=0; x<EXPECTED_WIDTH; x++) {
+        bool white=(x<5 && y<7 && glyph[y][x]=='#') ||
+            (x>=24 && x<26 && ((y>=6 && y<16) || (y>=18 && y<20))) ||
+            (x==EXPECTED_WIDTH-1 && y>=EXPECTED_HEIGHT-4);
+        int row=y;
+#ifdef MCUJS_CANVAS_STICKY
+        row=EXPECTED_HEIGHT-1-y;
+#endif
+        bool actual=(ram[row*(EXPECTED_WIDTH/8)+x/8] & (0x80u>>(x%8)))!=0;
+        assert(actual==white);
+    }
+    evaluate("var ascii='';for(var n=32;n<=126;n++)ascii+=String.fromCharCode(n);"
+             "eq(t.measureText(ascii).width,570,'ASCII metrics');t.fillText(ascii,0,40);"
+             "t.fillText(new Array(129).join('W'),0,60);"
+             "h.close();code(function(){t.fillText('A',0,7);},'ENXIO');"
+             "code(function(){t.measureText('A');},'ENXIO');"
+             "h=desc.open();eq(h.canvas.getContext('2d').font,'8px monospace','fresh font');"
+             "h.close();h=null;t=null;ascii=null;");
+    assert_released();
+    puts("PASS Canvas text: literal A/2x ! pixels, right/bottom clipping, ASCII/bound, metrics, close/reopen");
+}
+
 static void cycles_and_cleanup(unsigned vm) {
     phase = "bounded GC / VM destruction";
     const char *cycle = "(function(){var d=desc.open();paint(d);d.present();"
@@ -342,6 +376,7 @@ int main(void) {
         setup_vm();
         discovery_and_lifecycle();
         failures_and_recovery();
+        canvas_text_pixels();
         cycles_and_cleanup(vm);
     }
     printf("PASS %s: real devices/Canvas factories, registry and driver; lifecycle, "

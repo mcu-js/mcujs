@@ -39,6 +39,49 @@ otherwise discards the pending frame. `present()` belongs to the display handle,
 not to the context. E-paper can retain an image after close and can take much
 longer to refresh. See [configured handle lifetime](device-display-handles.md).
 
+## Bounded bitmap text
+
+Canvas now has `fillText(text, x, y)`, `measureText(text).width` and `font`.
+For example, after opening a configured display:
+
+```js
+var ctx = display.canvas.getContext('2d');
+ctx.font = '16px monospace';
+ctx.fillStyle = '#66ff99';
+var label = 'MCU.js 123!';
+var left = (display.canvas.width - ctx.measureText(label).width) / 2;
+ctx.fillText(label, left, 40);
+```
+
+This is a small bitmap subset, not browser font layout:
+
+- The default is **`8px monospace`**. Only `8px`, `16px`, `24px` and `32px`
+  followed by ` monospace` are supported. Invalid font assignments are ignored.
+  `save()` / `restore()` include the font.
+- Glyphs are 5-by-7 pixels at 1x scale, with a 6-pixel advance. The other sizes
+  are exact 2x, 3x and 4x scales. `measureText()` returns only `width`, including
+  trailing spaces; no other TextMetrics fields are promised.
+- Position is fixed **left-aligned, alphabetic baseline**: the glyph top is
+  `y - 7 * scale`. There is no `textAlign` or `textBaseline` implementation.
+  Draw separate lines with separate calls, normally `8 * scale` pixels apart.
+- Printable ASCII (space through `~`) is supported, at most 128 characters per
+  call. Other characters and longer strings throw `RangeError` before painting.
+  Tab, LF, FF and CR each become one space, as in Canvas text—not a new line.
+- The old bitmap shapes for ASCII 32–125 are retained. `~` is now a tilde rather
+  than the legacy right-arrow substitution; DEL/left-arrow is unsupported.
+- Text uses `fillStyle`, including alpha, and clips to the canvas. It does not
+  change the current path or depend on `lineWidth`. Nonfinite coordinates draw
+  nothing. Closed/unavailable displays reject text operations with `ENXIO`.
+- A fourth `maxWidth` argument is explicitly rejected with `RangeError`.
+  `strokeText`, arbitrary fonts, Unicode, wrapping, rotation and scaling
+  transforms are not implemented. Adding plain JS properties does not enable them.
+
+Existing `screen.drawText` remains until its callers are migrated. Its implicit
+newlines must become separate Canvas calls, and its sizes outside 1x–4x need
+an explicit caller decision. Circles remain separate work in
+[issue #20](https://github.com/mcu-js/mcujs/issues/20). E-paper readability is
+not established by native renderer tests or LCD camera evidence.
+
 ## Explicit external LCD setup
 
 For external wiring, setup may use the existing connector below. This is not the
@@ -186,7 +229,7 @@ This is a source audit, not a claim of cross-board parity:
 | --- | --- | --- |
 | `graphics.fill`, `fillRect`, `setPixel`; `screen.fill`, `fillRect`, `drawLine` (`host/bindings/graphics.c`, `screen.c`) | Solid fills, rectangles and single-segment lines are covered by Canvas. A 1-by-1 `fillRect` is the drawing equivalent of an integer pixel write. | Keep public Canvas/native tests; current camera proof covers only the named static drawing, not every raster edge. |
 | `screen.drawCircle` / `fillCircle`, plus example-local circle rasterizers | No Canvas arc/curve API exists. | Needs a bounded, tested replacement or a documented retirement decision. Do not silently drop circles from maintained demos. |
-| `screen.drawText`: built-in 5-by-7 bitmap glyphs, integer scale and newline handling | No Canvas text/font API exists. | Preserve useful readable text behavior before removing this binding. Font metrics, clipping, character coverage and LCD/e-paper readability need explicit tests. |
+| `screen.drawText`: built-in 5-by-7 bitmap glyphs, integer scale and newline handling | Bounded `fillText`, width-only `measureText` and 1x–4x bitmap fonts are available; see the text contract above. | Migrate callers with explicit line placement; no arbitrary fonts or Unicode. E-paper readability remains a separate hardware check. |
 | `image.info`, `decodeJPEG`, `drawJPEG` (`host/bindings/image.c`, picojpeg baseline decoder) | No general Canvas image decoder or `drawImage` exists. | Preserve the decoder implementation; separate bounded decoding from display ownership. JPEG is not replaced by the BMP example. |
 | Legacy BMP decode/draw: 16-bit RGB565, 24-bit BGR, 32-bit BGRA (alpha ignored) | `examples/portable/sd-bmp/show.js` reads raw `fs` bytes and draws rows with Canvas; only 24-bit uncompressed BI_RGB with a 40-byte DIB is covered. | 16/32-bit BMP and image-info behavior remain unported. The [binary-assets proof](binary-file-assets.md) is limited to its documented format and board. |
 | Raw buffer handles/pointers, byte-order options, `screen.show`, direct SPI/DVI transfers | Applications use `display.canvas`; the adapter owns buffers and wire order. Automatic task-end presentation or `display.present()` handles pending frames. | Retire raw buffer/pin/byte-swap plumbing from application examples after their useful drawing is migrated; do not expose it as a new Canvas API. |

@@ -143,7 +143,29 @@ without a reset. The old persistent `Done!` screen is deliberately retired in
 favor of releasing ownership: LCD close turns the backlight off, while DVI may
 retain its last frame. This consumer migration does not requalify absent
 PiZero/DVI hardware or slow e-paper refresh, and is not an e-paper animation
-recommendation. Other rainbow/shapes demos and their circle paths are unchanged.
+recommendation. Other shapes and slideshow callers are unchanged.
+
+## Bounded bouncing-balls animation
+
+`examples/waveshare_rp2040_pizero/bouncing-balls.js` now uses configured
+`devices` + Canvas, including the bounded `arc()` API above. The historical
+folder does not require a PiZero or DVI display. Use a non-startup `.run` file
+on firmware with Canvas text and arcs; the canvas must be at least 20 by 20.
+
+The demo retains five balls (red, green, blue, yellow and cyan), their radii,
+per-update velocities and the frame counter. Starting positions scale from the
+old 160-by-120 layout to the configured dimensions. Edge collisions clamp the
+ball inside the canvas and reverse its velocity. Each ball uses its own path;
+there is no per-pixel loop, RGB565 packing or legacy `screen` access. Canvas
+curves are antialiased approximations, not the old integer midpoint pixels.
+
+A 33ms interval requests updates; achieved frame rate and motion speed depend
+on the display and runtime. A separate 30-second timer ends the demo, cancels
+its timers and closes its own display even if fewer than 900 frames ran.
+Drawing or timer-setup failure also releases its resources. It can run again
+after `Demo complete!` without a reset. The old persistent `Done!` image is
+retired in favor of releasing ownership. This LCD-style animation is not an
+e-paper refresh recommendation or physical DVI qualification.
 
 ## Explicit external LCD setup
 

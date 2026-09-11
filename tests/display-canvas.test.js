@@ -300,9 +300,10 @@ test('rainbow caller uses configured Canvas, animates bars and releases on a dur
   }
 });
 
-test('rainbow drawing and timer-setup failures release their own display and timers', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../examples/waveshare_rp2040_pizero/rainbow.js'), 'utf8');
-  for (const failure of ['initial draw', 'later draw', 'deadline allocation']) {
+for (const demo of ['rainbow', 'bouncing-balls']) {
+test(`${demo} drawing and timer-setup failures release their own display and timers`, () => {
+  const source = fs.readFileSync(path.join(__dirname, '../examples/waveshare_rp2040_pizero/' + demo + '.js'), 'utf8');
+  for (const failure of ['initial draw', 'later draw', 'interval allocation', 'deadline allocation']) {
     const { api, opens } = loadCanvas();
     const timers = new Map();
     let next = 0, failDraw = failure === 'initial draw';
@@ -318,7 +319,10 @@ test('rainbow drawing and timer-setup failures release their own display and tim
         } } };
       },
       console: { log() {} },
-      setInterval(callback) { timers.set(++next, callback); return next; },
+      setInterval(callback) {
+        if (failure === 'interval allocation') throw error;
+        timers.set(++next, callback); return next;
+      },
       setTimeout(callback) {
         if (failure === 'deadline allocation') throw error;
         timers.set(++next, callback); return next;
@@ -334,6 +338,89 @@ test('rainbow drawing and timer-setup failures release their own display and tim
     }
     assert.equal(opens[0].closes, 1);
     assert.equal(timers.size, 0);
+  }
+});
+}
+
+test('bouncing balls reject absent displays and release unsupported canvases', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../examples/waveshare_rp2040_pizero/bouncing-balls.js'), 'utf8');
+  assert.throws(() => vm.runInNewContext(source, { require: () => ({}) }), /No configured display/);
+  for (const [width, height, arcAvailable] of [[19, 120, true], [160, 19, true], [160, 120, false]]) {
+    const { api, opens } = loadCanvas(width, height);
+    let timers = 0;
+    assert.throws(() => vm.runInNewContext(source, {
+      require: () => ({ display: { open() {
+        const d = api.connect('default');
+        if (!arcAvailable) d.canvas.getContext('2d').arc = undefined;
+        return d;
+      } } }),
+      setInterval() { timers++; }, setTimeout() { timers++; },
+      clearInterval() {}, clearTimeout() {}, console: { log() {} },
+    }));
+    assert.equal(opens[0].closes, 1);
+    assert.equal(timers, 0);
+  }
+});
+
+test('bouncing balls use Canvas circles, stay in bounds and stop by elapsed duration', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../examples/waveshare_rp2040_pizero/bouncing-balls.js'), 'utf8');
+  for (const [width, height] of [[160, 120], [320, 172], [240, 280], [20, 20]]) {
+    const { api, opens } = loadCanvas(width, height);
+    const timers = new Map(), messages = [];
+    let next = 0;
+    const realm = vm.createContext({
+      require(name) {
+        assert.equal(name, 'devices', 'no DVI globals or legacy screen');
+        return { display: { open: () => api.connect('default') } };
+      },
+      console: { log: message => messages.push(message) },
+      setInterval(callback, delay) { timers.set(++next, { callback, delay, repeat: true }); return next; },
+      setTimeout(callback, delay) { timers.set(++next, { callback, delay, repeat: false }); return next; },
+      clearInterval: id => timers.delete(id), clearTimeout: id => timers.delete(id),
+    });
+    for (let run = 0; run < 2; run++) {
+      vm.runInContext(source, realm, { timeout: 1000 });
+      const record = opens[run];
+      const interval = [...timers.values()].find(t => t.repeat);
+      const deadline = [...timers.values()].find(t => !t.repeat);
+      assert.equal(interval.delay, 33);
+      assert.equal(deadline.delay, 30000);
+      let first, moved = false, bounced = false, previous, lastDx;
+      for (let frame = 0; frame < 300; frame++) {
+        assert.deepEqual(record.calls[0].commands, [4, 0, 0, width, height]);
+        assert.deepEqual(record.calls[0].rgba, [0, 0, 0, 1]);
+        const circles = record.calls.filter(call => call.commands.length === 99);
+        assert.equal(circles.length, 5, 'each ball gets its own bounded path');
+        assert.deepEqual(circles.map(c => c.rgba), [
+          [1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1], [1, 1, 0, 1], [0, 1, 1, 1],
+        ]);
+        for (const circle of circles) {
+          assert.equal(circle.mode, 'fill');
+          for (let i = 0; i < circle.commands.length; i += 3) {
+            const x = circle.commands[i + 1], y = circle.commands[i + 2];
+            assert.ok(x >= -1e-9 && x <= width + 1e-9 && y >= -1e-9 && y <= height + 1e-9);
+          }
+        }
+        const x = circles[0].commands[1] - 8;
+        if (frame === 0) {
+          first = x;
+          if (width === 160) assert.equal(x, 42, 'retain the original first x step');
+        } else {
+          const dx = x - previous;
+          moved ||= x !== first;
+          bounced ||= dx * lastDx < 0;
+          if (dx) lastDx = dx;
+        }
+        previous = x;
+        record.calls.length = 0;
+        interval.callback();
+      }
+      assert.ok(moved && bounced, 'the ball must move and reverse at an edge');
+      deadline.callback();
+      assert.equal(record.closes, 1);
+      assert.equal(timers.size, 0);
+      assert.equal(messages.at(-1), 'Demo complete!');
+    }
   }
 });
 

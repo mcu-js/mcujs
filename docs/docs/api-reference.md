@@ -13,7 +13,30 @@ sidebar_position: 7
 - Core modules: [Built-in Modules](./built-in-modules.md)
 - Hardware modules: [Built-in Modules](./built-in-modules.md)
 
-## Display and Image APIs
+## Display and Canvas
+
+New drawing code uses the configured device handle:
+
+```js
+var display = require('devices').display.open();
+var canvas = display.canvas;
+var ctx = canvas.getContext('2d');
+```
+
+First check that `require('devices').display` exists in the installed firmware.
+Keep one owner, draw through its canvas, and close the handle when finished.
+See [Canvas setup, runnable example and legacy behavior audit](./development/display-canvas.md)
+and [display lifetime](./development/device-display-handles.md). Use `fs` to read
+asset bytes independently of `/app` or optional `/sd`; the bounded
+[24-bit BMP example](./development/binary-file-assets.md) is not a general image API.
+
+## Deprecated display and image APIs
+
+`screen`, `graphics` and public `image` are deprecated for new code and will be
+removed before v1.0 once useful behaviors are replaced or explicitly retired.
+They have **not** been removed by the documentation/example migration. Do not
+mix them with Canvas or add shims; the audit above records remaining text,
+image, circle and refresh gaps.
 
 These display helpers are globals or built-in modules, depending on the board:
 
@@ -34,8 +57,7 @@ Likewise, feature-detect `graphics`, `screen`, and `dvi` through
 descriptors for the exact current-image methods and limits. An onboard LCD entry
 in `board.devices.display` is physical inventory, not proof that any one of
 those modules exists. These RP compatibility surfaces are documented for honest
-discovery only; portable graphics and display API normalization remains deferred
-to a later 0.x release.
+discovery of older code only; new applications use `devices` + `display.canvas`.
 
 ## MCU.js 0.2 portable contract
 

@@ -4,6 +4,15 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Made `devices` + `display.canvas` the documented default for drawing. The
+  existing `display-canvas-demo.js` is now directly runnable (not an exported
+  helper), closes after 20 seconds, and passed repeat/close checks with visible
+  geometry on the attached 1.47-A and 1.69 LCDs without firmware changes.
+  Deprecated `screen`, `graphics` and public `image` for new code; removal is
+  before v1.0, gated on useful behavior replacements or explicit retirement.
+  No bindings or decoders are removed yet. See the
+  [migration audit and physical limits](docs/docs/development/display-canvas.md#legacy-behavior-audit-and-removal-gate).
+
 - Added `devices.microphone` capture on ePaper 1.54 V2: explicit bounded PCM
   recording, one owner, AbortSignal/stop/close and native audio-rail shutdown
   independent of JavaScript. The onboard mic captured a known three-tone chime;

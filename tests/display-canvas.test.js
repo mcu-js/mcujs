@@ -224,6 +224,41 @@ test('native driver and option errors propagate unchanged and failed default ope
   assert.equal(calls[5].options, invalid);
 });
 
+test('configured display demo draws, closes after 20 seconds and can run again', () => {
+  const { api, opens } = loadCanvas();
+  const devices = loadModule('devices.js', name => {
+    if (name === 'board') return { capability: () => ({ display: {} }) };
+    assert.equal(name, 'canvas');
+    return api;
+  });
+  const timers = [];
+  const messages = [];
+  const realm = vm.createContext({
+    require(name) { assert.equal(name, 'devices'); return devices; },
+    console: { log(message) { messages.push(message); } },
+    setTimeout(callback, delay) { timers.push({ callback, delay }); },
+  });
+  const source = fs.readFileSync(path.join(__dirname,
+    '../examples/waveshare-lcd-1.47/display-canvas-demo.js'), 'utf8');
+  for (let run = 0; run < 2; run++) {
+    vm.runInContext(source, realm);
+    assert.equal(opens.length, run + 1, 'example must acquire a configured display');
+    assert.equal(opens[run].kind, 'default');
+    assert.equal(opens[run].closes, 0, 'leave time for the frame to be visible');
+    assert.deepEqual(opens[run].calls[0], {
+      commands: [4, 0, 0, 160, 120], mode: 'fill',
+      rgba: [8 / 255, 24 / 255, 46 / 255, 1], lineWidth: 1,
+    });
+    assert.equal(opens[run].calls.length, 9);
+    assert.equal(timers.length, 1, 'one bounded timer, no animation loop');
+    const timer = timers.shift();
+    assert.equal(timer.delay, 20000);
+    timer.callback();
+    assert.equal(opens[run].closes, 1);
+    assert.equal(messages[messages.length - 1], 'Demo complete!');
+  }
+});
+
 for (const first of ['canvas', 'display']) {
   test(`default display is lazy and cached when accessing ${first} first`, () => {
     const { api, opens } = loadCanvas();

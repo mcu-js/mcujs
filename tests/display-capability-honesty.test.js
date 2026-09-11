@@ -233,5 +233,9 @@ test("generated registry, schema, docs, and portable example derive display disc
   assert.doesNotMatch(example, /boardApi\.(?:name|chip)\s*={2,3}/);
 
   const apiReference = source("docs/docs/api-reference.md");
-  assert.match(apiReference, /portable graphics and display API\s+normalization remains deferred\s+to a later 0\.x release/i);
+  assert.match(apiReference, /require\('devices'\)\.display\.open\(\)/);
+  assert.match(apiReference, /var canvas = display\.canvas/);
+  assert.match(apiReference, /Deprecated display and image APIs/);
+  assert.match(apiReference, /removed before v1\.0 once useful behaviors are replaced or explicitly retired/);
+  assert.match(apiReference, /have \*\*not\*\* been removed/);
 });

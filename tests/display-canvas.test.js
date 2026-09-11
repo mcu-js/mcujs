@@ -16,7 +16,7 @@ function loadModule(filename, requireModule) {
   return module.exports;
 }
 
-function loadCanvas() {
+function loadCanvas(width = 160, height = 120) {
   const opens = [];
   const native = {
     open(kind, options) {
@@ -42,8 +42,8 @@ function loadCanvas() {
         },
       };
       Object.defineProperties(backend, {
-        width: { value: kind === 'default' ? 160 : 240 },
-        height: { value: kind === 'default' ? 120 : 320 },
+        width: { value: kind === 'default' ? width : 240 },
+        height: { value: kind === 'default' ? height : 320 },
       });
       opens.push(record);
       return backend;
@@ -256,6 +256,84 @@ test('configured display demo draws, closes after 20 seconds and can run again',
     timer.callback();
     assert.equal(opens[run].closes, 1);
     assert.equal(messages[messages.length - 1], 'Demo complete!');
+  }
+});
+
+test('rainbow caller uses configured Canvas, animates bars and releases on a duration timer', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../examples/waveshare_rp2040_pizero/rainbow.js'), 'utf8');
+  for (const [width, height, lastY, lastHeight] of [[160, 120, 110, 10], [320, 172, 170, 2], [240, 280, 270, 10]]) {
+    const { api, opens } = loadCanvas(width, height);
+    const timers = new Map(), messages = [];
+    let next = 0;
+    const sandbox = {
+      require(name) {
+        assert.equal(name, 'devices', 'no legacy display or hardware access');
+        return { display: { open: () => api.connect('default') } };
+      },
+      console: { log: message => messages.push(message) },
+      setInterval(callback, delay) { timers.set(++next, { callback, delay, repeat: true }); return next; },
+      setTimeout(callback, delay) { timers.set(++next, { callback, delay, repeat: false }); return next; },
+      clearInterval: id => timers.delete(id), clearTimeout: id => timers.delete(id),
+    };
+    for (let run = 0; run < 2; run++) {
+      vm.runInNewContext(source, sandbox, { timeout: 1000 });
+      const record = opens[run];
+      assert.equal(record.kind, 'default');
+      assert.deepEqual(record.calls[0], {
+        commands: [4, 0, 0, width, 10], mode: 'fill', rgba: [0, 1, 0, 1], lineWidth: 1,
+      });
+      const bars = record.calls.slice(0, Math.ceil(height / 10));
+      assert.deepEqual(bars.at(-1).commands, [4, 0, lastY, width, lastHeight]);
+      assert.ok(record.calls.length > bars.length, 'frame label paints glyphs');
+      const interval = [...timers.values()].find(t => t.repeat);
+      const deadline = [...timers.values()].find(t => !t.repeat);
+      assert.equal(interval.delay, 50);
+      assert.equal(deadline.delay, 30000, 'duration must not depend on achieved FPS');
+      const before = record.calls.length;
+      interval.callback();
+      assert.deepEqual(record.calls[before].rgba, [24 / 255, 231 / 255, 0, 1]);
+      deadline.callback();
+      assert.equal(record.closes, 1);
+      assert.equal(timers.size, 0);
+      assert.equal(messages.at(-1), 'Demo complete!');
+    }
+  }
+});
+
+test('rainbow drawing and timer-setup failures release their own display and timers', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../examples/waveshare_rp2040_pizero/rainbow.js'), 'utf8');
+  for (const failure of ['initial draw', 'later draw', 'deadline allocation']) {
+    const { api, opens } = loadCanvas();
+    const timers = new Map();
+    let next = 0, failDraw = failure === 'initial draw';
+    const error = new Error(failure);
+    const sandbox = {
+      require(name) {
+        assert.equal(name, 'devices');
+        return { display: { open() {
+          const display = api.connect('default');
+          const ctx = display.canvas.getContext('2d'), fillText = ctx.fillText;
+          ctx.fillText = function (...args) { if (failDraw) throw error; return fillText(...args); };
+          return display;
+        } } };
+      },
+      console: { log() {} },
+      setInterval(callback) { timers.set(++next, callback); return next; },
+      setTimeout(callback) {
+        if (failure === 'deadline allocation') throw error;
+        timers.set(++next, callback); return next;
+      },
+      clearInterval: id => timers.delete(id), clearTimeout: id => timers.delete(id),
+    };
+    if (failure === 'later draw') {
+      vm.runInNewContext(source, sandbox);
+      failDraw = true;
+      assert.throws(() => timers.get(1)(), thrown => thrown === error);
+    } else {
+      assert.throws(() => vm.runInNewContext(source, sandbox), thrown => thrown === error);
+    }
+    assert.equal(opens[0].closes, 1);
+    assert.equal(timers.size, 0);
   }
 });
 

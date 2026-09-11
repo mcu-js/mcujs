@@ -4,6 +4,11 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Migrated the existing PiZero-folder rainbow demo to configured `devices` +
+  Canvas: scrolling bars and frame text, no DVI globals or RGB565 plumbing.
+  It closes after 30 seconds instead of leaving a persistent `Done!` screen.
+  No firmware or legacy binding change. See [scope and hardware limits](docs/docs/development/display-canvas.md#bounded-rainbow-animation).
+
 - Added bounded Canvas bitmap text: `fillText`, width-only `measureText`, and
   1x–4x `monospace` fonts with saved state, clipping and printable ASCII limits.
   No new native interface or legacy binding removal. Newlines become spaces;

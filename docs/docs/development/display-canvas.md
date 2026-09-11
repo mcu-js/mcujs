@@ -82,6 +82,28 @@ an explicit caller decision. Circles remain separate work in
 [issue #20](https://github.com/mcu-js/mcujs/issues/20). E-paper readability is
 not established by native renderer tests or LCD camera evidence.
 
+## Bounded rainbow animation
+
+`examples/waveshare_rp2040_pizero/rainbow.js` now opens the configured display
+through `devices`, without DVI globals or legacy `screen`. Its historical folder
+name is not a hardware requirement. It needs firmware with Canvas bitmap text.
+Use the same non-startup `.run` workflow described above.
+
+The example retains scrolling, full-width 10-pixel color bars and the `F:` frame
+counter. It uses the canvas dimensions and clips the last bar to the bottom edge.
+The hue cycle is unchanged; CSS RGB replaces caller-owned RGB565 packing.
+A 50ms interval targets 20 updates per second, **not** a measured frame-rate
+promise. Task-end presentation belongs to the display adapter.
+
+A separate 30-second timer ends the demo even if fewer than 600 frames ran.
+Drawing/timer-setup errors cancel its timers and close its own handle. On success
+it prints `Demo complete!`, cancels both timers and closes; it can run again
+without a reset. The old persistent `Done!` screen is deliberately retired in
+favor of releasing ownership: LCD close turns the backlight off, while DVI may
+retain its last frame. This consumer migration does not requalify absent
+PiZero/DVI hardware or slow e-paper refresh, and is not an e-paper animation
+recommendation. Other rainbow/shapes demos and their circle paths are unchanged.
+
 ## Explicit external LCD setup
 
 For external wiring, setup may use the existing connector below. This is not the
@@ -241,7 +263,10 @@ This is a source audit, not a claim of cross-board parity:
 - **Start here:** the runnable `display-canvas-demo.js` above, plus the existing
   `examples/portable/device-display/` and `examples/portable/sd-bmp/` consumers.
   The latter two retain their own documented setup and qualification limits.
-- **Still to migrate:** legacy scripts in `examples/waveshare-lcd-1.28/`,
+- **Migrated caller:** `examples/waveshare_rp2040_pizero/rainbow.js` retains
+  animated bars and frame text through Canvas, with timed close instead of a
+  persistent completion screen. See [scope and limits](#bounded-rainbow-animation).
+- **Still to migrate:** other legacy scripts in `examples/waveshare-lcd-1.28/`,
   `waveshare-lcd-1.47/`, `waveshare-lcd-1.69/` and
   `waveshare_rp2040_pizero/` use globals as well as `require()` imports. Searching
   only `require('screen')` misses these callers. Text, circles, images and

@@ -202,6 +202,82 @@ test('retains paths across fill/stroke, with standard subpath starts and closure
   assert.deepEqual(calls[2].commands, [1, 1, 2]);
 });
 
+test('arc retains a bounded full circle for fill and stroke with exact cardinal points', () => {
+  const { canvas, calls } = loadCanvas();
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'red';
+  ctx.strokeStyle = 'blue';
+  ctx.arc(40, 50, 20, 0, 2 * Math.PI);
+  assert.equal(calls.length, 0);
+  ctx.fill();
+  ctx.stroke();
+  const commands = calls[0].commands;
+  assert.equal(commands.length, 99); // Move plus 32 straight segments.
+  assert.deepEqual(commands.slice(0, 3), [1, 60, 50]);
+  for (const [vertex, x, y] of [[8, 40, 70], [16, 20, 50], [24, 40, 30], [32, 60, 50]]) {
+    assert.equal(commands[vertex * 3], 2);
+    assert.ok(Math.abs(commands[vertex * 3 + 1] - x) < 1e-10);
+    assert.ok(Math.abs(commands[vertex * 3 + 2] - y) < 1e-10);
+  }
+  assert.deepEqual(calls[1].commands, commands);
+  assert.equal(calls[0].mode, 'fill');
+  assert.deepEqual(calls[0].rgba, [1, 0, 0, 1]);
+  assert.equal(calls[1].mode, 'stroke');
+  assert.deepEqual(calls[1].rgba, [0, 0, 1, 1]);
+});
+
+test('arc normalizes sweep direction, connects subpaths and bounds radius and path work', () => {
+  const { canvas, calls } = loadCanvas();
+  const ctx = canvas.getContext('2d');
+  function draw(args) {
+    ctx.beginPath(); ctx.arc(...args); ctx.stroke();
+    return calls.pop().commands;
+  }
+  let c = draw([40, 50, 20, 0, Math.PI / 2]);
+  assert.equal(c.length, 27); // A quarter turn uses eight segments.
+  assert.ok(c[5] > 50);
+  assert.deepEqual(c.slice(-3), [2, 40, 70]);
+  c = draw([40, 50, 20, 0, -Math.PI / 2, true]);
+  assert.equal(c.length, 27);
+  assert.ok(c[5] < 50);
+  assert.deepEqual(c.slice(-3), [2, 40, 30]);
+  assert.equal(draw([40, 50, 20, 0, Math.PI / 2, true]).length, 75);
+  assert.equal(draw([40, 50, 20, 0, -Math.PI / 2]).length, 75);
+  c = draw([40, 50, 20, 1, 100]);
+  assert.equal(c.length, 99);
+  assert.deepEqual(c.slice(-2), c.slice(1, 3)); // No floating-point seam.
+  c = draw([40, 50, 20, 1, -100, true]);
+  assert.equal(c.length, 99);
+  assert.deepEqual(c.slice(-2), c.slice(1, 3));
+  for (const args of [[1, 2, 3, 0, 0], [1, 2, 3, 0, -2 * Math.PI], [1, 2, 0, 0, 2 * Math.PI]]) {
+    c = draw(args);
+    assert.equal(c.length, 3); // Start point only; not a circle or a closed polygon.
+  }
+  assert.equal(draw([0, 0, 128, 0, 2 * Math.PI]).length, 99);
+  assert.ok(draw([0, 0, 1, 1e308, -1e308]).every(Number.isFinite));
+  assert.ok(draw([0, 0, 1, -1e308, 1e308, true]).every(Number.isFinite));
+  ctx.beginPath(); ctx.moveTo(1, 2);
+  ctx.arc('40', '50', '20', '0', Math.PI / 2);
+  ctx.closePath(); ctx.lineTo(3, 4); ctx.stroke();
+  c = calls.pop().commands;
+  assert.deepEqual(c.slice(0, 6), [1, 1, 2, 2, 60, 50]);
+  assert.deepEqual(c.slice(-4), [3, 2, 3, 4]);
+  ctx.beginPath(); ctx.moveTo(1, 2);
+  for (const radius of [-1, 128.01, 1e100]) {
+    assert.throws(() => ctx.arc(0, 0, radius, 0, 1), { name: 'RangeError' });
+  }
+  assert.throws(() => ctx.arc(0, 0, 1, 0), { name: 'TypeError' });
+  assert.throws(() => ctx.arc(0, 0, Symbol(), 0, 1), { name: 'TypeError' });
+  assert.throws(() => ctx.arc(0, 0, 1n, 0, 1), { name: 'TypeError' });
+  ctx.arc(0, 0, NaN, 0, 1); ctx.arc(0, Infinity, 1, 0, 1);
+  ctx.stroke(); assert.deepEqual(calls.pop().commands, [1, 1, 2]);
+  for (let i = 0; i < 9; i++) ctx.moveTo(i, i); // 30 entries; circle needs 99.
+  assert.throws(() => ctx.arc(0, 0, 1, 0, 2 * Math.PI), { name: 'RangeError' });
+  ctx.stroke(); assert.equal(calls.pop().commands.length, 30);
+  ctx.beginPath(); ctx.arc(0, 0, 1, 0, 2 * Math.PI); ctx.closePath(); ctx.stroke();
+  assert.equal(calls.pop().commands.length, 100);
+});
+
 test('rectangle drawing is immediate, signed and independent of the current path', () => {
   const { canvas, calls } = loadCanvas();
   const ctx = canvas.getContext('2d');

@@ -78,9 +78,50 @@ This is a small bitmap subset, not browser font layout:
 
 Existing `screen.drawText` remains until its callers are migrated. Its implicit
 newlines must become separate Canvas calls, and its sizes outside 1x–4x need
-an explicit caller decision. Circles remain separate work in
-[issue #20](https://github.com/mcu-js/mcujs/issues/20). E-paper readability is
-not established by native renderer tests or LCD camera evidence.
+an explicit caller decision. E-paper readability is not established by native
+renderer tests or LCD camera evidence.
+
+## Bounded circles and arcs
+
+Use `arc(x, y, radius, startAngle, endAngle, counterclockwise?)` on the same
+context. For example, after opening a configured display:
+
+```js
+var ctx = display.canvas.getContext('2d');
+ctx.beginPath();
+ctx.arc(64, 64, 40, 0, 2 * Math.PI);
+ctx.closePath();
+ctx.fillStyle = 'aqua';
+ctx.fill();
+ctx.strokeStyle = 'white';
+ctx.lineWidth = 3;
+ctx.stroke();
+// Return to the event loop to present; close your display when finished.
+```
+
+- Angles are radians. Positive angles go clockwise on the display; the optional
+  counterclockwise argument defaults to false. A sweep of at least one full turn
+  in the requested direction draws one circle, not multiple revolutions.
+- Radius is **0 through 128 pixels**, including fractions. Negative or larger
+  finite radii throw `RangeError`. Nonfinite numeric arguments are ignored;
+  missing required arguments, Symbols and BigInts throw `TypeError`.
+- Curves are approximated by straight segments: at most 32 per full circle,
+  fewer for a partial arc. Chord error is below 0.62 pixels at radius 128,
+  before native rasterization. This is not the legacy midpoint pixel pattern
+  or a pixel-identical browser Canvas implementation.
+- `arc` only changes the retained path. It connects an existing subpath to the
+  arc start; an empty path moves there. A zero radius or zero sweep adds only
+  that start point. `fill()` closes open subpaths implicitly; `stroke()` does
+  not. Use `closePath()` for a closed outline and `beginPath()` between circles.
+- The existing **128 numeric-entry path limit** still applies. A full circle
+  needs 99 entries, plus one for `closePath()`. A path-capacity error leaves the
+  previous path unchanged. Fill/stroke use the existing styles, alpha, line
+  width, native clipping and display lifecycle. Existing native coordinate and
+  stroke-width limits still apply when drawing.
+- No new native opcode, framebuffer, driver, transform, `ellipse`, `arcTo` or
+  general curve API is added. Radius limits and different raster edges require
+  an explicit caller decision when migrating legacy demos. Those migrations
+  remain in [issue #20](https://github.com/mcu-js/mcujs/issues/20).
 
 ## Bounded rainbow animation
 
@@ -250,7 +291,7 @@ This is a source audit, not a claim of cross-board parity:
 | Existing behavior and source | Canonical status | Remaining work |
 | --- | --- | --- |
 | `graphics.fill`, `fillRect`, `setPixel`; `screen.fill`, `fillRect`, `drawLine` (`host/bindings/graphics.c`, `screen.c`) | Solid fills, rectangles and single-segment lines are covered by Canvas. A 1-by-1 `fillRect` is the drawing equivalent of an integer pixel write. | Keep public Canvas/native tests; current camera proof covers only the named static drawing, not every raster edge. |
-| `screen.drawCircle` / `fillCircle`, plus example-local circle rasterizers | No Canvas arc/curve API exists. | Needs a bounded, tested replacement or a documented retirement decision. Do not silently drop circles from maintained demos. |
+| `screen.drawCircle` / `fillCircle`, plus example-local circle rasterizers | Bounded Canvas `arc` supports radius 0–128 with fill/stroke; see the contract above. | Migrate callers using separate paths. Larger radii and exact legacy midpoint pixels need explicit decisions; do not silently drop circles. |
 | `screen.drawText`: built-in 5-by-7 bitmap glyphs, integer scale and newline handling | Bounded `fillText`, width-only `measureText` and 1x–4x bitmap fonts are available; see the text contract above. | Migrate callers with explicit line placement; no arbitrary fonts or Unicode. E-paper readability remains a separate hardware check. |
 | `image.info`, `decodeJPEG`, `drawJPEG` (`host/bindings/image.c`, picojpeg baseline decoder) | No general Canvas image decoder or `drawImage` exists. | Preserve the decoder implementation; separate bounded decoding from display ownership. JPEG is not replaced by the BMP example. |
 | Legacy BMP decode/draw: 16-bit RGB565, 24-bit BGR, 32-bit BGRA (alpha ignored) | `examples/portable/sd-bmp/show.js` reads raw `fs` bytes and draws rows with Canvas; only 24-bit uncompressed BI_RGB with a 40-byte DIB is covered. | 16/32-bit BMP and image-info behavior remain unported. The [binary-assets proof](binary-file-assets.md) is limited to its documented format and board. |

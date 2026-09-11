@@ -4,6 +4,11 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Added bounded Canvas `arc()` for filled and outlined circles and partial arcs:
+  radius 0–128, at most 32 straight segments per turn, retained paths and the
+  existing native renderer. No new native interface or legacy API removal.
+  See [limits and migration decisions](docs/docs/development/display-canvas.md#bounded-circles-and-arcs).
+
 - Migrated the existing PiZero-folder rainbow demo to configured `devices` +
   Canvas: scrolling bars and frame text, no DVI globals or RGB565 plumbing.
   It closes after 30 seconds instead of leaving a persistent `Done!` screen.

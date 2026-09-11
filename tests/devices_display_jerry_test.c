@@ -332,6 +332,46 @@ static void canvas_text_pixels(void) {
     puts("PASS Canvas text: literal A/2x ! pixels, right/bottom clipping, ASCII/bound, metrics, close/reopen");
 }
 
+static void canvas_circle_pixels(void) {
+    phase = "bounded Canvas arcs / independent circle distance oracle";
+    /* Real JS module + rasterizer + SPI packing. Skip only the two-pixel
+     * antialiased polygon boundary; expected interiors use circle equations,
+     * not production tessellation or its emitted path. */
+    const int cases[][4] = {{64,64,48,0}, {0,64,24,0},
+        {EXPECTED_WIDTH-1,64,40,1}, {64,0,24,0},
+        {64,EXPECTED_HEIGHT-1,24,0}, {64,64,128,0}};
+    for (unsigned n=0; n<sizeof(cases)/sizeof(cases[0]); n++) {
+        int cx=cases[n][0], cy=cases[n][1], radius=cases[n][2], stroke=cases[n][3];
+        char script[600];
+        snprintf(script,sizeof(script),
+            "h=desc.open();var t=h.canvas.getContext('2d');"
+            "t.clearRect(0,0,h.canvas.width,h.canvas.height);"
+            "t.fillStyle='white';t.strokeStyle='white';t.lineWidth=4;"
+            "t.beginPath();t.arc(%d,%d,%d,0,2*Math.PI);t.closePath();t.%s();h.present();",
+            cx,cy,radius,stroke?"stroke":"fill");
+        evaluate(script);
+        assert(ram_len==sizeof(ram));
+        for (int y=0; y<EXPECTED_HEIGHT; y++) for (int x=0; x<EXPECTED_WIDTH; x++) {
+            double dx=x+0.5-cx, dy=y+0.5-cy, d2=dx*dx+dy*dy;
+            bool inside=stroke ? d2>(radius-0.75)*(radius-0.75) && d2<(radius+0.75)*(radius+0.75)
+                               : d2<(radius-2.0)*(radius-2.0);
+            bool outside=stroke ? d2<(radius-3.0)*(radius-3.0) || d2>(radius+3.0)*(radius+3.0)
+                                : d2>(radius+2.0)*(radius+2.0);
+            int row=y;
+#ifdef MCUJS_CANVAS_STICKY
+            row=EXPECTED_HEIGHT-1-y;
+#endif
+            bool actual=(ram[row*(EXPECTED_WIDTH/8)+x/8] & (0x80u>>(x%8)))!=0;
+            if(inside) assert(actual);
+            if(outside) assert(!actual);
+        }
+        evaluate("h.close();code(function(){t.fill();},'ENXIO');"
+                 "code(function(){t.stroke();},'ENXIO');h=null;t=null;");
+        assert_released();
+    }
+    puts("PASS Canvas circles: fill/stroke, radius 128, four-edge clipping, close/reopen; distance oracle");
+}
+
 static void cycles_and_cleanup(unsigned vm) {
     phase = "bounded GC / VM destruction";
     const char *cycle = "(function(){var d=desc.open();paint(d);d.present();"
@@ -377,6 +417,7 @@ int main(void) {
         discovery_and_lifecycle();
         failures_and_recovery();
         canvas_text_pixels();
+        canvas_circle_pixels();
         cycles_and_cleanup(vm);
     }
     printf("PASS %s: real devices/Canvas factories, registry and driver; lifecycle, "

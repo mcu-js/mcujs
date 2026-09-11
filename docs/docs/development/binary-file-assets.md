@@ -46,7 +46,21 @@ try {
 
 Install `examples/portable/sd-bmp/copy.js` as `/app/bmp-copy.js` and `show.js` as
 `/app/bmp-show.js`, through the internal USB volume. Eject that volume first.
-The helpers require an uncompressed 24-bit BI_RGB BMP (40-byte DIB header):
+Copy is format-agnostic. The renderer accepts a bounded 40-byte DIB BMP:
+
+- **16-bit RGB565:** `BI_BITFIELDS` (`compression=3`), with explicit masks
+  `0xf800`, `0x07e0`, `0x001f` immediately after the DIB and pixels at offset 66
+  or later. RGB555, other masks and ambiguous 16-bit `BI_RGB` are rejected;
+  the old native decoder's implicit RGB565 assumption is not copied.
+- **24-bit BGR:** uncompressed `BI_RGB`, as before.
+- **32-bit BGRX:** uncompressed `BI_RGB`. The fourth byte is ignored, including
+  zero; it is not alpha blending. Equal colors can share a run even when that
+  unused byte differs. Extended DIB headers and 32-bit bitfields are not covered.
+
+Real fixtures are in `examples/images/test_172x320_16bit.bmp` and
+`test_172x320_32bit.bmp`. The former was mislabeled 24-bit/V5 data and is now
+actual RGB565; the latter retains full BGR color with varying unused bytes.
+JPEG and public image metadata remain separate work; no native decoder was removed.
 
 ```js
 require('/app/bmp-copy')('/app/picture.bmp', '/sd/picture.bmp');
@@ -55,8 +69,10 @@ require('/app/bmp-show')('/sd/picture.bmp');
 ```
 
 Copy refuses an existing destination, uses a 1024-byte Uint8Array and yields
-between chunks. The image renderer reads a 54-byte header and one padded BGR row
-per timer turn. It supports bottom-up/top-down rows, honors padding, rejects
+between chunks. The image renderer reads a 54-byte header, 12 mask bytes only for
+RGB565, and one padded row per timer turn. At the 640-pixel width limit its input
+buffers total at most 2614 bytes; no read exceeds 2560 bytes. It supports
+bottom-up/top-down rows, honors padding, rejects
 invalid dimensions/compression/truncation, and closes the file on completion or
 failure. Images must fit the configured display directly or after clockwise rotation
 (and be no larger than 640x640). Rotation uses canvas dimensions only.

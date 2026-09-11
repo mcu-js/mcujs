@@ -4,6 +4,12 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Extended the row-wise Canvas BMP example to explicit 16-bit RGB565 bitfields
+  and 32-bit BI_RGB (unused fourth byte ignored). Input stays bounded; mask,
+  truncation and cleanup tests accompany real format fixtures. Corrected the
+  previously mislabeled 16-bit asset. Native decoders and JPEG remain unchanged.
+  See [supported formats](docs/docs/development/binary-file-assets.md#image-example).
+
 - Migrated the bouncing-balls demo to configured `devices` + Canvas circles:
   five colored balls, dimension-aware positions, bounded edge collisions and
   frame text. A separate 30-second timer releases the display instead of leaving

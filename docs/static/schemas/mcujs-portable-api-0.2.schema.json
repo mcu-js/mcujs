@@ -280,6 +280,54 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "speaker": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interface",
+            "maxOpenHandles",
+            "maxConcurrentPlays",
+            "encoding",
+            "channels",
+            "sampleRateHz",
+            "defaultVolume",
+            "bufferFrames",
+            "maxRiffChunks",
+            "shutdown"
+          ],
+          "properties": {
+            "interface": {
+              "const": "wav"
+            },
+            "maxOpenHandles": {
+              "const": 1
+            },
+            "maxConcurrentPlays": {
+              "const": 1
+            },
+            "encoding": {
+              "const": "pcm-s16le"
+            },
+            "channels": {
+              "const": 1
+            },
+            "sampleRateHz": {
+              "const": 16000
+            },
+            "defaultVolume": {
+              "const": 0.25
+            },
+            "bufferFrames": {
+              "const": 1024
+            },
+            "maxRiffChunks": {
+              "const": 128
+            },
+            "shutdown": {
+              "const": "native-silence"
+            }
+          }
+        },
         "buzzer": {
           "type": "object",
           "additionalProperties": false,

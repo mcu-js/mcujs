@@ -38,6 +38,20 @@
         "cdc",
         "msc"
       ]
+    },
+    "devices": {
+      "speaker": {
+        "interface": "wav",
+        "maxOpenHandles": 1,
+        "maxConcurrentPlays": 1,
+        "encoding": "pcm-s16le",
+        "channels": 1,
+        "sampleRateHz": 16000,
+        "defaultVolume": 0.25,
+        "bufferFrames": 1024,
+        "maxRiffChunks": 128,
+        "shutdown": "native-silence"
+      }
     }
   }
 }

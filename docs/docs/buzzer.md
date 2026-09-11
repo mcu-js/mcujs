@@ -18,7 +18,9 @@ if (devices.buzzer) {
 
 Only Waveshare RP2350 Touch LCD 1.69 has this adapter. Other boards omit
 `devices.buzzer`, its capability, and both private `mcujs:buzzer` modules.
-No Sticky buzzer, speaker, microphone, PCM, WAV, mixing, queue or Web Audio.
+This tone adapter has no Sticky buzzer, PCM, WAV, mixing, queue or Web Audio.
+The separate [configured WAV speaker](speaker.md) targets the 2.8-inch board;
+neither adapter provides microphone access.
 
 ## Contract
 

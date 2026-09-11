@@ -214,6 +214,10 @@ bool js_timers_process(void) {
  */
 /* Release retained callbacks while their JerryScript context is still alive. */
 void js_timers_cleanup(void) {
+#if MCUJS_HAS_CONFIGURED_SPEAKER
+    extern void js_speaker_cleanup(void);
+    js_speaker_cleanup();
+#endif
 #if MCUJS_HAS_CONFIGURED_BUZZER
     js_buzzer_cleanup();
 #endif

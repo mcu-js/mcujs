@@ -1,0 +1,21 @@
+; Waveshare BCLK2, LRCLK3, DIN4. MSB first, 16-bit left then right.
+; Same edges as the vendor 64-cycle program, at 3 cycles per half-bit:
+; 192 cycles/frame. The first high half-bit does useful work instead of
+; delaying: X=0 is the pull-noblock fallback. Empty DMA/FIFO ALWAYS clocks
+; digital zero, even when neither JS nor a native IRQ can run. No autopull.
+.program speaker_i2s
+.side_set 2
+.wrap_target
+    mov x, null       side 0b01
+    pull noblock      side 0b01
+    set y, 14         side 0b01
+left_channel:
+    out pins, 1       side 0b00 [2]
+    jmp y-- left_channel      side 0b01 [2]
+    out pins, 1       side 0b10 [2]
+    set y, 14         side 0b11 [2]
+right_channel:
+    out pins, 1       side 0b10 [2]
+    jmp y-- right_channel     side 0b11 [2]
+    out pins, 1       side 0b00 [2]
+.wrap

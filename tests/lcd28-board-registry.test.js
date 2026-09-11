@@ -5,7 +5,7 @@ const test = require("node:test");
 const { boardDescriptors } = require("../runtime/board-registry.js");
 const id = "waveshare_rp2350_touch_lcd_2.8";
 
-test("LCD 2.8 first port advertises only qualified core runtime and USB storage", () => {
+test("LCD 2.8 advertises core runtime, USB storage and bounded configured speaker", () => {
   const descriptor = boardDescriptors[id];
   assert.ok(descriptor, "LCD 2.8 board must be registered");
   assert.equal(descriptor.board.chip, "RP2350");
@@ -16,10 +16,11 @@ test("LCD 2.8 first port advertises only qualified core runtime and USB storage"
   });
   assert.deepEqual(Object.entries(descriptor.features).filter(([, enabled]) => enabled).map(([name]) => name),
     ["moduleLoader", "console", "timers", "board", "process", "require", "fs"]);
-  assert.deepEqual(descriptor.modules, ["board", "fs", "process", "events", "devices", "mcujs:module", "node:module"]);
+  assert.deepEqual(descriptor.modules, ["board", "fs", "process", "events", "devices", "mcujs:module", "node:module", "mcujs:speaker", "mcujs:speaker-native"]);
   assert.deepEqual(descriptor.capabilities, {
     fs: { appRoot: "/app", binary: { buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096, maxPosition: 2147483647, flags: ["r", "w"] }, implementation: "fat", writable: true, hostTransfer: true },
     usb: { classes: ["cdc", "msc"] },
+    devices: {speaker: {"interface": "wav", "maxOpenHandles": 1, "maxConcurrentPlays": 1, "encoding": "pcm-s16le", "channels": 1, "sampleRateHz": 16000, "defaultVolume": 0.25, "bufferFrames": 1024, "maxRiffChunks": 128, "shutdown": "native-silence"}},
   });
 });
 

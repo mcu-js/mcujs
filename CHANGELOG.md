@@ -4,6 +4,13 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Added configured `devices.speaker` on RP2350 Touch LCD 2.8: bounded native
+  PCM WAV (16-bit mono, 16000 Hz) streaming, linear volume, Promise completion,
+  cancellation, stop/close, and fail-silent PIO/native underrun handling.
+  No mixing, microphone or SD qualification. The operator-heard chime,
+  recorded cancellation/replay, large-file streaming and reset checks passed;
+  see [speaker contract and evidence](docs/docs/speaker.md).
+
 - Added `devices.buzzer` on RP2350 Touch LCD 1.69: one exclusive tone handle,
   bounded exact-representable frequencies and durations, Promise completion,
   AbortSignal cancellation, stop/close and native-alarm shutdown independent of

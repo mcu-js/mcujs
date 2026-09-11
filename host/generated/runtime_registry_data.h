@@ -84,6 +84,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"pico\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16,\"LED\":25},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":25,\"activeLow\":false},\"button\":{\"type\":\"managed\",\"name\":\"BOOTSEL\",\"activeLow\":true,\"readOnly\":true}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 1
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -201,6 +202,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"pico2\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16,\"LED\":25},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":25,\"activeLow\":false}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -317,6 +319,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"pico2_w\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{\"led\":{\"type\":\"managed\"}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -432,6 +435,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2040_zero\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,26,27,28,29],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D26\":26,\"D27\":27,\"D28\":28,\"D29\":29,\"A0\":26,\"A1\":27,\"A2\":28,\"A3\":29,\"SDA\":4,\"SCL\":5,\"SCK\":10,\"MOSI\":11,\"MISO\":12,\"NEOPIXEL\":16},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":16,\"length\":1,\"order\":\"RGB\"}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -547,6 +551,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2040_pizero\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"SDA\":2,\"SCL\":3,\"SCK\":18,\"MOSI\":19,\"MISO\":16},\"devices\":{}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -661,6 +666,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2040_touch_lcd_1.28\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"D23\":23,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":6,\"SCL\":7,\"SCK\":10,\"MOSI\":11,\"MISO\":12},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"GC9A01A\",\"width\":240,\"height\":240}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -775,6 +781,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_lcd_1.47_a\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,5,6,7,8,9,14,16,17,18,19,20,21,22],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D14\":14,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D20\":20,\"D21\":21,\"D22\":22,\"SDA\":4,\"SCL\":5,\"SCK\":18,\"MOSI\":19,\"MISO\":0,\"NEOPIXEL\":22},\"devices\":{\"neopixel\":{\"type\":\"neopixel\",\"pin\":22,\"length\":1,\"order\":\"GRB\"},\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789V3\",\"width\":172,\"height\":320}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -887,6 +894,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_touch_lcd_1.69\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,21,22,23,24,25,26,27,28],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D4\":4,\"D5\":5,\"D6\":6,\"D7\":7,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D14\":14,\"D15\":15,\"D16\":16,\"D17\":17,\"D18\":18,\"D19\":19,\"D21\":21,\"D22\":22,\"D23\":23,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"A0\":26,\"A1\":27,\"A2\":28,\"SDA\":6,\"SCL\":7,\"SCK\":10,\"MOSI\":11,\"MISO\":12},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789V2\",\"width\":240,\"height\":280}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 1
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -1000,14 +1008,15 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 0
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_rp2350_touch_lcd_2.8\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789T3\",\"width\":240,\"height\":320}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 1
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
-#define MCUJS_RUNTIME_DEVICE_CAPABILITIES_JSON "{\"display\":{\"interface\":\"canvas-2d-subset\",\"maxOpenHandles\":1}}"
-#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_touch_lcd_2.8\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789T3\",\"width\":240,\"height\":320}}},\"capabilities\":{\"fs\":{\"appRoot\":\"/app\",\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\"]},\"devices\":{\"display\":{\"interface\":\"canvas-2d-subset\",\"maxOpenHandles\":1}}}}"
+#define MCUJS_RUNTIME_DEVICE_CAPABILITIES_JSON "{\"speaker\":{\"interface\":\"wav\",\"maxOpenHandles\":1,\"maxConcurrentPlays\":1,\"encoding\":\"pcm-s16le\",\"channels\":1,\"sampleRateHz\":16000,\"defaultVolume\":0.25,\"bufferFrames\":1024,\"maxRiffChunks\":128,\"shutdown\":\"native-silence\"},\"display\":{\"interface\":\"canvas-2d-subset\",\"maxOpenHandles\":1}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_touch_lcd_2.8\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789T3\",\"width\":240,\"height\":320}}},\"capabilities\":{\"fs\":{\"appRoot\":\"/app\",\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\"]},\"devices\":{\"speaker\":{\"interface\":\"wav\",\"maxOpenHandles\":1,\"maxConcurrentPlays\":1,\"encoding\":\"pcm-s16le\",\"channels\":1,\"sampleRateHz\":16000,\"defaultVolume\":0.25,\"bufferFrames\":1024,\"maxRiffChunks\":128,\"shutdown\":\"native-silence\"},\"display\":{\"interface\":\"canvas-2d-subset\",\"maxOpenHandles\":1}}}}"
 #else
-#define MCUJS_RUNTIME_DEVICE_CAPABILITIES_JSON "{}"
-#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_touch_lcd_2.8\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789T3\",\"width\":240,\"height\":320}}},\"capabilities\":{\"fs\":{\"appRoot\":\"/app\",\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\"]}}}"
+#define MCUJS_RUNTIME_DEVICE_CAPABILITIES_JSON "{\"speaker\":{\"interface\":\"wav\",\"maxOpenHandles\":1,\"maxConcurrentPlays\":1,\"encoding\":\"pcm-s16le\",\"channels\":1,\"sampleRateHz\":16000,\"defaultVolume\":0.25,\"bufferFrames\":1024,\"maxRiffChunks\":128,\"shutdown\":\"native-silence\"}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"waveshare_rp2350_touch_lcd_2.8\",\"chip\":\"RP2350\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"lcd\",\"controller\":\"ST7789T3\",\"width\":240,\"height\":320}}},\"capabilities\":{\"fs\":{\"appRoot\":\"/app\",\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true},\"usb\":{\"classes\":[\"cdc\",\"msc\"]},\"devices\":{\"speaker\":{\"interface\":\"wav\",\"maxOpenHandles\":1,\"maxConcurrentPlays\":1,\"encoding\":\"pcm-s16le\",\"channels\":1,\"sampleRateHz\":16000,\"defaultVolume\":0.25,\"bufferFrames\":1024,\"maxRiffChunks\":128,\"shutdown\":\"native-silence\"}}}}"
 #endif
 #define MCUJS_RUNTIME_BUILTIN_MODULES(X) \
     X("board") \
@@ -1016,7 +1025,9 @@
     X("events") \
     X("devices") \
     X("mcujs:module") \
-    X("node:module")
+    X("node:module") \
+    X("mcujs:speaker") \
+    X("mcujs:speaker-native")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
     X("fs", "{\"appRoot\":\"/app\",\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":true}") \
     X("usb", "{\"classes\":[\"cdc\",\"msc\"]}")
@@ -1095,6 +1106,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 62500000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"adafruit_feather_rp2040\",\"chip\":\"RP2040\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[0,1,2,3,4,8,9,10,11,12,13,16,18,19,20,24,25,26,27,28,29],\"pins\":{\"D0\":0,\"D1\":1,\"D2\":2,\"D3\":3,\"D4\":4,\"D8\":8,\"D9\":9,\"D10\":10,\"D11\":11,\"D12\":12,\"D13\":13,\"D16\":16,\"D18\":18,\"D19\":19,\"D20\":20,\"D24\":24,\"D25\":25,\"D26\":26,\"D27\":27,\"D28\":28,\"D29\":29,\"A0\":26,\"A1\":27,\"A2\":28,\"A3\":29,\"SDA\":2,\"SCL\":3,\"SCK\":18,\"MOSI\":19,\"MISO\":20,\"LED\":13,\"NEOPIXEL\":16},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":13,\"activeLow\":false},\"neopixel\":{\"type\":\"neopixel\",\"pin\":16,\"length\":1,\"order\":\"GRB\"}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -1210,6 +1222,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 40000000
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"seeed_xiao_esp32s3\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[1,2,3,4,5,6,7,8,9,21],\"pins\":{\"D0\":1,\"D1\":2,\"D2\":3,\"D3\":4,\"D4\":5,\"D5\":6,\"D8\":7,\"D9\":8,\"D10\":9,\"A0\":1,\"A1\":2,\"A2\":3,\"A3\":4,\"A4\":5,\"A5\":6,\"A6\":7,\"A7\":8,\"A8\":9,\"SDA\":5,\"SCL\":6,\"SCK\":7,\"MISO\":8,\"MOSI\":9,\"LED\":21},\"devices\":{\"led\":{\"type\":\"gpio\",\"pin\":21,\"activeLow\":true},\"button\":{\"type\":\"managed\",\"name\":\"BOOT\",\"activeLow\":true,\"readOnly\":true}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 1
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -1315,6 +1328,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 0
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"waveshare_esp32s3_epaper_1.54_v2\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"epaper\",\"controller\":\"Waveshare-1.54-V2\",\"width\":200,\"height\":200}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
@@ -1407,6 +1421,7 @@
 #define MCUJS_RUNTIME_SPI_MAX_HZ 0
 #define MCUJS_RUNTIME_API_VERSION "0.2"
 #define MCUJS_RUNTIME_BOARD_JSON "{\"name\":\"seeed_reterminal_sticky\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"epaper\",\"controller\":\"SSD1677\",\"width\":800,\"height\":480}}}"
+#define MCUJS_HAS_CONFIGURED_SPEAKER 0
 #define MCUJS_HAS_CONFIGURED_BUZZER 0
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY

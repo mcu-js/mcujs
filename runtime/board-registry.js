@@ -500,6 +500,12 @@ for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];
   if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
   descriptor.presentation = Object.freeze({ ...presentation });
+  if (boardId === 'waveshare_rp2350_touch_lcd_2.8') {
+    descriptor.modules.push('mcujs:speaker', 'mcujs:speaker-native');
+    descriptor.capabilities.devices = { speaker: { interface: 'wav', maxOpenHandles: 1,
+      maxConcurrentPlays: 1, encoding: 'pcm-s16le', channels: 1, sampleRateHz: 16000,
+      defaultVolume: 0.25, bufferFrames: 1024, maxRiffChunks: 128, shutdown: 'native-silence' } };
+  }
   if (boardId === 'waveshare_rp2350_touch_lcd_1.69') {
     descriptor.modules.push('mcujs:buzzer', 'mcujs:buzzer-native');
     descriptor.capabilities.gpio.pins = descriptor.capabilities.gpio.pins.filter(pin => pin !== 2);

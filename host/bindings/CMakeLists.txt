@@ -31,7 +31,13 @@ endif()
 
 # JavaScript API bindings library
 add_library(mcujs_bindings STATIC ${BINDINGS_SOURCES})
-set(MCUJS_PACKAGED_MODULES events devices button buzzer)
+set(MCUJS_PACKAGED_MODULES events devices button buzzer speaker)
+if(BOARD STREQUAL "waveshare_rp2350_touch_lcd_2.8")
+    target_sources(mcujs_bindings PRIVATE speaker_wav.c
+        ${CMAKE_SOURCE_DIR}/platform/rp2/bindings/speaker.c)
+    pico_generate_pio_header(mcujs_bindings
+        ${CMAKE_SOURCE_DIR}/platform/rp2/bindings/speaker_i2s.pio)
+endif()
 if(MCUJS_EXPERIMENTAL_CANVAS)
     list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
 endif()

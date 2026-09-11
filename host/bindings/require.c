@@ -27,6 +27,10 @@
 jerry_value_t js_create_events_module(void);
 jerry_value_t js_create_devices_module(void);
 jerry_value_t js_create_button_module(void);
+#if MCUJS_HAS_CONFIGURED_MICROPHONE
+jerry_value_t js_create_microphone_module(void);
+jerry_value_t js_create_microphone_native_module(void);
+#endif
 #if MCUJS_HAS_CONFIGURED_SPEAKER
 jerry_value_t js_create_speaker_module(void);
 jerry_value_t js_create_speaker_native_module(void);
@@ -684,6 +688,10 @@ static const builtin_module_t s_builtin_modules[] = {
 #endif
     {"events", js_create_events_module},
     {"devices", js_create_devices_module},
+#if MCUJS_HAS_CONFIGURED_MICROPHONE
+    {"mcujs:microphone", js_create_microphone_module},
+    {"mcujs:microphone-native", js_create_microphone_native_module},
+#endif
 #if MCUJS_HAS_CONFIGURED_SPEAKER
     {"mcujs:speaker", js_create_speaker_module},
     {"mcujs:speaker-native", js_create_speaker_native_module},

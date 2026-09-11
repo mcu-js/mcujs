@@ -1,6 +1,7 @@
 /* Private V2 power latch, from vendor 07_BATT_PWR_Test/user_config.h.
  * GPIO17 high holds battery power; GPIO18 is active-low PWR; GPIO42 high
- * disables the unimplemented audio rail. Not a public GPIO/PMIC API. */
+ * disables the audio rail. Native microphone shutdown precedes latch release.
+ * Not a public GPIO/PMIC API. */
 #include "board_power.h"
 #ifdef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
 #include "driver/gpio.h"
@@ -67,7 +68,13 @@ void mcujs_board_power_task(void) {
  if(!armed)return; /* First release the button used to switch the board on. */
  int64_t now=esp_timer_get_time();
  if(pressed_at<0)pressed_at=now;
- if(now-pressed_at>=2000000){gpio_set_level(17,0);enabled=false;}
+ if(now-pressed_at>=2000000){
+#ifdef ESP_PLATFORM
+  extern void js_microphone_cleanup(void);
+  js_microphone_cleanup(); /* USB may still power the board after latch release. */
+#endif
+  gpio_set_level(17,0);enabled=false;
+ }
 }
 #else
 bool mcujs_board_power_init(void){return true;}

@@ -500,6 +500,12 @@ for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];
   if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
   descriptor.presentation = Object.freeze({ ...presentation });
+  if (boardId === 'waveshare_esp32s3_epaper_1.54_v2') {
+    descriptor.modules.push('mcujs:microphone', 'mcujs:microphone-native');
+    descriptor.capabilities.devices = { microphone: { interface: 'pcm', encoding: 'pcm-s16le',
+      channels: 1, sampleRateHz: 16000, maxOpenHandles: 1, maxConcurrentRecordings: 1,
+      maxBufferBytes: 32000, duration: {minMs: 20, maxMs: 1000}, shutdown: 'native-rail-off' } };
+  }
   if (boardId === 'waveshare_rp2350_touch_lcd_2.8') {
     descriptor.modules.push('mcujs:speaker', 'mcujs:speaker-native');
     descriptor.capabilities.devices = { speaker: { interface: 'wav', maxOpenHandles: 1,

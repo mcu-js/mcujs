@@ -64,6 +64,10 @@ if(MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2" OR MCUJS_BOARD STREQU
  list(REMOVE_ITEM MCUJS_SOURCES bindings/i2c.c bindings/spi.c)
 endif()
 
+if(MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2")
+ list(APPEND MCUJS_SOURCES bindings/microphone.c)
+endif()
+
 if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
  list(REMOVE_ITEM MCUJS_SOURCES usb_cdc.c usb_msc.c)
  list(APPEND MCUJS_SOURCES serial_uart.c)
@@ -97,6 +101,9 @@ mcujs_write_capability_manifest("${MCUJS_ROOT}" "${MCUJS_BOARD}"
 endif()
 
 set(MCUJS_PACKAGED_MODULES events devices button)
+if(MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2")
+ list(APPEND MCUJS_PACKAGED_MODULES microphone)
+endif()
 if(MCUJS_EXPERIMENTAL_CANVAS)
  list(APPEND MCUJS_PACKAGED_MODULES canvas displays/st7789)
 endif()

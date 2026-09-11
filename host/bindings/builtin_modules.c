@@ -4,6 +4,9 @@
 #include "devices_source.h"
 #include "button_source.h"
 #include "runtime_features.h"
+#if MCUJS_HAS_CONFIGURED_MICROPHONE
+#include "microphone_source.h"
+#endif
 #if MCUJS_HAS_CONFIGURED_SPEAKER
 #include "speaker_source.h"
 #endif
@@ -49,6 +52,9 @@ jerry_value_t js_create_buzzer_module(void) { return load(buzzer_source,sizeof(b
 #endif
 #if MCUJS_HAS_CONFIGURED_SPEAKER
 jerry_value_t js_create_speaker_module(void) { return load(speaker_source,sizeof(speaker_source)); }
+#endif
+#if MCUJS_HAS_CONFIGURED_MICROPHONE
+jerry_value_t js_create_microphone_module(void) { return load(microphone_source,sizeof(microphone_source)); }
 #endif
 jerry_value_t js_create_button_module(void) { return load(button_source,sizeof(button_source)); }
 jerry_value_t js_create_devices_module(void) { return load(devices_source,sizeof(devices_source)); }

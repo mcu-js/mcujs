@@ -145,6 +145,7 @@ function branchFor(boardId, first) {
   lines.push(`#define MCUJS_RUNTIME_SPI_MAX_HZ ${spi?.frequency.maxHz ?? 0}`);
   lines.push(`#define MCUJS_RUNTIME_API_VERSION ${cString(manifest.apiVersion)}`);
   lines.push(`#define MCUJS_RUNTIME_BOARD_JSON ${cString(JSON.stringify(manifest.board))}`);
+  lines.push(`#define MCUJS_HAS_CONFIGURED_MICROPHONE ${descriptor.capabilities.devices?.microphone ? 1 : 0}`);
   lines.push(`#define MCUJS_HAS_CONFIGURED_SPEAKER ${descriptor.capabilities.devices?.speaker ? 1 : 0}`);
   lines.push(`#define MCUJS_HAS_CONFIGURED_BUZZER ${descriptor.capabilities.devices?.buzzer ? 1 : 0}`);
   lines.push(`#define MCUJS_HAS_CONFIGURED_BUTTON ${descriptor.capabilities.devices?.button ? 1 : 0}`);

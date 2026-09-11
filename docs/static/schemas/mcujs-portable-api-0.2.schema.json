@@ -441,6 +441,63 @@
               "const": 30
             }
           }
+        },
+        "microphone": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interface",
+            "encoding",
+            "channels",
+            "sampleRateHz",
+            "maxOpenHandles",
+            "maxConcurrentRecordings",
+            "maxBufferBytes",
+            "shutdown",
+            "duration"
+          ],
+          "properties": {
+            "interface": {
+              "const": "pcm"
+            },
+            "encoding": {
+              "const": "pcm-s16le"
+            },
+            "channels": {
+              "const": 1
+            },
+            "sampleRateHz": {
+              "const": 16000
+            },
+            "maxOpenHandles": {
+              "const": 1
+            },
+            "maxConcurrentRecordings": {
+              "const": 1
+            },
+            "maxBufferBytes": {
+              "const": 32000
+            },
+            "shutdown": {
+              "const": "native-rail-off"
+            },
+            "duration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "minMs",
+                "maxMs"
+              ],
+              "properties": {
+                "minMs": {
+                  "const": 20
+                },
+                "maxMs": {
+                  "const": 1000
+                }
+              }
+            }
+          }
         }
       },
       "minProperties": 1

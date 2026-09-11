@@ -31,6 +31,22 @@
         "cdc",
         "msc"
       ]
+    },
+    "devices": {
+      "microphone": {
+        "interface": "pcm",
+        "encoding": "pcm-s16le",
+        "channels": 1,
+        "sampleRateHz": 16000,
+        "maxOpenHandles": 1,
+        "maxConcurrentRecordings": 1,
+        "maxBufferBytes": 32000,
+        "duration": {
+          "minMs": 20,
+          "maxMs": 1000
+        },
+        "shutdown": "native-rail-off"
+      }
     }
   }
 }

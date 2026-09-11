@@ -636,11 +636,18 @@ js_result_t js_engine_init(void) {
     return JS_OK;
 }
 
+#if MCUJS_HAS_CONFIGURED_MICROPHONE
+extern void js_microphone_cleanup(void);
+#endif
 void js_engine_cleanup(void) {
     if (!s_initialized) {
         return;
     }
     
+#if MCUJS_HAS_CONFIGURED_MICROPHONE
+    /* Quiesce input while the native context is still intact. */
+    js_microphone_cleanup();
+#endif
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     /* Deliver cancellation while modules, event listeners and timers are valid. */
     js_canvas_reset();

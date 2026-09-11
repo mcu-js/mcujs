@@ -4,6 +4,12 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Added `devices.microphone` capture on ePaper 1.54 V2: explicit bounded PCM
+  recording, one owner, AbortSignal/stop/close and native audio-rail shutdown
+  independent of JavaScript. The onboard mic captured a known three-tone chime;
+  physical cancellation/reopen and stalled-JS capture checks passed. No background
+  capture or upload. See [microphone contract and evidence](docs/docs/microphone.md).
+
 - Added configured `devices.speaker` on RP2350 Touch LCD 2.8: bounded native
   PCM WAV (16-bit mono, 16000 Hz) streaming, linear volume, Promise completion,
   cancellation, stop/close, and fail-silent PIO/native underrun handling.

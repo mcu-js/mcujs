@@ -30,6 +30,7 @@ for name, source in (
     ('canvas', 'lib/canvas.js'),
     ('devices', 'lib/devices.js'),
     ('button', 'lib/button.js'),
+    ('microphone', 'lib/microphone.js'),
     ('st7789', 'lib/displays/st7789.js'),
 ):
     data = (root / source).read_bytes()

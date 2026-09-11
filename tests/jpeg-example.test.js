@@ -14,7 +14,7 @@ function run(options = {}) {
   ];
   const r = {draws:[],reads:[],events:[],decoderReads:[],buffers:[],fileClosed:0,
     decoderOpened:0,decoderClosed:0,displayOpened:0,displayClosed:0,presented:0};
-  const timers = new Map(); let next = 0, turn = 0, blockIndex = 0;
+  const timers = new Map(); let next = 0, turn = 0, blockIndex = 0, now = 0;
   const filename = options.path || '/sd/picture.jpg';
   const canvasContext = {fillStyle:'', fillRect(...args) {
     if (options.failDraw === r.draws.length) throw Error('draw failure');
@@ -52,8 +52,8 @@ function run(options = {}) {
   vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../examples/portable/jpeg/show.js'),'utf8'),{
     module,Uint8Array:ByteArray,console:{log(...args){r.events.push(args.join(' '));}},
     setTimeout(fn,delay) {
-      if (++next === options.failTimer || (delay === 60000 && options.failDeadline)) throw Error('timer failure');
-      timers.set(next,{fn,delay}); return next;
+      if (++next === options.failTimer || (delay > 0 && options.failDeadline)) throw Error('timer failure');
+      timers.set(next,{fn,delay,at:now+delay}); return next;
     },clearTimeout(id){timers.delete(id);},
     require(name) {
       if(name === 'fs')return fakeFs;
@@ -71,20 +71,22 @@ function run(options = {}) {
     const handle = module.exports(filename);
     if(options.cancelImmediately){handle.close();handle.close();}
     for(turn=1;turn<=10000;turn++) {
-      const entry = [...timers].find(([,t])=>t.delay !== 60000);if(!entry)break;
-      timers.delete(entry[0]);entry[1].fn();
+      let entry = [...timers].find(([,t])=>t.delay === 0);if(!entry)break;
+      const expired = [...timers].find(([,t])=>t.delay > 0 && t.at <= now);
+      if(expired) entry=expired;
+      timers.delete(entry[0]);entry[1].fn(); now += options.turnMs || 0;
       if(options.cancelAfterTurn === turn){
         const cancelled=[...timers.values()];handle.close();handle.close();
         if(options.runCancelledCallbacks)cancelled.forEach(t=>t.fn());
       }
       if(options.expireAfterTurn === turn){
-        const entry=[...timers].find(([,t])=>t.delay===60000);
+        const entry=[...timers].find(([,t])=>t.delay>0);
         if(entry){timers.delete(entry[0]);entry[1].fn();}
       }
     }
     assert.ok(turn<=10000,'bounded completion');
     if(options.expire) {
-      const entry=[...timers].find(([,t])=>t.delay===60000);
+      const entry=[...timers].find(([,t])=>t.delay>0);
       if(entry){timers.delete(entry[0]);entry[1].fn();}handle.close();
     }
   } catch(error) {r.error=error;}
@@ -163,4 +165,18 @@ test('JPEG read, decode, drawing, presentation and scheduling failures release a
     assert.ok(r.error||r.events.some(e=>e.startsWith('JPEG_ERROR ')),JSON.stringify(options));
     assert.ok(!r.events.some(e=>e.startsWith('JPEG_READY ')),JSON.stringify(options));
   }
+});
+
+test('slow bounded drawing can complete after 60 seconds without being cancelled',()=>{
+  const r=run({turnMs:20000,expire:true});
+  assert.equal(r.error,undefined);
+  assert.ok(r.events.some(e=>e.startsWith('JPEG_READY ')));
+  assert.ok(!r.events.some(e=>e.startsWith('JPEG_ERROR ')));
+  assert.equal(r.displayClosed,1);assert.equal(r.timerCount,0);
+});
+test('an unfinished deadline reports failure rather than silently disappearing',()=>{
+  const r=run({expireAfterTurn:3});
+  assert.ok(r.events.some(e=>e==='JPEG_ERROR JPEG timed out'));
+  assert.ok(!r.events.some(e=>e.startsWith('JPEG_READY ')));
+  assert.equal(r.decoderClosed,1);assert.equal(r.displayClosed,1);assert.equal(r.timerCount,0);
 });

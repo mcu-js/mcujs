@@ -6,7 +6,7 @@ module.exports = function showJpeg(path) {
   var fs = require('fs'), jpeg = require('jpeg');
   if (typeof jpeg.open !== 'function') throw new Error('This firmware needs the JPEG reader');
   var fd = null, reader = null, display = null, input = null, pixels = null;
-  var timer = null, deadline = null, stopped = false;
+  var timer = null, deadline = null, stopped = false, ready = false;
   function closeFile() {
     if (fd !== null) { var old = fd; fd = null; fs.closeSync(old); }
   }
@@ -41,7 +41,7 @@ module.exports = function showJpeg(path) {
         var block = reader.read(pixels);
         if (!block) {
           closeReader(); pixels = null;
-          display.present();
+          display.present(); ready = true;
           console.log('JPEG_READY ' + path + ' ' + width + 'x' + height);
           return;
         }
@@ -89,7 +89,11 @@ module.exports = function showJpeg(path) {
         timer = setTimeout(decode, 0);
       } catch (error) { failed(error); }
     }
-    deadline = setTimeout(close, 60000);
+    // Full-size Canvas rendering can exceed 60 seconds on the 1.47-inch LCD.
+    deadline = setTimeout(function () {
+      if (ready) close();
+      else failed(new Error('JPEG timed out'));
+    }, 120000);
     timer = setTimeout(load, 0);
     return { close: close };
   } catch (error) {

@@ -11,16 +11,16 @@ module.exports = function slideshow(paths) {
   var showJpeg = require('../jpeg/show'), showBmp = require('../sd-bmp/show');
   var index = 0, active = null, timer = null, deadline = null, stopped = false;
   function release() {
-    if (timer !== null) clearTimeout(timer);
-    timer = null;
-    if (deadline !== null) clearTimeout(deadline);
-    deadline = null;
-    if (active) { var old = active; active = null; old.close(); }
+    var pending = timer, expiry = deadline;
+    timer = null; deadline = null;
+    try { if (pending !== null) clearTimeout(pending); } finally {
+      try { if (expiry !== null) clearTimeout(expiry); } finally {
+        if (active) { var old = active; active = null; old.close(); }
+      }
+    }
   }
   function close() {
     stopped = true;
-    if (timer !== null) clearTimeout(timer);
-    timer = null;
     release();
   }
   function abort(error) {
@@ -36,8 +36,7 @@ module.exports = function slideshow(paths) {
   }
   function failed(message) {
     console.log('SLIDE_ERROR ' + paths[index - 1] + ' ' + message);
-    release();
-    schedule(next, 0);
+    abort(new Error(message));
   }
   function check() {
     var state = active.status();

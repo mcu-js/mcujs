@@ -54,7 +54,7 @@ function run(options = {}) {
     setTimeout(fn,delay) {
       if (++next === options.failTimer || (delay > 0 && options.failDeadline)) throw Error('timer failure');
       timers.set(next,{fn,delay,at:now+delay}); return next;
-    },clearTimeout(id){timers.delete(id);},
+    },clearTimeout(id){if(options.failClear)throw Error('cancel failure');timers.delete(id);},
     require(name) {
       if(name === 'fs')return fakeFs;
       if(name === 'jpeg')return nativeImage;
@@ -93,7 +93,7 @@ function run(options = {}) {
     }
     r.finalStatus = typeof handle.status === 'function' ? handle.status() : null;
   } catch(error) {r.error=error;}
-  r.timerCount=timers.size;return r;
+  r.remainingTimers=[...timers.values()].map(t=>({delay:t.delay,at:t.at,now}));r.timerCount=timers.size;return r;
 }
 
 test('JPEG blocks reach Canvas as exact RGB runs without decoder-owned display access',()=>{
@@ -187,4 +187,14 @@ test('an unfinished deadline reports failure rather than silently disappearing',
 test('JPEG controller exposes completion without log parsing',()=>{
  const r=run({expire:true});assert.equal(r.initialStatus,'loading');assert.equal(r.renderStatus,'ready');assert.equal(r.finalStatus,'closed');
  assert.equal(run({failDecode:0}).finalStatus,'error');assert.equal(run({cancelImmediately:true}).finalStatus,'closed');
+});
+
+test('ready JPEG owns a fresh hold deadline, even near the render deadline',()=>{
+ const r=run({turnMs:29750});assert.equal(r.renderStatus,'ready');
+ assert.ok(r.remainingTimers.some(t=>t.delay===60000&&t.at===179000));
+});
+test('JPEG cancellation failures still attempt file, decoder and display release',()=>{
+ for(const options of [{cancelImmediately:true},{cancelAfterTurn:3}]) {
+  const r=run({...options,failClear:true});assert.ok(r.error);assert.equal(r.fileClosed,1);assert.equal(r.decoderClosed,r.decoderOpened);assert.equal(r.displayClosed,r.displayOpened);
+ }
 });

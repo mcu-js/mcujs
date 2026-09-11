@@ -16,12 +16,16 @@ module.exports = function showJpeg(path) {
   function close() {
     stopped = true;
     if (state !== 'error') state = 'closed';
-    if (timer !== null) clearTimeout(timer);
-    if (deadline !== null) clearTimeout(deadline);
+    var pending = timer, expiry = deadline;
+    timer = null; deadline = null;
     input = null; pixels = null;
-    try { closeFile(); } finally {
-      try { closeReader(); } finally {
-        if (display) { var old = display; display = null; old.close(); }
+    try { if (pending !== null) clearTimeout(pending); } finally {
+      try { if (expiry !== null) clearTimeout(expiry); } finally {
+        try { closeFile(); } finally {
+          try { closeReader(); } finally {
+            if (display) { var old = display; display = null; old.close(); }
+          }
+        }
       }
     }
   }
@@ -43,7 +47,10 @@ module.exports = function showJpeg(path) {
         var block = reader.read(pixels);
         if (!block) {
           closeReader(); pixels = null;
-          display.present(); ready = true; state = 'ready';
+          display.present();
+          clearTimeout(deadline);
+          deadline = setTimeout(close, 60000);
+          ready = true; state = 'ready';
           console.log('JPEG_READY ' + path + ' ' + width + 'x' + height);
           return;
         }
@@ -93,6 +100,7 @@ module.exports = function showJpeg(path) {
     }
     // Full-size Canvas rendering can exceed 60 seconds on the 1.47-inch LCD.
     deadline = setTimeout(function () {
+      if (stopped) return;
       if (ready) close();
       else failed(new Error('JPEG timed out'));
     }, 120000);

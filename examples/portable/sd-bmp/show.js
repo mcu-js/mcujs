@@ -12,9 +12,11 @@ module.exports = function showBmp(path) {
   function close() {
     stopped = true;
     if (state !== 'error') state = 'closed';
-    if (timer !== null) clearTimeout(timer);
-    try { closeFile(); } finally {
-      if (display) { var d = display; display = null; d.close(); }
+    var pending = timer; timer = null;
+    try { if (pending !== null) clearTimeout(pending); } finally {
+      try { closeFile(); } finally {
+        if (display) { var d = display; display = null; d.close(); }
+      }
     }
   }
   function readExact(buffer, position) {

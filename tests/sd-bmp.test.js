@@ -62,7 +62,7 @@ function run(data, options = {}) {
     setTimeout(fn,delay){
       if(++next===options.failTimer || (delay===60000 && options.failDeadline)) throw Error('timer failure');
       timers.set(next,{fn,delay});return next;
-    },clearTimeout(id){timers.delete(id);},
+    },clearTimeout(id){if(options.failClear)throw Error('cancel failure');timers.delete(id);},
     require(name) {
       if(name==='fs') return fakeFs;
       if(name==='devices') return {display:{open(){
@@ -199,4 +199,8 @@ test('BMP controller exposes ready, error and close without log parsing',()=>{
 test('BMP ready status follows successful presentation, not only pixel writes',()=>{
  const r=run(bitmap(),{expire:true});assert.ok(r.events.indexOf('PRESENTED')>=0);assert.ok(r.events.indexOf('PRESENTED')<r.events.indexOf('RENDER_STATUS:ready'));
  const failed=run(bitmap(),{failPresent:true});assert.ok(failed.events.includes('FINAL_STATUS:error'));assert.ok(!failed.events.some(e=>e.startsWith('BMP_READY ')));assert.ok(failed.events.includes('CLOSED'));assert.equal(failed.timerCount,0);
+});
+
+test('BMP cancellation failures still attempt file and display release',()=>{
+ const r=run(bitmap(),{cancelImmediately:true,failClear:true});assert.ok(r.error);assert.equal(r.closed,1);assert.equal(r.events.filter(e=>e==='CLOSED').length,1);
 });

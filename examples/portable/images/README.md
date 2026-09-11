@@ -28,8 +28,9 @@ var slides = require('/app/portable/images/slideshow')([
 No directory scanning: supply one to eight explicit paths. The list is copied
 and shown once, with at most one active renderer/display. Each successful
 slide stays visible for two seconds **after** rendering completes. Bad headers,
-unsupported decodes and per-slide timeouts are reported, then skipped; there
-is no endless retry. A timer/cleanup failure stops the whole slideshow.
+unsupported decodes and per-slide timeouts are reported and stop the slideshow.
+All errors fail closed: there is no retry or error-classification framework,
+and no later renderer opens after a timer or cleanup failure.
 
 ## Metadata is not decode validation
 
@@ -51,6 +52,9 @@ remain for manual use. The slideshow observes status, never parses console
 output, and closes the previous display before opening the next.
 
 JPEG rendering still uses one MCU block per timer turn; BMP uses one row.
+The standalone JPEG renderer has a 120-second rendering deadline, then a fresh
+60-second display lifetime after completion (matching BMP), so a late success
+cannot interrupt the slideshow hold.
 A 172x320 JPEG currently takes about a minute on the 1.47-inch LCD. A fixed
 five-second slide interval would interrupt it, so the slideshow waits for
 completion and caps each rendering attempt at 122 seconds. This is not an

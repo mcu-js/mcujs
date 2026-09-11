@@ -105,7 +105,8 @@ opening a decoder or display. It centers the image or rotates it clockwise to
 fit the configured canvas, without scaling. One JPEG block is decoded and drawn
 per subsequent timer turn. Adjacent equal RGB values share a Canvas rectangle.
 The existing display framebuffer is reused; no second full-frame pixel buffer
-is created. The entire load/display operation has a 60-second deadline.
+is created. Loading/rendering has a 120-second deadline; successful presentation starts
+a fresh 60-second display lifetime.
 
 The concrete decoder interface is independent of paths and display ownership:
 
@@ -182,8 +183,9 @@ The list is copied, limited to eight paths, and played once. Rendering completes
 before the two-second hold starts; the next image opens only after the previous
 handle closes. Each renderer exposes `status()` (`loading`, `ready`, `error`,
 `closed`) alongside `close()`, so callers need not parse console messages.
-A failed slide is reported and skipped; a 122-second per-render deadline prevents
-an endless wait. This is deliberately not the old five-second decode-interrupting
+Any failed slide stops the slideshow after attempting cleanup; there is no
+error classification or retry. A 122-second per-render deadline prevents an
+endless wait. This is deliberately not the old five-second decode-interrupting
 slideshow and does not change controller-specific refresh policy.
 
 Legacy image diagnostics containing manual positioning, clipping, compound

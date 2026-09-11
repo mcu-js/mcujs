@@ -156,6 +156,41 @@ new firmware and is not implied by passing either suite. This slice does not
 qualify JPEG on ESP builds without the decoder, slideshow callers, arbitrary
 image metadata, or SD-card hardware compatibility.
 
+## Portable image metadata and slideshow (Unreleased)
+
+The example-level `images/info.js` helper replaces the useful header-inspection
+part of legacy `image.info` without bringing back a public `image` module.
+It returns `{format, width, height}` for JPEG or adds `bpp` for BMP. It uses one
+128-byte buffer and at most 128 reads, with JPEG header scanning confined to
+16,384 bytes. Baseline/progressive JPEG and BMP DIB headers 40/52/56/108/124 can
+be described; **metadata is not a claim that the renderer supports the file**.
+It neither acquires a decoder/display nor validates compressed pixels.
+
+The maintained board-wired 1.47 image demo and PiZero JPEG slideshow are replaced
+by `examples/portable/images/slideshow.js`. Copy `images/info.js`,
+`images/slideshow.js`, `jpeg/show.js` and `sd-bmp/show.js` with that relative
+layout under `/app/portable`, then eject the host volume:
+
+```js
+var slides = require('/app/portable/images/slideshow')([
+  '/app/test_172x320.jpg', '/app/test_172x320_24bit.bmp'
+]);
+// slides.close(); // optional early cancellation
+```
+
+The list is copied, limited to eight paths, and played once. Rendering completes
+before the two-second hold starts; the next image opens only after the previous
+handle closes. Each renderer exposes `status()` (`loading`, `ready`, `error`,
+`closed`) alongside `close()`, so callers need not parse console messages.
+A failed slide is reported and skipped; a 122-second per-render deadline prevents
+an endless wait. This is deliberately not the old five-second decode-interrupting
+slideshow and does not change controller-specific refresh policy.
+
+Legacy image diagnostics containing manual positioning, clipping, compound
+overlays and raw controller setup remain in the #19/#21 audit. Their complete
+scenarios are not claimed as migrated by this entrypoint change. LCD proof does
+not establish DVI/SD/e-paper hardware qualification.
+
 ## Write-fault investigation and acceptance
 
 On diagnostic firmware `17c4bf3`, three new-file writes and three rewrites passed

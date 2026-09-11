@@ -67,7 +67,7 @@ function run(data, options = {}) {
       if(name==='fs') return fakeFs;
       if(name==='devices') return {display:{open(){
         displays++;
-        return {canvas:{width:options.width||2,height:options.height||2,getContext(){return context;}},close(){events.push('CLOSED');}};
+        return {canvas:{width:options.width||2,height:options.height||2,getContext(){return context;}},present(){if(options.failPresent)throw Error('present failure');events.push('PRESENTED');},close(){events.push('CLOSED');}};
       }}};
       throw Error(name);
     }};
@@ -75,16 +75,19 @@ function run(data, options = {}) {
   vm.runInNewContext(source,sandbox); let error;
   try {
     const handle=module.exports(inputPath);
+    events.push('STATUS:'+ (typeof handle.status === 'function' ? handle.status() : null));
     if(options.cancelImmediately) {handle.close();handle.close();}
     for(let i=0;i<650;i++) {
       const entry=[...timers].find(([,t])=>t.delay<60000);if(!entry)break;
       timers.delete(entry[0]);entry[1].fn();
     }
+    events.push('RENDER_STATUS:'+ (typeof handle.status === 'function' ? handle.status() : null));
     if(options.expire) {
       const entry=[...timers].find(([,t])=>t.delay===60000);
       if(entry){timers.delete(entry[0]);entry[1].fn();}
       handle.close();
     }
+    events.push('FINAL_STATUS:'+ (typeof handle.status === 'function' ? handle.status() : null));
   }catch(e){error=e;}
   return {draws,reads,events,closed,displays,error,timerCount:timers.size};
 }
@@ -186,4 +189,14 @@ test('BMP rejects ambiguous RGB555/BI_RGB, unsupported masks and invalid bounds 
     const r=run(b,{width:3});assert.ok(r.error);assert.equal(r.closed,1);
     assert.equal(r.displays,0);assert.equal(r.timerCount,0);
   }
+});
+
+test('BMP controller exposes ready, error and close without log parsing',()=>{
+ const r=run(bitmap(),{expire:true});assert.ok(r.events.includes('STATUS:loading'));assert.ok(r.events.includes('RENDER_STATUS:ready'));assert.ok(r.events.includes('FINAL_STATUS:closed'));
+ assert.ok(run(bitmap(),{failDraw:1}).events.includes('FINAL_STATUS:error'));assert.ok(run(bitmap(),{cancelImmediately:true}).events.includes('FINAL_STATUS:closed'));
+});
+
+test('BMP ready status follows successful presentation, not only pixel writes',()=>{
+ const r=run(bitmap(),{expire:true});assert.ok(r.events.indexOf('PRESENTED')>=0);assert.ok(r.events.indexOf('PRESENTED')<r.events.indexOf('RENDER_STATUS:ready'));
+ const failed=run(bitmap(),{failPresent:true});assert.ok(failed.events.includes('FINAL_STATUS:error'));assert.ok(!failed.events.some(e=>e.startsWith('BMP_READY ')));assert.ok(failed.events.includes('CLOSED'));assert.equal(failed.timerCount,0);
 });

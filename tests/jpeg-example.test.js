@@ -69,6 +69,7 @@ function run(options = {}) {
   });
   try {
     const handle = module.exports(filename);
+    r.initialStatus = typeof handle.status === 'function' ? handle.status() : null;
     if(options.cancelImmediately){handle.close();handle.close();}
     for(turn=1;turn<=10000;turn++) {
       let entry = [...timers].find(([,t])=>t.delay === 0);if(!entry)break;
@@ -85,10 +86,12 @@ function run(options = {}) {
       }
     }
     assert.ok(turn<=10000,'bounded completion');
+    r.renderStatus = typeof handle.status === 'function' ? handle.status() : null;
     if(options.expire) {
       const entry=[...timers].find(([,t])=>t.delay>0);
       if(entry){timers.delete(entry[0]);entry[1].fn();}handle.close();
     }
+    r.finalStatus = typeof handle.status === 'function' ? handle.status() : null;
   } catch(error) {r.error=error;}
   r.timerCount=timers.size;return r;
 }
@@ -179,4 +182,9 @@ test('an unfinished deadline reports failure rather than silently disappearing',
   assert.ok(r.events.some(e=>e==='JPEG_ERROR JPEG timed out'));
   assert.ok(!r.events.some(e=>e.startsWith('JPEG_READY ')));
   assert.equal(r.decoderClosed,1);assert.equal(r.displayClosed,1);assert.equal(r.timerCount,0);
+});
+
+test('JPEG controller exposes completion without log parsing',()=>{
+ const r=run({expire:true});assert.equal(r.initialStatus,'loading');assert.equal(r.renderStatus,'ready');assert.equal(r.finalStatus,'closed');
+ assert.equal(run({failDecode:0}).finalStatus,'error');assert.equal(run({cancelImmediately:true}).finalStatus,'closed');
 });

@@ -6,7 +6,7 @@ module.exports = function showJpeg(path) {
   var fs = require('fs'), jpeg = require('jpeg');
   if (typeof jpeg.open !== 'function') throw new Error('This firmware needs the JPEG reader');
   var fd = null, reader = null, display = null, input = null, pixels = null;
-  var timer = null, deadline = null, stopped = false, ready = false;
+  var timer = null, deadline = null, stopped = false, ready = false, state = 'loading';
   function closeFile() {
     if (fd !== null) { var old = fd; fd = null; fs.closeSync(old); }
   }
@@ -15,6 +15,7 @@ module.exports = function showJpeg(path) {
   }
   function close() {
     stopped = true;
+    if (state !== 'error') state = 'closed';
     if (timer !== null) clearTimeout(timer);
     if (deadline !== null) clearTimeout(deadline);
     input = null; pixels = null;
@@ -25,6 +26,7 @@ module.exports = function showJpeg(path) {
     }
   }
   function failed(error) {
+    state = 'error';
     try { close(); } catch (ignored) {}
     console.log('JPEG_ERROR ' + error.message);
   }
@@ -41,7 +43,7 @@ module.exports = function showJpeg(path) {
         var block = reader.read(pixels);
         if (!block) {
           closeReader(); pixels = null;
-          display.present(); ready = true;
+          display.present(); ready = true; state = 'ready';
           console.log('JPEG_READY ' + path + ' ' + width + 'x' + height);
           return;
         }
@@ -95,7 +97,7 @@ module.exports = function showJpeg(path) {
       else failed(new Error('JPEG timed out'));
     }, 120000);
     timer = setTimeout(load, 0);
-    return { close: close };
+    return { close: close, status: function () { return state; } };
   } catch (error) {
     try { close(); } catch (ignored) {}
     throw error;

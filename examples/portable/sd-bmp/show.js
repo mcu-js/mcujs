@@ -5,12 +5,13 @@
 module.exports = function showBmp(path) {
   var fs = require('fs');
   var fd = fs.openSync(path, 'r');
-  var display = null, timer = null, stopped = false;
+  var display = null, timer = null, stopped = false, state = 'loading';
   function closeFile() {
     if (fd !== null) { var closing = fd; fd = null; fs.closeSync(closing); }
   }
   function close() {
     stopped = true;
+    if (state !== 'error') state = 'closed';
     if (timer !== null) clearTimeout(timer);
     try { closeFile(); } finally {
       if (display) { var d = display; display = null; d.close(); }
@@ -85,16 +86,19 @@ module.exports = function showBmp(path) {
         if (y < height) timer = setTimeout(step, 0);
         else {
           closeFile();
+          display.present();
+          state = 'ready';
           timer = setTimeout(close, 60000);
           console.log('BMP_READY ' + path + ' ' + width + 'x' + height + ' buffers=' + (54 + stride + (masks ? 12 : 0)));
         }
       } catch (error) {
+        state = 'error';
         try { close(); } catch (ignored) {}
         console.log('BMP_ERROR ' + error.message);
       }
     }
     timer = setTimeout(step, 0);
-    return { close: close };
+    return { close: close, status: function () { return state; } };
   } catch (error) {
     try { close(); } catch (ignored) {}
     throw error;

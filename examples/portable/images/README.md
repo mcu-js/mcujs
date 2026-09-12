@@ -60,11 +60,60 @@ five-second slide interval would interrupt it, so the slideshow waits for
 completion and caps each rendering attempt at 122 seconds. This is not an
 image-speed optimisation or an e-paper-refresh qualification.
 
-## Remaining legacy diagnostics
+## Placement, clipping and overlays
 
-The old `test-image`, `test-jpeg`, `test-blue`, `test-all`, `test-features`,
-`test-step` and `test-minimal` board scripts are legacy diagnostics, not the
-maintained image entrypoints. Their raw driver/buffer access and compound
-positioning/clipping/overlay scenarios are still in the #19/#21 retirement
-audit; this slice does not claim those whole scripts have been ported. Native
-legacy bindings remain until that audit and e-paper qualification are finished.
+Copy `images/features.js` alongside the files above, then run:
+
+```js
+var demo = require('/app/portable/images/features')(
+  '/app/test_172x320.jpg', '/app/icon_32x32.bmp'
+);
+// demo.close();
+```
+
+The diagnostic owns one display for four completed scenes: four corner icons on
+blue, a centered icon on red, icons clipped at all four edges on bright green,
+and a centered JPEG with five layered BMP icons plus white/black rectangles and
+a yellow line. It needs a Canvas at least 128x128 and the supplied 32x32 BMP icon.
+Each intermediate scene holds for two seconds after presentation. The entire
+rendering sequence is bounded to three minutes, then the final composite has a
+fresh one-minute lifetime. Any error stops the diagnostic and attempts all
+cleanup. JPEG backgrounds are centered and clipped, **not rotated or scaled**;
+this deliberately differs from the standalone full-image renderer.
+
+For custom composition, both existing renderer functions also expose:
+
+```js
+var task = require('/app/portable/sd-bmp/show').draw(
+  '/app/icon_32x32.bmp', display.canvas, -16, 40
+);
+```
+
+`draw(path, canvas, x, y)` borrows the caller's Canvas. Positions are explicit
+finite signed-32-bit integers; clipping uses the existing Canvas implementation.
+The helper does not acquire, clear, rotate, present or close the caller's display.
+It paints through `fillRect` and changes `fillStyle`. Wait for `task.status()` to
+be `ready`, then call `task.close()` before starting the next image. The caller
+presents the completed composition and closes its display. Borrowed completion
+logs use `JPEG_DRAW_READY`/`BMP_DRAW_READY`, not the standalone presentation
+markers. Cancellation/error
+releases the helper's file/decoder/timers, not the borrowed Canvas. Buffers and
+one-MCU/one-row scheduling stay the same; no second decoder or framebuffer is added.
+
+## Retired image diagnostics and coverage
+
+The seven old image-only scripts from the 1.28/1.47 board directories have been
+removed rather than kept as compatibility shims:
+
+- `test-image`, `test-minimal`, `test-step`: file decode and placement move to
+  the portable renderers and this diagnostic.
+- `test-all`, `test-blue`, `test-jpeg`: format/color/read failures are covered by
+  the native JPEG suite, binary BMP tests, and portable show/slideshow examples.
+- `test-features`: corners, centering, edge clipping and layered shapes/icons
+  move to `features.js`; full-image BMP remains in `sd-bmp/show.js`.
+
+Their private GPIO/SPI initialization and raw-buffer handles are intentionally
+not reproduced. The image behavior is separated from display-controller setup.
+This migration does not establish physical qualification of the 1.28, DVI,
+SD cards or e-paper. Native legacy bindings/registrations remain for #19;
+e-paper refresh and retained-image qualification remain #22.

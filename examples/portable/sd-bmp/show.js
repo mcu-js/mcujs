@@ -2,7 +2,8 @@
 
 // RGB565 BITFIELDS or 24/32-bit BI_RGB BMP, one row per timer turn.
 // No full-file/string decode and no display-specific pixel packing.
-module.exports = function showBmp(path) {
+function showBmp(path, canvas, left, top, ctx) {
+  var borrowed = !!canvas;
   var fs = require('fs');
   var fd = fs.openSync(path, 'r');
   var display = null, timer = null, stopped = false, state = 'loading';
@@ -53,17 +54,21 @@ module.exports = function showBmp(path) {
           mv.getUint32(8, true) !== 0x001f) throw new Error('Unsupported BMP: RGB565 masks required');
     }
     var row = new Uint8Array(stride);
-    display = require('devices').display.open();
-    var canvas = display.canvas;
-    var rotated = width > canvas.width || height > canvas.height;
-    if (rotated && (height > canvas.width || width > canvas.height)) throw new Error('BMP exceeds display');
-    var ctx = canvas.getContext('2d');
-    var left = Math.floor((canvas.width - (rotated ? height : width)) / 2);
-    var top = Math.floor((canvas.height - (rotated ? width : height)) / 2);
-    ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    var rotated = false;
+    if (!borrowed) {
+      display = require('devices').display.open();
+      canvas = display.canvas;
+      rotated = width > canvas.width || height > canvas.height;
+      if (rotated && (height > canvas.width || width > canvas.height)) throw new Error('BMP exceeds display');
+      ctx = canvas.getContext('2d');
+      left = Math.floor((canvas.width - (rotated ? height : width)) / 2);
+      top = Math.floor((canvas.height - (rotated ? width : height)) / 2);
+      ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     var y = 0;
     function step() {
       if (stopped) return;
+      timer = null;
       try {
         readExact(row, offset + (signedHeight < 0 ? y : height - 1 - y) * stride);
         // Adjacent identical colors share a rectangle; padding is never drawn.
@@ -88,10 +93,10 @@ module.exports = function showBmp(path) {
         if (y < height) timer = setTimeout(step, 0);
         else {
           closeFile();
-          display.present();
+          if (!borrowed) display.present();
           state = 'ready';
-          timer = setTimeout(close, 60000);
-          console.log('BMP_READY ' + path + ' ' + width + 'x' + height + ' buffers=' + (54 + stride + (masks ? 12 : 0)));
+          if (!borrowed) timer = setTimeout(close, 60000);
+          console.log((borrowed ? 'BMP_DRAW_READY ' : 'BMP_READY ') + path + ' ' + width + 'x' + height + ' buffers=' + (54 + stride + (masks ? 12 : 0)));
         }
       } catch (error) {
         state = 'error';
@@ -105,4 +110,21 @@ module.exports = function showBmp(path) {
     try { close(); } catch (ignored) {}
     throw error;
   }
+}
+
+module.exports = function (path) { return showBmp(path); };
+// Borrow only the drawing surface; clipping and presentation belong to its caller.
+module.exports.draw = function (path, canvas, x, y) {
+  if (!canvas || typeof canvas.width !== 'number' || typeof canvas.height !== 'number' ||
+      canvas.width < 1 || canvas.width > 2147483647 || canvas.width !== Math.floor(canvas.width) ||
+      canvas.height < 1 || canvas.height > 2147483647 || canvas.height !== Math.floor(canvas.height) ||
+      typeof canvas.getContext !== 'function') throw new TypeError('Canvas required');
+  if (typeof x !== 'number' || typeof y !== 'number' ||
+      x < -2147483648 || x > 2147483647 || x !== Math.floor(x) ||
+      y < -2147483648 || y > 2147483647 || y !== Math.floor(y)) {
+    throw new RangeError('x and y must be signed32 integers');
+  }
+  var ctx = canvas.getContext('2d');
+  if (!ctx || typeof ctx.fillRect !== 'function') throw new TypeError('Canvas 2d context required');
+  return showBmp(path, canvas, x, y, ctx);
 };

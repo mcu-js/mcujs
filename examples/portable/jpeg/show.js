@@ -2,7 +2,8 @@
 
 // Baseline JPEG through the existing Canvas API; no graphics/display handle in decoding.
 // One <=256-byte file read or one <=16x16 RGB block per timer turn.
-module.exports = function showJpeg(path) {
+function showJpeg(path, canvas, left, top, ctx) {
+  var borrowed = !!canvas;
   var fs = require('fs'), jpeg = require('jpeg');
   if (typeof jpeg.open !== 'function') throw new Error('This firmware needs the JPEG reader');
   var fd = null, reader = null, display = null, input = null, pixels = null;
@@ -40,18 +41,20 @@ module.exports = function showJpeg(path) {
     if (size < 1 || size > 16384 || size !== Math.floor(size)) throw new RangeError('JPEG input must be 1..16384 bytes');
     fd = fs.openSync(path, 'r');
     input = new Uint8Array(size);
-    var position = 0, width, height, rotated, left, top, ctx;
+    var position = 0, width, height, rotated = false;
     function decode() {
       if (stopped) return;
+      timer = null;
       try {
         var block = reader.read(pixels);
         if (!block) {
           closeReader(); pixels = null;
-          display.present();
+          if (!borrowed) display.present();
           clearTimeout(deadline);
-          deadline = setTimeout(close, 60000);
+          deadline = null;
+          if (!borrowed) deadline = setTimeout(close, 60000);
           ready = true; state = 'ready';
-          console.log('JPEG_READY ' + path + ' ' + width + 'x' + height);
+          console.log((borrowed ? 'JPEG_DRAW_READY ' : 'JPEG_READY ') + path + ' ' + width + 'x' + height);
           return;
         }
         for (var y = 0; y < block.height; y++) {
@@ -73,6 +76,7 @@ module.exports = function showJpeg(path) {
     }
     function load() {
       if (stopped) return;
+      timer = null;
       try {
         if (position < size) {
           var n = fs.readSync(fd, input, position, Math.min(256, size - position), position);
@@ -87,14 +91,16 @@ module.exports = function showJpeg(path) {
         reader = jpeg.open(input); input = null;
         width = reader.width; height = reader.height;
         pixels = new Uint8Array(768);
-        display = require('devices').display.open();
-        var canvas = display.canvas;
-        rotated = width > canvas.width || height > canvas.height;
-        if (rotated && (height > canvas.width || width > canvas.height)) throw new Error('JPEG exceeds display');
-        left = Math.floor((canvas.width - (rotated ? height : width)) / 2);
-        top = Math.floor((canvas.height - (rotated ? width : height)) / 2);
-        ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (!borrowed) {
+          display = require('devices').display.open();
+          canvas = display.canvas;
+          rotated = width > canvas.width || height > canvas.height;
+          if (rotated && (height > canvas.width || width > canvas.height)) throw new Error('JPEG exceeds display');
+          left = Math.floor((canvas.width - (rotated ? height : width)) / 2);
+          top = Math.floor((canvas.height - (rotated ? width : height)) / 2);
+          ctx = canvas.getContext('2d');
+          ctx.fillStyle = 'black'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
         timer = setTimeout(decode, 0);
       } catch (error) { failed(error); }
     }
@@ -110,4 +116,21 @@ module.exports = function showJpeg(path) {
     try { close(); } catch (ignored) {}
     throw error;
   }
+}
+
+module.exports = function (path) { return showJpeg(path); };
+// Borrow only the drawing surface; clipping and presentation belong to its caller.
+module.exports.draw = function (path, canvas, x, y) {
+  if (!canvas || typeof canvas.width !== 'number' || typeof canvas.height !== 'number' ||
+      canvas.width < 1 || canvas.width > 2147483647 || canvas.width !== Math.floor(canvas.width) ||
+      canvas.height < 1 || canvas.height > 2147483647 || canvas.height !== Math.floor(canvas.height) ||
+      typeof canvas.getContext !== 'function') throw new TypeError('Canvas required');
+  if (typeof x !== 'number' || typeof y !== 'number' ||
+      x < -2147483648 || x > 2147483647 || x !== Math.floor(x) ||
+      y < -2147483648 || y > 2147483647 || y !== Math.floor(y)) {
+    throw new RangeError('x and y must be signed32 integers');
+  }
+  var ctx = canvas.getContext('2d');
+  if (!ctx || typeof ctx.fillRect !== 'function') throw new TypeError('Canvas 2d context required');
+  return showJpeg(path, canvas, x, y, ctx);
 };

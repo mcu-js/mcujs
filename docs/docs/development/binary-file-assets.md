@@ -151,7 +151,9 @@ additional memory, not included in those byte-buffer limits. Input is bounded,
 not a claim of constant-memory streaming of arbitrarily large JPEG files.
 
 `JPEG_READY` is emitted only after decoding completes and the display accepts
-presentation. It is not camera proof. Native decoder tests and example
+presentation for standalone `show(path)`. Borrowed `.draw()` emits
+`JPEG_DRAW_READY` instead: decoding is complete, but only the caller can
+present the composite. Neither marker is camera proof. Native decoder tests and example
 scheduling/ownership tests are separate evidence; LCD acceptance requires the
 new firmware and is not implied by passing either suite. This slice does not
 qualify JPEG on ESP builds without the decoder, slideshow callers, arbitrary
@@ -188,10 +190,24 @@ error classification or retry. A 122-second per-render deadline prevents an
 endless wait. This is deliberately not the old five-second decode-interrupting
 slideshow and does not change controller-specific refresh policy.
 
-Legacy image diagnostics containing manual positioning, clipping, compound
-overlays and raw controller setup remain in the #19/#21 audit. Their complete
-scenarios are not claimed as migrated by this entrypoint change. LCD proof does
-not establish DVI/SD/e-paper hardware qualification.
+The portable `images/features.js` diagnostic now covers corner/center placement,
+all four clipped edges, and a JPEG combined with five BMP icons and Canvas
+rectangles. Both renderers expose example-level `draw(path, canvas, x, y)` for
+borrowing a caller-owned Canvas without clearing, rotating, presenting or
+closing it. The caller sequences completed draws, presents the whole scene,
+and retains sole display ownership. Native decode/input bounds remain unchanged.
+
+The seven image-only diagnostics in the 1.28/1.47 board folders are retired;
+their private controller initialization is not copied into application code.
+Full-frame decode, metadata and slideshow behavior remain covered by the other
+portable examples. Copy `images/features.js` beside `images/info.js`, and pass a
+JPEG background and the existing `icon_32x32.bmp`. The four-scene run is bounded
+to three minutes with a fresh one-minute final-frame lifetime. Larger JPEG
+backgrounds are centered and clipped, not scaled or rotated.
+
+This completes the remaining image composition scenario migration, not the
+removal of native legacy bindings (#19). LCD proof does not establish 1.28,
+DVI, SD-card or e-paper hardware qualification (#22).
 
 ## Write-fault investigation and acceptance
 

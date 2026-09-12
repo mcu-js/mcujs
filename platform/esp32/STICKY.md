@@ -17,8 +17,11 @@ Not a release-qualified target and excluded from shipping board packaging.
   `c2ed847c3654085299d74ef42f7e1a4d760a5b53`, same driver path.
 
 Private EPD pins: MOSI14 SCK13 CS15 DC16 RESET17 BUSY18(high busy), EN47(active
-high). Power hold45 and lock46 high; unused SD10, microphone38, touch41/42 and
-buzzer48 stay low. Charger39 is untouched. No public GPIO, touch, sensors,
+high). Power hold45 and lock46 high. SD_EN10 stays high and SD_CS8 is driven
+high: the inserted card shares MOSI/SCK and must be powered/deselected during
+display traffic. The TPS22916C switch is active-high despite the vendor comment.
+Unused microphone38, touch41/42 and buzzer48 stay low. Charger39 is untouched.
+No public GPIO, touch, sensors,
 audio, SD, Wi-Fi or BLE implementation is advertised in this first slice.
 
 ## Memory and display
@@ -41,7 +44,8 @@ into insufficient internal SRAM. PSRAM must initialize successfully. The ctx
 limits and scratch sizes stay unchanged. Each dirty JS task is presented once.
 
 Full monochrome only: convert rows to 1bpp, send both SSD1677 planes, use the
-vendor OTP full waveform (0x22/F7), wait with a 10-second BUSY deadline, deep
+vendor OTP full waveform (0x22/F7), require BUSY to assert within 500ms and
+complete within 10 seconds, then deep
 sleep then remove panel power. SPI polling sends <=50-byte pieces; the PSRAM
 surface is never passed to DMA. No partial/grayscale promise in this target.
 Timeout/transport errors close the display and remove its rail.

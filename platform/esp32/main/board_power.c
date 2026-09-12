@@ -12,12 +12,13 @@ static bool restart_enabled, restart_armed;
 static int64_t released_at, pressed_at;
 bool mcujs_board_power_init(void) {
  restart_enabled=false;restart_armed=false;released_at=-1;pressed_at=-1;
- /* Seeed Sticky_dashboard_demo board.cpp: hold and lock high.
-  * Unused SD/touch/microphone/buzzer rails stay off; charger is untouched. */
- const int pins[]={45,46,10,38,41,42,47,48};
+ /* SD shares display SCK/MOSI: keep SD powered and deselected.
+  * TPS22916C SD_EN is active high (the vendor comment is misleading).
+  * Other unused rails stay off; charger is untouched. */
+ const int pins[]={45,46,8,10,38,41,42,47,48};
  uint64_t mask=0;
  for(unsigned i=0;i<sizeof(pins)/sizeof(pins[0]);i++) {
-  int level=i<2?1:0;
+  int level=i<4?1:0;
   if(gpio_set_level(pins[i],level)!=0)return false;
 #ifdef ESP_PLATFORM
   (void)gpio_hold_dis(pins[i]);

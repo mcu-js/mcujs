@@ -47,11 +47,21 @@ static bool idle(void) {
     }
     return true;
 }
+/* An immediately idle BUSY line is not a completed refresh. */
+static bool refresh_cycle(void) {
+    int64_t deadline=esp_timer_get_time()+500000;
+    do {
+        if (gpio_get_level(BUSY)) return idle();
+        service();delay_ms(1);
+    } while (esp_timer_get_time()<deadline);
+    usb_cdc_puts("Sticky ePaper refresh did not start\r\n");
+    return false;
+}
 static bool send(bool data,const uint8_t *bytes,size_t n) {
-    if (gpio_set_level(DC,data)!=ESP_OK || gpio_set_level(CS,0)!=ESP_OK) return false;
+    if (gpio_set_level(DC,data)!=ESP_OK) return false;
     spi_transaction_t t={.length=n*8,.tx_buffer=bytes};
-    bool ok=spi_device_polling_transmit(spi,&t)==ESP_OK;
-    return gpio_set_level(CS,1)==ESP_OK && ok;
+    /* The SPI peripheral owns CS, matching the vendor transport. */
+    return spi_device_polling_transmit(spi,&t)==ESP_OK;
 }
 static bool cmd(uint8_t c,const uint8_t *data,size_t n) {
     return send(false,&c,1) && (!n || send(true,data,n));
@@ -87,8 +97,7 @@ static bool present(canvas_display_t *d) {
         && C(0x11,3) && C(0x44,0,0,0x1f,3) && C(0x45,0,0,0xdf,1)
         && idle() && write_plane(0x26,d->state) && write_plane(0x24,d->state)
         && C(0x22,0xf7) && cmd(0x20,NULL,0);
-    delay_ms(10);
-    ok=ok && idle();
+    ok=ok && refresh_cycle();
     if (ok) ok=C(0x10,3); /* SSD1677 deep sleep; next present resets it. */
     delay_ms(100);
     /* Always remove the rail, even after a timeout/failed transaction. */
@@ -109,9 +118,9 @@ bool canvas_display_sticky_init(canvas_display_t *d) {
     uint16_t *pixels=heap_caps_malloc(WIDTH*HEIGHT*sizeof(uint16_t),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
     if (!pixels) return false;
     memset(pixels,0xff,WIDTH*HEIGHT*sizeof(uint16_t));
-    gpio_config_t out={.pin_bit_mask=(1ULL<<DC)|(1ULL<<CS)|(1ULL<<RST)|(1ULL<<POWER),.mode=GPIO_MODE_OUTPUT};
+    gpio_config_t out={.pin_bit_mask=(1ULL<<DC)|(1ULL<<RST)|(1ULL<<POWER),.mode=GPIO_MODE_OUTPUT};
     gpio_config_t in={.pin_bit_mask=1ULL<<BUSY,.mode=GPIO_MODE_INPUT};
-    if (gpio_set_level(POWER,0)!=ESP_OK || gpio_set_level(CS,1)!=ESP_OK ||
+    if (gpio_set_level(POWER,0)!=ESP_OK ||
         gpio_config(&out)!=ESP_OK || gpio_config(&in)!=ESP_OK) {
         free(pixels);return false;
     }
@@ -123,7 +132,7 @@ bool canvas_display_sticky_init(canvas_display_t *d) {
         .data4_io_num=-1,.data5_io_num=-1,.data6_io_num=-1,.data7_io_num=-1,
 #endif
         .max_transfer_sz=64};
-    spi_device_interface_config_t dev={.clock_speed_hz=10000000,.mode=0,.spics_io_num=-1,.queue_size=1};
+    spi_device_interface_config_t dev={.clock_speed_hz=10000000,.mode=0,.spics_io_num=CS,.queue_size=1};
     if (spi_bus_initialize(SPI2_HOST,&bus,0)!=ESP_OK) {free(pixels);return false;}
     if (spi_bus_add_device(SPI2_HOST,&dev,&spi)!=ESP_OK) {
         spi=NULL;(void)spi_bus_free(SPI2_HOST);free(pixels);return false;

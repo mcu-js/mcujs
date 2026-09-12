@@ -6,19 +6,20 @@
 #include <string.h>
 #include <stdio.h>
 static int pins[49], live, bus_owned, fail_alloc, fail_gpio, fail_bus, fail_add;
-static int fail_spi, stuck, busy_ticks;
+static int fail_spi, stuck, busy_ticks, never_busy, busy_delay_ms, refresh_stuck;
+static int64_t busy_at;
 static unsigned transfers, services, watchdogs, updates, sleeps;
 static int64_t now;
 static uint8_t command, control, ram[48000], old_ram[48000];
 static size_t ram_len, old_len;
 void vTaskDelay(unsigned ms) {now+=(int64_t)ms*1000;}
 int64_t esp_timer_get_time(void) {return now;}
-int gpio_get_level(int p) {assert(p==18);if(stuck)return 1;if(busy_ticks){busy_ticks--;return 1;}return 0;}
-int gpio_set_level(int p,int v) {if(fail_gpio)return -1;pins[p]=v;return 0;}
-int gpio_config(const gpio_config_t *c) {assert(!(c->pin_bit_mask & ((1ULL<<19)|(1ULL<<20))));return fail_gpio?-1:0;}
+int gpio_get_level(int p) {assert(p==18);if(stuck || (refresh_stuck && command==0x20))return 1;if(busy_ticks){if(now<busy_at)return 0;busy_ticks--;return 1;}return 0;}
+int gpio_set_level(int p,int v) {assert(p!=15);if(fail_gpio)return -1;pins[p]=v;return 0;}
+int gpio_config(const gpio_config_t *c) {assert(!(c->pin_bit_mask & ((1ULL<<15)|(1ULL<<19)|(1ULL<<20))));return fail_gpio?-1:0;}
 int esp_task_wdt_status(void *p) {(void)p;return 0;}
 int esp_task_wdt_reset(void) {watchdogs++;return 0;}
-void usb_cdc_puts(const char *s) {assert(strstr(s,"timeout") && strstr(s,"\r\n"));}
+void usb_cdc_puts(const char *s) {assert(strstr(s,"\r\n"));}
 void usb_cdc_task(void) {services++;}
 int spi_bus_initialize(int h,const spi_bus_config_t *b,int dma) {
  assert(h==1 && dma==0 && b->sclk_io_num==13 && b->mosi_io_num==14 && b->miso_io_num==-1);
@@ -27,7 +28,7 @@ int spi_bus_initialize(int h,const spi_bus_config_t *b,int dma) {
  bus_owned++;return 0;
 }
 int spi_bus_add_device(int h,const spi_device_interface_config_t *d,spi_device_handle_t *s) {
- assert(h==1 && d->mode==0 && d->clock_speed_hz==10000000 && d->spics_io_num==-1);
+ assert(h==1 && d->mode==0 && d->clock_speed_hz==10000000 && d->spics_io_num==15);
  if(fail_add)return -1;
  *s=(void*)1;return 0;
 }
@@ -36,14 +37,14 @@ int spi_bus_free(int h) {assert(h==1);bus_owned--;return 0;}
 void *heap_caps_malloc(size_t n,int caps) {assert(n==768000 && caps==3);if(fail_alloc)return NULL;live++;return malloc(n);}
 static void tracked_free(void *p) {if(p)live--;free(p);}
 int spi_device_polling_transmit(spi_device_handle_t s,spi_transaction_t *t) {
- assert(s && !pins[15] && pins[47]==1);size_t n=t->length/8;assert(n>0 && n<=64);
+ assert(s && pins[47]==1);size_t n=t->length/8;assert(n>0 && n<=64);
  transfers++;if(fail_spi && transfers==(unsigned)fail_spi)return -1;
  const uint8_t *p=t->tx_buffer;
  if(!pins[16]) {
   assert(n==1);command=*p;
   if(command==0x24)ram_len=0;
   if(command==0x26)old_len=0;
-  if(command==0x20){assert(control==0xf7);updates++;busy_ticks=3;}
+  if(command==0x20){assert(control==0xf7);updates++;busy_ticks=never_busy?0:3;busy_at=now+(int64_t)busy_delay_ms*1000;}
  } else switch(command) {
   case 0x24: assert(ram_len+n<=48000);memcpy(ram+ram_len,p,n);ram_len+=n;break;
   case 0x26: assert(old_len+n<=48000);memcpy(old_ram+old_len,p,n);old_len+=n;break;
@@ -77,6 +78,11 @@ int main(void) {
  assert(ram[47900]==0x5e && ram[47901]==0x7f && ram[47999]==0xfe && ram[99]==0xfe);
  assert(updates==1 && sleeps==1 && command==0x10 && !pins[47] && services && watchdogs);
  assert(d.present(&d));assert(updates==2 && sleeps==2); /* Always a full refresh. */
+ never_busy=1;unsigned old_sleeps=sleeps;int64_t start=now;
+ assert(!d.present(&d));assert(!pins[47] && sleeps==old_sleeps && now-start>=500000 && now-start<1000000);never_busy=0;
+ busy_delay_ms=100;assert(d.present(&d));busy_delay_ms=0;
+ refresh_stuck=1;old_sleeps=sleeps;start=now;
+ assert(!d.present(&d));assert(!pins[47] && sleeps==old_sleeps && now-start>=10000000 && now-start<11000000);refresh_stuck=0;
  stuck=1;int64_t before=now;unsigned count=updates;
  assert(!d.present(&d));assert(now-before>=10000000 && now-before<11000000 && !pins[47] && updates==count);stuck=0;
  fail_spi=transfers+30;assert(!d.present(&d));assert(!pins[47] && updates==count);fail_spi=0;

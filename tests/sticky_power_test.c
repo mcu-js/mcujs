@@ -19,8 +19,9 @@ int main(void){
  for(int i=0;i<49;i++)pins[i]=-1;
  pins[4]=0;
  assert(mcujs_board_power_init());assert(pins[45]==1&&pins[46]==1);
- int off[]={10,38,41,42,47,48};for(unsigned i=0;i<sizeof(off)/sizeof(off[0]);i++)assert(pins[off[i]]==0);
- assert(outputs==((1ULL<<45)|(1ULL<<46)|(1ULL<<10)|(1ULL<<38)|(1ULL<<41)|(1ULL<<42)|(1ULL<<47)|(1ULL<<48)));
+ assert(pins[8]==1 && pins[10]==1); /* Seeed: SD deselected and powered. */
+ int off[]={38,41,42,47,48};for(unsigned i=0;i<sizeof(off)/sizeof(off[0]);i++)assert(pins[off[i]]==0);
+ assert(outputs==((1ULL<<8)|(1ULL<<45)|(1ULL<<46)|(1ULL<<10)|(1ULL<<38)|(1ULL<<41)|(1ULL<<42)|(1ULL<<47)|(1ULL<<48)));
  assert(pins[39]==-1&&pins[19]==-1&&pins[20]==-1);
  sample(0,10000000);assert(restarts==0); /* held through boot */
  sample(1,0);sample(1,49999);sample(0,0);sample(0,4000000);
@@ -37,5 +38,5 @@ int main(void){
  fail_input=1;assert(!mcujs_board_power_init());
  sample(1,0);sample(1,50000);sample(0,0);sample(0,4000000);assert(restarts==2);
  puts("PASS Sticky restart: startup hold guard, stable release, short-press cancellation, 3s threshold, one-shot, reinit and GPIO failure");
- puts("PASS Sticky power: vendor hold/lock preserved; unused rails off; charger and microphone signal pins untouched");
+ puts("PASS Sticky power: hold/lock preserved; SD powered/deselected; other unused rails off; charger and microphone signal pins untouched");
 }

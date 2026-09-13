@@ -17,6 +17,7 @@ function demo(boardId) {
     capability: name => boardDescriptors[boardId].capabilities[name], millis: () => now >>> 0 };
   const modules = {};
   function requireModule(name) {
+    if (name === 'mcujs:module') return { has: moduleName => moduleName === 'devices' };
     if (name === 'board') return board;
     if (!modules[name]) {
       const module = {};

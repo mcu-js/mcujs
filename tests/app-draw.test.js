@@ -16,7 +16,7 @@ function run(files, failWrite = false) {
     close: () => { state.closed++; } };
   const fakeFS = { existsSync: p => files.has(p), readFileSync: p => files.get(p),
     writeFileSync: (p, s) => { if (failWrite) throw Object.assign(new Error('USB host owns storage'), { code: 'EBUSY' }); files.set(p, s); } };
-  const sandbox = { require: n => ({ fs: fakeFS, devices: { display: { open: () => display } }, './draw': draw })[n],
+  const sandbox = { require: n => ({ 'mcujs:module': { has: () => true }, fs: fakeFS, devices: { display: { open: () => display } }, './draw': draw })[n],
     console: { log: s => state.logs.push(s), error: () => {} },
     setTimeout: (f, ms) => { assert.equal(ms, 60000); state.finish = f; return 1; }, clearTimeout: () => {} };
   try { vm.runInNewContext(source, sandbox); } catch (error) { state.error = error; }

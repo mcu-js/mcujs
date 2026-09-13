@@ -23,7 +23,7 @@
 
   try {
     const fs = require('fs');
-    console.log('Device storage is ready:', fs.existsSync('/index.js'));
+    console.log('Device storage is ready. Startup app exists:', fs.existsSync('/app/index.js'));
   } catch (error) {
     if (error && error.code === 'EBUSY') {
       console.log('Storage ownership changed; eject the MCU.js volume and retry.');

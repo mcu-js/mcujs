@@ -26,16 +26,25 @@
     globalThis.blinkLedOn = false;
     writeLed(false);
     console.log('Blinking onboard LED every ' + blinkPeriodMs + ' ms.');
-    globalThis.blinkInterval = setInterval(function () {
-        globalThis.blinkLedOn = !globalThis.blinkLedOn;
-        writeLed(globalThis.blinkLedOn);
-    }, blinkPeriodMs);
-    globalThis.blinkTimeout = setTimeout(function () {
+    try {
+        globalThis.blinkInterval = setInterval(function () {
+            globalThis.blinkLedOn = !globalThis.blinkLedOn;
+            writeLed(globalThis.blinkLedOn);
+        }, blinkPeriodMs);
+        globalThis.blinkTimeout = setTimeout(function () {
+            clearInterval(globalThis.blinkInterval);
+            globalThis.blinkInterval = undefined;
+            globalThis.blinkTimeout = undefined;
+            globalThis.blinkLedOn = false;
+            writeLed(false);
+            console.log('Demo complete!');
+        }, 30000);
+    } catch (error) {
         clearInterval(globalThis.blinkInterval);
         globalThis.blinkInterval = undefined;
         globalThis.blinkTimeout = undefined;
         globalThis.blinkLedOn = false;
         writeLed(false);
-        console.log('Demo complete!');
-    }, 30000);
+        throw error;
+    }
 }());

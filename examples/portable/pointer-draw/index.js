@@ -1,19 +1,23 @@
 // Bounded firmware setup. Application drawing is shared with browser.html.
-var devices = require('devices');
-var draw = require('./draw');
+(function () {
+if (typeof globalThis.pointerDrawStop === 'function') globalThis.pointerDrawStop();
+var devices = require('mcujs:module').has('devices') ? require('devices') : {};
 
 if (!devices.display) {
   console.log('No configured display is enabled in this firmware.');
 } else {
+  var draw = require('./draw');
   var display = devices.display.open();
   var stop, timer, finished = false;
   function finish() {
     if (finished) return;
     finished = true;
     if (timer !== undefined) clearTimeout(timer);
+    display.canvas.removeEventListener('error', finish);
     try { if (stop) stop(); } finally { display.close(); }
     console.log('Demo complete!');
   }
+  globalThis.pointerDrawStop = finish;
   try {
     if (!display.canvas.maxTouchPoints) {
       console.log('This configured display has no pointer input.');
@@ -27,3 +31,4 @@ if (!devices.display) {
     }
   } catch (error) { finish(); throw error; }
 }
+}());

@@ -14,6 +14,9 @@ node --test \
     "${ROOT}/tests/display-capability-honesty.test.js" \
     "${ROOT}/tests/portable-api-conformance.test.js" \
     "${ROOT}/tests/examples-gpio-contract.test.js" \
+    "${ROOT}/tests/examples-newcomer.test.js" \
+    "${ROOT}/tests/pointer-draw.test.js" \
+    "${ROOT}/tests/app-draw.test.js" \
     "${ROOT}/tests/examples-i2c-contract.test.js"
 "${ROOT}/scripts/test-runtime-registry.sh"
 "${ROOT}/scripts/test-runtime-bindings.sh"

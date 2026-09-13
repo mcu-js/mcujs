@@ -1,0 +1,6 @@
+{
+  "appName": "My mcujs App",
+  "version": "1.0.0",
+  "debug": true,
+  "features": ["log", "status"]
+}

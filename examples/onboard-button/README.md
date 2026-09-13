@@ -1,24 +1,24 @@
 # Onboard button → LED (no wiring)
 
-Supported firmware: Raspberry Pi **Pico (RP2040)** and Seeed **XIAO ESP32-S3**.
-Use **BOOTSEL** on Pico or **BOOT** on XIAO (not RESET). Do not hold the button
-while resetting or powering on: that can enter bootloader/recovery mode.
+Use firmware that advertises `devices.button`: for example **Pico (RP2040)**
+BOOTSEL or **XIAO ESP32-S3** BOOT (not RESET). Do not hold the button while
+resetting or powering on; that can enter bootloader/recovery mode.
 
-Copy `index.js` into `/lib/onboard-button/index.js` on the MCUJS filesystem,
-then run manually from the REPL:
+Copy `index.js` to the application volume as `onboard-button.js`, eject safely,
+and wait for `require('board').storageReady()` before running:
 
-```js
-require('/lib/onboard-button');
+```text
+.run /app/onboard-button.js
 ```
 
-Do **not** copy it to `/index.js`; this example is not an autorun application.
-It uses the same board API on both boards: `board.buttonPressed()` returns a
-boolean and accepts no arguments. `board.devices.button` describes a managed,
-read-only button, not a pin available to generic GPIO or other peripherals.
-Unsupported boards omit the method and metadata and the demo exits harmlessly.
+The script checks module availability, opens `devices.button`, and listens for
+`press`, `release`, and `error` events. It logs the initial state, then changes;
+the declared onboard LED follows the button if present. No GPIO pin is guessed.
+Missing configured input produces a skip message without timers or handles.
 
-The LED initially follows the button directly. After that, three matching 10ms
-samples debounce each change; only state changes are logged. After 60 seconds
-the interval is cleared, the LED turns off, and `Demo complete!` is printed.
-The REPL remains responsive throughout. As with other required modules, a reset
-clears the module cache before running it again.
+After **60 seconds**, it removes listeners, closes the button, turns the LED off,
+and prints `Demo complete!`. Stop early with `onboardButtonStop()`. Running the
+same `.run` command again first cleans up the previous run; a stale timeout
+cannot close the new handle. Do not install this as `/app/index.js` unless you
+intentionally want it to run at startup. `require()` caches modules; use `.run`
+to execute the entry again without resetting.

@@ -1,130 +1,107 @@
-# mcujs Examples
+# MCU.js examples
 
-Example programs demonstrating MCU.js features across supported boards.
+Start with [First light](blink/README.md), then [board discovery](board-discovery/index.js).
+These examples target the current portable API source line; a folder name is not
+proof that an older firmware supports it. Inspect `.info` and
+`require('mcujs:module').builtinModules` before choosing a lesson.
 
-## Usage
+## Copy and run safely
 
-Start with [First light: blink an onboard LED](blink/README.md) for exact
-load, run, stop, and timing-edit steps on Pico and XIAO ESP32-S3.
+The host-visible application volume root maps to **`/app`** in the runtime.
+Copy `hello/index.js` as `hello.js` on that volume, eject it safely, wait for
+`require('board').storageReady()` to return `true`, then `.run /app/hello.js`.
+Use `.run` for fresh CommonJS entry execution; `require()` caches modules.
+Keep sibling files together. Use a non-`index.js` destination at the volume root
+unless you deliberately want `/app/index.js` startup execution. Never overwrite
+an existing app or settings just to try a demo. Boards without USB file access
+need their supported transfer method; the runtime paths remain `/app/...`.
 
-For other examples, copy the JavaScript file to the board's MCU.js filesystem,
-properly eject the volume, then use `.run filename.js` in the serial REPL.
-Use a non-`index.js` destination name if you do not want a startup script.
+## Maintained common entry points
 
-## Examples
+This is a finite inventory, not a claim that every script below this directory
+is a portable, beginner-safe entry point. Missing capabilities should be read
+as a reason to skip a lesson, not to guess a GPIO number.
 
-### hello/
-Basic hello world - prints board info and a periodic heartbeat message.
+| Entry | Files to copy together | Behavior / stop |
+| --- | --- | --- |
+| `hello/index.js` | entry only | Board info and 5-second heartbeat; 30s; `helloStop()` |
+| `board-discovery/index.js` | entry only | Read-only identity, pins, modules and capabilities; immediate |
+| `storage-ownership/index.js` | entry only | Read-only filesystem ownership check; immediate |
+| `blink/index.js` (or `blink/blink.js`) | either entry | Declared onboard LED; 30s; [early stop](blink/README.md) |
+| `config/index.js` | `config.json` beside entry | Read/log static JSON; immediate; no writes or LED pin assumptions |
+| `modules/index.js` | `math.js` beside entry | Relative CommonJS exports and cache identity; immediate; no writes |
+| `onboard-button/index.js` | entry only | Configured button events and optional onboard LED; 60s; `onboardButtonStop()` |
+| `pwm-fade/index.js` | entry only | Advertised PWM-capable LED/pin only; 15s; no fallback pin guessing |
+| `i2c-scan/index.js` | entry only | Finite scan on declared default route; requires correctly wired 3.3V target/pull-ups/common ground |
 
-**Concepts:** `console.log`, `board` object, `setInterval`
-
-### board-discovery/
-Prints the canonical board identity, semantic pin map, onboard devices, built-in
-modules, and capability snapshot without branching on a board name.
-
-**Concepts:** `require('board')`, `require('mcujs:module')`, `board.pins`,
-`board.devices`, `board.capabilities()`, optional image-module discovery
-
-**Hardware:** None
-
-### storage-ownership/
-Feature-detects filesystem support and `board.storageReady()`, then performs a
-read-only check only while the device owns the mounted volume.
-
-**Concepts:** static `fs` capability, dynamic storage readiness, USB MSC
-ownership, `EBUSY`
-
-**Hardware:** None
-
-### blink/
-Portable LED blink - uses onboard inventory and toggles the LED every 500ms for 30 seconds.
-Follow the [first-light lesson](blink/README.md), then change one timing value.
-
-**Concepts:** `board.devices`, `gpio.init`, strict boolean `gpio.set`, `setInterval`
-
-**Hardware:** A board with a declared onboard LED; managed LEDs use `board.led()` and GPIO LEDs use their declared pin.
-
-### button/
-Button input with software debounce - toggles LED on button press.
-
-**Concepts:** `GPIO.INPUT_PULLUP`, `GPIO.get`, debouncing, state tracking
-
-**Hardware:** Push button connected between GPIO 15 and GND
-
-### pwm-fade/
-Portable LED breathing effect using PWM - smoothly fades an advertised PWM-capable GPIO LED up and down for 15 seconds.
-
-**Concepts:** `board.capability('pwm')`, `pwm.init`, ratio-only `pwm.setDuty`, safe reruns
-
-**Hardware:** A PWM-capable onboard GPIO LED, or set `globalThis.pwmFadePin` to an advertised PWM pin connected to an LED and resistor. Set `globalThis.pwmFadeActiveLow = true` for active-low wiring.
+The timer demos above replace their own prior run. Stop one hardware lesson
+before starting a different one that needs the same resource. Configuration and
+helper modules remain cached until reset or explicit cache invalidation; `.run`
+refreshes the entry, not its dependencies.
 
 ### i2c-scan/
-Scans readable standard addresses on the board-declared default I2C route.
 
-**Concepts:** `board.capability('i2c')`, options-object `i2c.init`,
-`defaultRoute`, strict `ENXIO` handling, safe persistent-realm reruns
+Scans readable standard addresses using `board.capability('i2c')` and its
+`defaultRoute`, not a fixed pair of Pico pins. Use the options-object `i2c.init`
+contract. Connect a 3.3 V target, appropriate SDA/SCL pull-ups and common ground.
+Read-incompatible targets may not appear. Only `ENXIO` means no responding target;
+unexpected bus and native I/O errors stop the scan.
 
-**Hardware:** A 3.3 V I2C target connected to the printed `defaultRoute`, with
-appropriate SDA/SCL pull-ups and a common ground. Read-incompatible targets may
-not appear; unexpected bus and native I/O errors stop the scan.
+## Maintained configured-display entry points
 
-### modules/
-Demonstrates the CommonJS `require()` system with custom modules.
+**Start drawing with `devices` and `display.canvas`, not a board-specific
+`screen.js` driver.** The firmware must advertise the `devices` module and a
+configured display. These entries check availability before opening a display.
 
-**Concepts:** `require()`, `exports`, module caching, `/lib/` directory
+| Entry | Additional files | Behavior / stop |
+| --- | --- | --- |
+| `portable/device-display/index.js` | its sibling `draw.js` | Draw, present, close immediately |
+| `portable/pointer-draw/index.js` | its sibling `draw.js` | Configured pointer input; 30s; `pointerDrawStop()` |
+| `portable/app-draw/index.js` | copy `portable/pointer-draw/draw.js` beside entry | Pointer input and **intentional** validated `/app/settings.json` persistence; 60s; `appDrawStop()` |
 
-**Hardware:** None
+Pointer entries replace their own old timers, listeners and handles on `.run`.
+The pointer drawing consumer also has a browser demonstration: keep
+`browser.html`, `browser.js`, `browser-adapter.js`, and `draw.js` together.
 
-### config/
-Load application settings from JSON configuration files.
+### Portable helper modules (not `.run` entry lessons)
 
-**Concepts:** `require()` with JSON, configuration-driven code
+[`portable/images/README.md`](portable/images/README.md) documents the image
+helpers: `images/features.js`, `images/info.js`, `images/slideshow.js`,
+`jpeg/show.js`, `sd-bmp/show.js`, and `sd-bmp/copy.js`. They require explicit
+paths, assets and appropriate filesystem/decoder/display support. Preserve the
+relative directory layout and follow their returned-handle cleanup contract.
+`portable/sd-asset/show.js` is a separate explicit-path asset helper. These are
+not universal onboard demos; SD access and copy operations have additional
+hardware and write/ownership prerequisites.
 
-**Hardware:** None (uses onboard LED on GPIO 25)
+## External-hardware / board-specific legacy and experimental examples
 
-### waveshare-lcd-1.28/
-Examples for Waveshare RP2040 Touch LCD 1.28" (240x240 round GC9A01A display).
+The remaining scripts are **not in the maintained newcomer entry inventory**.
+They may depend on older APIs, fixed wiring, local drivers, specific firmware,
+assets, or longer-running loops. Review each folder's instructions and source;
+do not infer compatibility or safe reruns from their presence here.
 
-**Files:**
-- `gc9a01a.js` - Low-level display driver
-- `screen.js` - High-level drawing API
-- `demo-fps.js` - FPS benchmark with bouncing ball
-- `demo-slideshow.js` - Slideshow with shapes, text, colors
-- `demo-touch-draw.js` - Touch-enabled drawing demo
-- `demo-imu.js` - IMU visualization
+- `button/`: external push button and fixed-wiring lesson, not the onboard input API.
+- `waveshare-lcd-1.28/`, `waveshare-lcd-1.47/`, `waveshare-lcd-1.69/`,
+  `waveshare-lcd-2.8/`, `waveshare_rp2040_pizero/`: board/controller-specific
+  drivers, animations, games and experiments.
+- `waveshare-epaper-1.54-v2/`, `reterminal-sticky/`: dedicated e-paper hardware,
+  artwork and board-specific setup; see their own READMEs.
+- `images/`: assets, not executable lessons.
 
-**Hardware:** Waveshare RP2040 Touch LCD 1.28" board
+There is no universal Pico pin table: use `require('board').pins`,
+`require('board').devices`, and the relevant capability's declared routes.
 
-### waveshare-lcd-1.47/
-Examples for Waveshare RP2350-LCD-1.47-A (320x172 ST7789V3 display).
+## Verification
 
-**Files:**
-- `st7789v3.js` - Low-level display driver
-- `screen.js` - High-level drawing API
-- `demo-fps.js` - FPS benchmark with bouncing balls
-- `demo-slideshow.js` - Slideshow with shapes, text, colors
-- `demo-shapes.js` - Animated shapes demo
-- `demo-rainbow.js` - Rainbow/color effects demo
+Host regressions execute real example sources with simulated public SDK/timer
+boundaries, including fresh CommonJS entries in one persistent VM:
 
-**Hardware:** Waveshare RP2350-LCD-1.47-A board
+```sh
+node --test tests/examples-newcomer.test.js tests/examples-gpio-contract.test.js tests/pointer-draw.test.js
+```
 
-## Pin Reference
-
-| Function | Default Pin |
-|----------|-------------|
-| Onboard LED | GPIO 25 |
-| I2C0 SDA | GPIO 4 |
-| I2C0 SCL | GPIO 5 |
-| I2C1 SDA | GPIO 6 |
-| I2C1 SCL | GPIO 7 |
-| SPI0 SCK | GPIO 18 |
-| SPI0 TX | GPIO 19 |
-| SPI0 RX | GPIO 16 |
-| SPI0 CS | GPIO 17 |
-
-## Creating Your Own
-
-1. Create a new folder in `examples/`
-2. Add an `index.js` file with your code
-3. Include a comment header explaining what it does
-4. Test on real hardware before committing
+These tests are not physical-board evidence. Firmware/native compatibility,
+USB transfer, actual timing, and visible/electrical behavior require separate
+hardware verification. New demos should be non-blocking, bounded, capability
+aware, and clean up on completion and rerun.

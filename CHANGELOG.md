@@ -4,6 +4,19 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Restore configured buzzer/speaker/microphone discovery in non-Canvas builds:
+  runtime capabilities and public `devices` factories now agree with manifests.
+  Expand the existing loader lane to all eleven package targets and both
+  experimental profiles, and compare Canvas-off/on registry metadata.
+- Preserve ESP safe-mode failure reasons: active boot qualification reports
+  `EBUSY`, while NVS persistence failures report `EIO`. Real board/boot native
+  regression coverage retains the existing state transitions.
+- Correct LCD 2.8 speaker presentation and release-target inventory; accept the
+  existing trusted HTTPS `.com` meta-refresh in the public-link verifier, with
+  negative cases and destination validation. No DNS/settings/deployment or
+  published-release changes. See [#27](https://github.com/mcu-js/mcujs/issues/27)
+  for exact-commit acceptance evidence and separate hardware exclusions.
+
 - Omit unsupported `board.enterUf2` on Sticky and ePaper154 instead of exposing
   a throwing stub. The independently optional `boot.enterUf2` capability now
   describes RP/XIAO availability; safe-mode behavior and REPL recovery handlers

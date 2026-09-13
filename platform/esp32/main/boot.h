@@ -9,6 +9,12 @@ void mcujs_boot_task(void);
 
 bool mcujs_boot_storage_ready(void);
 bool mcujs_boot_safe_mode(void);
-bool mcujs_boot_set_safe_mode(bool enabled);
+typedef enum {
+    MCUJS_BOOT_SAFE_MODE_OK,
+    MCUJS_BOOT_SAFE_MODE_BUSY,
+    MCUJS_BOOT_SAFE_MODE_IO,
+} mcujs_boot_safe_mode_result_t;
+
+mcujs_boot_safe_mode_result_t mcujs_boot_set_safe_mode(bool enabled);
 
 #endif /* MCUJS_ESP32_BOOT_H */

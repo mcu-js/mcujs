@@ -34,21 +34,34 @@ test('compiled registry, manifest and device discovery agree for enabled and dis
   const dir = mkdtempSync(join(tmpdir(), 'mcujs-device-registry-'));
   try {
     const source = join(dir, 'dump.c');
-    writeFileSync(source, '#include "runtime_registry.h"\n#include <stdio.h>\nint main(void){puts(mcujs_runtime_registry()->manifest_json); printf("%d %d\\n",mcujs_runtime_has_module("devices"),mcujs_runtime_find_capability("devices")!=NULL);return 0;}\n');
-    for (const [board, macro, profile] of [
-      ['seeed_reterminal_sticky', 'MCUJS_BOARD_SEEED_RETERMINAL_STICKY', 'MCUJS_CANVAS_STICKY'],
-      ['waveshare_rp2350_lcd_1.47_a', 'MCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A', 'MCUJS_CANVAS_DEFAULT_ST7789'],
-      ['pico', 'MCUJS_BOARD_PICO', null],
-      ['seeed_xiao_esp32s3', 'MCUJS_BOARD_SEEED_XIAO_ESP32S3', null],
-    ]) {
+    writeFileSync(source, '#include "runtime_registry.h"\n#include <stdio.h>\nint main(void){const mcujs_runtime_registry_t *r=mcujs_runtime_registry();puts(r->manifest_json); printf("%d %d\\n",mcujs_runtime_has_module("devices"),mcujs_runtime_find_capability("devices")!=NULL);for(size_t i=0;i<r->builtin_module_count;i++)puts(r->builtin_modules[i]);return 0;}\n');
+    const displayProfiles = {
+      seeed_reterminal_sticky: 'MCUJS_CANVAS_STICKY',
+      'waveshare_esp32s3_epaper_1.54_v2': 'MCUJS_CANVAS_EPAPER154',
+      waveshare_rp2040_pizero: 'MCUJS_CANVAS_DVI',
+      'waveshare_rp2350_lcd_1.47_a': 'MCUJS_CANVAS_DEFAULT_ST7789',
+      'waveshare_rp2350_touch_lcd_1.69': 'MCUJS_CANVAS_DEFAULT_ST7789',
+      'waveshare_rp2350_touch_lcd_2.8': 'MCUJS_CANVAS_DEFAULT_ST7789',
+    };
+    for (const board of Object.keys(boardDescriptors)) {
+      const macro = 'MCUJS_BOARD_' + board.toUpperCase().replaceAll('.', '_');
+      const profile = displayProfiles[board];
       for (const enabled of [false, true]) {
         const args = ['-std=c11', '-I' + join(root, 'host'), '-D' + macro, source, join(root, 'host/runtime_registry.c'), '-o', join(dir, 'dump')];
         if (enabled) { args.push('-DMCUJS_EXPERIMENTAL_CANVAS=1'); if (profile) args.push('-D' + profile + '=1'); }
         execFileSync(process.env.CC || 'cc', args);
-        const [json, flags] = execFileSync(join(dir, 'dump'), { encoding: 'utf8' }).trim().split('\n');
+        const [json, flags, ...modules] = execFileSync(join(dir, 'dump'), { encoding: 'utf8' }).trim().split('\n');
         const configured = enabled && !!profile;
-        assert.deepEqual(JSON.parse(json), manifestFor(board, { configuredDisplay: configured }));
-        assert.equal(flags, (configured || board === 'pico' || board === 'seeed_xiao_esp32s3') ? '1 1' : '1 0');
+        const manifest = manifestFor(board, { configuredDisplay: configured });
+        assert.deepEqual(JSON.parse(json), manifest, board);
+        assert.equal(flags, Object.hasOwn(manifest.capabilities, 'devices') ? '1 1' : '1 0', board);
+        const expectedModules = [...boardDescriptors[board].modules];
+        if (enabled) {
+          expectedModules.push('mcujs:canvas-native', 'canvas');
+          if (!['MCUJS_CANVAS_EPAPER154', 'MCUJS_CANVAS_STICKY'].includes(profile))
+            expectedModules.push('displays/st7789');
+        }
+        assert.deepEqual(modules.sort(), expectedModules.sort(), `${board}: actual compiled module list`);
         const output = join(dir, 'build.capabilities.json');
         execFileSync('python3', [join(root, 'scripts/build-capability-manifest.py'), '--board', board, '--output', output, ...(configured ? ['--configured-display'] : [])]);
         assert.deepEqual(JSON.parse(readFileSync(output, 'utf8')), JSON.parse(json));

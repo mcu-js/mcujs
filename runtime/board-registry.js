@@ -26,7 +26,7 @@ const boardPresentation = Object.freeze({
   "waveshare_rp2040_touch_lcd_1.28": { label: "Waveshare RP2040 Touch LCD 1.28", flash: "4MB", notes: "Round LCD, touch, IMU" },
   "waveshare_rp2350_lcd_1.47_a": { label: "Waveshare RP2350-LCD-1.47-A", flash: "16MB", notes: "LCD, NeoPixel" },
   "waveshare_rp2350_touch_lcd_1.69": { label: "Waveshare RP2350-Touch-LCD-1.69", flash: "16MB", notes: "LCD, touch, IMU, buzzer" },
-  "waveshare_rp2350_touch_lcd_2.8": { label: "Waveshare RP2350-Touch-LCD-2.8", flash: "16MB", notes: "Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; touch/audio/SD/sensors unsupported" },
+  "waveshare_rp2350_touch_lcd_2.8": { label: "Waveshare RP2350-Touch-LCD-2.8", flash: "16MB", notes: "Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; bounded WAV speaker; touch/SD/sensors unsupported" },
   adafruit_feather_rp2040: { label: "Adafruit Feather RP2040", flash: "8MB", notes: "NeoPixel, STEMMA QT" },
   seeed_reterminal_sticky: { label: "Seeed reTerminal Sticky", flash: "32MB", notes: "Experimental PSRAM Canvas; UART bridge; ROM recovery; touch/audio/sensors unqualified" },
   "waveshare_esp32s3_epaper_1.54_v2": { label: "Waveshare ESP32-S3-ePaper-1.54 V2", flash: "8MB", notes: "Experimental Canvas opt-in; ROM recovery only; peripherals unqualified" },

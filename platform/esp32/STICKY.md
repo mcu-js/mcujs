@@ -147,5 +147,41 @@ failures; application files were unchanged. There were no SD writes or write
 attempts. This is new glass evidence, not merely retained artwork after flashing.
 
 This does not qualify partial refresh, long-term ghosting, battery life/cold
-power-on, arbitrary cards, hot-swap or power-loss safety. JPEG/text/circle and
-slideshow consumers remain separate bounded checks; no other panel is covered.
+power-on, arbitrary cards, hot-swap or power-loss safety. Text/circle and image
+consumers remain separate bounded checks; no other panel is covered.
+
+### Exact-build discovery follow-up
+
+A read-only API probe on `0.1.0+37e3771` found nine built-ins: `board`, `fs`,
+`process`, `events`, `devices`, `mcujs:module`, `node:module`,
+`mcujs:canvas-native` and `canvas`. Actual `require()`, `modules.has()`, the
+`.help` module list and `.capabilities` module summary agreed. The four
+capabilities (`boot`, `fs`, `usb`, `devices`), their per-name REPL output and
+board metadata matched the **configured-display build artifact's** manifest,
+not the unconfigured checked-in manifest. Only `devices.display` was exposed.
+Four strict-mode mutation attempts and missing/wrong/empty module-name probes
+returned the expected TypeError/RangeError; original module/device data remained
+unchanged. This is a bounded sample, not exhaustive mutation conformance.
+
+Two help/recovery gaps remain: `.help` lists `ledPin` although it is undefined,
+and advertises UF2 commands although this target has no TinyUF2. The exported
+`board.enterUf2` function throws an unavailable error in source; it was not
+invoked. Do not follow the generic UF2 help on Sticky or call discovery fully
+qualified until these unsupported surfaces are corrected.
+
+`jpeg` and legacy `image` are **absent** in this firmware, consistently with
+`modules.has()` and actual `require()` failure. The native JPEG registration
+currently shares `MCUJS_FEATURE_IMAGE`, disabled on Sticky. JPEG/slideshow
+qualification is therefore not merely a pending camera test: support needs a
+separately reviewed decoder-capability decision, not a compatibility shim or
+enabling legacy graphics implicitly. BMP and header-only metadata use raw `fs`
+and do not by themselves establish JPEG decoding support.
+
+No flash, file write or explicit reset was requested by this probe. Boot output
+was observed on UART attachment despite inactive DTR/RTS; its cause was not
+established, so this is not proof of a reset-free attachment. The ensuing REPL
+was responsive, safe mode false, startup files unchanged, and the startup-owned
+display remained `busy` with stable one-presentation/zero-failure counters
+during the probe. No test handle or timer was created. A final camera still was
+too dark to inspect; it adds **no new visual acceptance** beyond the earlier
+eight-photo qualification. Further visual experiments wait for usable lighting.

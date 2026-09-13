@@ -132,9 +132,21 @@ protected prefix and internal filesystem bytes were unchanged. Application BIN:
 This qualifies one inserted card, bounded serialized display/read use and
 settled software restarts. It does **not** qualify other cards, hot-swap,
 power-loss safety, battery cold boot, battery life, long-term ghosting, partial
-refresh, or the Waveshare ePaper panel. Text/arcs/JPEG/metadata/slideshow on
-Sticky still need their own bounded consumer checks. #22 and #7 stay open.
+refresh, or the Waveshare ePaper panel. Text/arcs/BMP/metadata consumers on
+Sticky still need their own bounded example checks. JPEG is absent in the
+installed profile (its registration shares the disabled legacy-image feature),
+so JPEG/slideshow needs a separate support decision before hardware testing.
+#22 and #7 stay open.
 See [SD assets](sd-assets.md) and [Canvas migration](display-canvas.md).
+
+A follow-up read-only discovery probe matched nine built-ins across actual
+`require()`, `modules.has()`, `.help` module entries and `.capabilities`; four
+capability descriptors and board metadata matched the configured-display
+artifact manifest. This is not a complete help pass: generic help still lists
+undefined `ledPin` and unavailable UF2 commands on Sticky. No firmware or file
+write was requested. Boot output appeared on attachment; reset-free connection
+was not established. The final still was too dark for new visual acceptance,
+so further visual experiments are deferred rather than inferred from counters.
 
 ### Software backlog reconciliation
 

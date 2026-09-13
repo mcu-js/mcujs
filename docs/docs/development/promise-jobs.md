@@ -115,6 +115,61 @@ recovery. Do not flash or change startup files without the device-specific
 approval and preservation plan. Existing safe-boot behavior is unchanged;
 completion of an asynchronous startup task is not a new healthy-boot signal.
 
+## Pending-job admission follow-up (#23)
+
+**A queue cap and overload/recovery policy are still unimplemented.** The native
+lifecycle tests above are prerequisites, not proof of safe overload handling.
+
+The admission audit uses JerryScript commit
+`50200152feb724a74a5f64e44d7885151537cfad` and MCU.js
+`62ab0e68e2a4296e64bd52a9ac72ef021eb84b01`. Relevant sources are the pinned
+[Jerry queue producers/processors](https://github.com/jerryscript-project/jerryscript/blob/50200152feb724a74a5f64e44d7885151537cfad/jerry-core/ecma/operations/ecma-jobqueue.c),
+[Promise objects](https://github.com/jerryscript-project/jerryscript/blob/50200152feb724a74a5f64e44d7885151537cfad/jerry-core/ecma/operations/ecma-promise-object.c),
+and [MCU.js engine lifecycle](https://github.com/mcu-js/mcujs/blob/62ab0e68e2a4296e64bd52a9ac72ef021eb84b01/host/engine.c):
+
+- All four enqueue producer families (reaction, async reaction, async-generator
+  continuation and thenable assimilation) allocate their job and retain its
+  payload before the common `ecma_enqueue_job()` call. Their enqueue interfaces
+  return `void`. A drop-on-full check at that common call neither prevents the
+  allocation nor propagates a completion policy to the caller.
+- Promise settlement can enqueue many reactions, and rejection can enqueue more
+  work. Rejecting an excess job is not automatically nonrecursive backpressure.
+  Reactions attached to a still-pending Promise and async-generator request tasks
+  also retain memory before they become runnable jobs. A runnable-job cap would
+  not bound all Promise-related memory or make general OOM recoverable.
+- A Jerry abort is not by itself a persistent poisoned-context policy. Some
+  Promise paths take the exception and convert it into rejection;
+  `jcontext_take_exception()` clears the abort flag too. A bounded native probe
+  returning `jerry_throw_abort()` observed different paths: a direct call skipped
+  its JS catch/finally, an async-function continuation returned an abort from the
+  job runner, while reaction, thenable and async-generator fixtures ran rejection
+  handlers. Both production timer backends also continued to a later due timer
+  after a native abort. Every tested context still accepted a later evaluation.
+  These are injected-abort observations, **not an implemented admission failure**.
+- Current job-error handling logs and continues to timers and another batch.
+  Ordinary Canvas teardown deliberately calls lifecycle listeners while the VM
+  is valid, and error/result formatting can invoke JavaScript. Neither is a
+  silent, no-further-callback poisoned-context shutdown path.
+
+A finite host-only branching probe also confirmed the existing gap without
+exhausting the heap: after four turns it had executed 128 callbacks and accepted
+257, leaving 129 outstanding. A timer ran after the first 16 jobs; stopping the
+producer from another evaluation allowed all 257 callbacks to finish in FIFO
+order. A separate 200-reaction pending-Promise fixture retained heap while the
+runnable queue was empty, then completed all callbacks after settlement. These
+characterize the current build, not a promised capacity or hardware result.
+
+The next implementation needs one coherent observable policy, not an enqueue
+counter alone. If terminal context cancellation is chosen, prove pre-allocation,
+context-local admission/accounting; abort propagation through all producers;
+no further user callbacks after failure (including timer, cleanup and diagnostic
+paths); fully unwound native-resource release; and explicit fresh-VM recovery.
+Use finite real-engine boundary tests, including fulfilled/rejected async paths,
+in-flight enqueue, pending collections, excess work and teardown. Preserve normal
+FIFO/draining behavior and the upstream API below the chosen limit. No terminal
+policy has been selected or approved by this audit; do not stress a live board to
+choose one.
+
 The next [bounded events slice](./bounded-events.md) supplies module-scoped
 EventTarget and AbortSignal subsets. Queue backpressure, unhandled-rejection
 reporting, asynchronous device I/O, touch, sensors, audio and networking remain

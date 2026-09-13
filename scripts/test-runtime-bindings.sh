@@ -85,15 +85,27 @@ python3 "${JERRY_ROOT}/tools/build.py" \
 compile_binding_test() {
     local output="$1"
     local backend="$2"
-    local display_sources=()
-    shift 2
+    local modules="$3"
+    local display_sources=() peripheral_sources=()
+    shift 3
     if [[ "${backend}" == "platform/rp2" ]]; then
-        display_sources=(
-            -Wno-type-limits
-            "${ROOT}/host/bindings/graphics.c"
-            "${ROOT}/host/bindings/screen.c"
-        )
+        display_sources=(-Wno-type-limits)
+        for name in graphics screen; do
+            if [[ " ${modules} " == *" ${name} "* ]]; then
+                display_sources+=("${ROOT}/host/bindings/${name}.c")
+            fi
+        done
     fi
+    # Like firmware CMake, do not compile peripheral implementations that this
+    # profile omits. Disabled route tables deliberately have no SDK arguments.
+    for name in gpio i2c neopixel pwm; do
+        if [[ " ${modules} " == *" ${name} "* ]]; then
+            peripheral_sources+=("${ROOT}/${backend}/bindings/${name}.c")
+            case "${name}" in
+                i2c|neopixel) peripheral_sources+=("${ROOT}/host/bindings/${name}_options.c") ;;
+            esac
+        fi
+    done
     cc -std=gnu17 -Wall -Wextra -Werror \
         -ffunction-sections -fdata-sections \
         "$@" \
@@ -109,8 +121,6 @@ compile_binding_test() {
         "${ROOT}/host/runtime_registry.c" \
         "${ROOT}/host/bindings/bindings.c" \
         "${ROOT}/host/bindings/validation.c" \
-        "${ROOT}/host/bindings/i2c_options.c" \
-        "${ROOT}/host/bindings/neopixel_options.c" \
         "${ROOT}/host/bindings/pwm_policy.c" \
         "${ROOT}/host/bindings/board_registry.c" \
         "${ROOT}/host/bindings/fs.c" \
@@ -119,10 +129,7 @@ compile_binding_test() {
         "${ROOT}/host/bindings/console.c" \
         "${display_sources[@]}" \
         "${ROOT}/${backend}/bindings/pin_policy.c" \
-        "${ROOT}/${backend}/bindings/gpio.c" \
-        "${ROOT}/${backend}/bindings/i2c.c" \
-        "${ROOT}/${backend}/bindings/neopixel.c" \
-        "${ROOT}/${backend}/bindings/pwm.c" \
+        "${peripheral_sources[@]}" \
         -Wl,--gc-sections \
         "${JERRY_BUILD}/lib/libjerry-core.a" \
         "${JERRY_BUILD}/lib/libjerry-port.a" \
@@ -148,9 +155,9 @@ for board in "${BINDING_BOARDS[@]}"; do
             backend=platform/rp2
             flags+=(-DMCUJS_PLATFORM_RP2=1 -I"${ROOT}/tests/native_stubs/rp2" -I"${ROOT}/board/${board}") ;;
     esac
-    compile_binding_test "${binary}" "${backend}" "${flags[@]}"
-    nm -g "${binary}" > "${binary}.nm"
     modules="$(node -e 'console.log(require(process.argv[1]).boardDescriptors[process.argv[2]].modules.join(" "))' "${ROOT}/runtime/board-registry.js" "${board}")"
+    compile_binding_test "${binary}" "${backend}" "${modules}" "${flags[@]}"
+    nm -g "${binary}" > "${binary}.nm"
     for factory in gpio i2c neopixel pwm keyboard mouse graphics screen; do
         if [[ " ${modules} " == *" ${factory} "* ]]; then
             grep -Eq " T js_create_${factory}_module$" "${binary}.nm"

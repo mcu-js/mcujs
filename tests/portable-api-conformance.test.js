@@ -562,10 +562,11 @@ test("native registry lanes link production backend factories instead of redefin
     assert.doesNotMatch(harness, new RegExp(`js_create_${factory}_module\\s*\\(`));
   }
   const script = readFileSync(join(__dirname, "..", "scripts", "test-runtime-bindings.sh"), "utf8");
-  assert.match(script, /\$\{backend\}\/bindings\/gpio\.c/);
+  assert.match(script, /for name in gpio i2c neopixel pwm/);
+  assert.match(script, /\$\{backend\}\/bindings\/\$\{name\}\.c/);
   assert.match(script, /BINDING_BOARDS=\("\$\{MCUJS_RELEASE_BOARDS\[@\]\}" waveshare_esp32s3_epaper_1\.54_v2 seeed_reterminal_sticky\)/);
   assert.match(script, /backend=platform\/rp2/);
   assert.match(script, /backend=platform\/esp32\/main/);
-  assert.match(script, /compile_binding_test "\$\{binary\}" "\$\{backend\}" "\$\{flags\[@\]\}"/);
+  assert.match(script, /compile_binding_test "\$\{binary\}" "\$\{backend\}" "\$\{modules\}" "\$\{flags\[@\]\}"/);
   assert.match(script, /nm -g/);
 });

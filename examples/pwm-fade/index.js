@@ -50,28 +50,36 @@
     pwm.setDuty(pin, offDuty);
     globalThis.pwmFadeState = state;
 
-    state.interval = setInterval(function () {
-        step += direction;
-        if (step >= stepCount) {
-            step = stepCount;
-            direction = -1;
-        } else if (step <= 0) {
-            step = 0;
-            direction = 1;
-        }
+    try {
+        state.interval = setInterval(function () {
+            step += direction;
+            if (step >= stepCount) {
+                step = stepCount;
+                direction = -1;
+            } else if (step <= 0) {
+                step = 0;
+                direction = 1;
+            }
 
-        var brightness = step / stepCount;
-        pwm.setDuty(pin, activeLow ? 1 - brightness : brightness);
-    }, 40);
+            var brightness = step / stepCount;
+            pwm.setDuty(pin, activeLow ? 1 - brightness : brightness);
+        }, 40);
 
-    state.timeout = setTimeout(function () {
-        if (globalThis.pwmFadeState !== state) return;
+        state.timeout = setTimeout(function () {
+            if (globalThis.pwmFadeState !== state) return;
+            clearInterval(state.interval);
+            pwm.setDuty(pin, offDuty);
+            pwm.stop(pin);
+            globalThis.pwmFadeState = undefined;
+            console.log('Demo complete!');
+        }, 15000);
+    } catch (error) {
         clearInterval(state.interval);
         pwm.setDuty(pin, offDuty);
         pwm.stop(pin);
         globalThis.pwmFadeState = undefined;
-        console.log('Demo complete!');
-    }, 15000);
+        throw error;
+    }
 
     console.log('PWM fade on GPIO', pin, 'at', frequency, 'Hz');
 }());

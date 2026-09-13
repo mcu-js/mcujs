@@ -141,7 +141,7 @@ test('firmware setup starts pointer once and closes after its bounded timer', ()
   const display = { canvas, present() {}, startPointer() { started++; },
     close() { closed++; events.EventTarget.clear(canvas); } };
   vm.runInNewContext(fs.readFileSync(require.resolve('../examples/portable/pointer-draw/index'), 'utf8'), {
-    require: name => name === 'devices' ? { display: { open: () => display } } : require('../examples/portable/pointer-draw/draw'),
+    require: name => name === 'mcujs:module' ? { has: () => true } : name === 'devices' ? { display: { open: () => display } } : require('../examples/portable/pointer-draw/draw'),
     console: { log() {} },
     setTimeout(fn, ms) { assert.equal(ms, 30000); tick = fn; return 1; },
     clearTimeout(id) { assert.equal(id, 1); cleared++; }

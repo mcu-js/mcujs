@@ -4,51 +4,76 @@ sidebar_position: 9
 
 # Debugging and Recovery
 
-If a script goes off the rails, you have a quick way back in. See the [Glossary](./glossary.md) if you need a refresher on terms like UF2 or REPL.
+Start with `.info` and `.help`: record the exact board/build and use only the
+commands that firmware advertises. A recovery operation must preserve the
+application before replacing firmware or formatting storage.
 
-## Safe boot
+## Stop an example before resetting anything
 
-Hold the **BOOTSEL** button during power-on to skip `index.js` auto-run. This keeps the on-device drive accessible so you can delete or edit scripts without reflashing.
+Maintained timed examples document their completion and rerun cleanup. Let the
+bounded run finish or use its documented stop function. Clearing a timer alone
+need not release a display, input handle or peripheral pin; close/stop the owned
+resource too. `.run FILE` executes an entry again, while `require()` caches its
+dependencies. Do not use a format or firmware update as a normal stop button.
 
-If you are stuck in a loop, this is the fastest way back in.
+## Storage busy is not corruption
 
-## Boot status indicator
+When USB storage belongs to the host, runtime file access may report `EBUSY`.
+Save and properly eject `MCUJS` while leaving the serial connection available,
+then check:
 
-On startup the board blinks its LED (or NeoPixel on boards without an LED) to show boot progress:
+```javascript
+require('board').storageReady()
+```
 
-| Pattern | Meaning |
-| --- | --- |
-| 3 blinks | Reached main successfully |
-| 10 rapid blinks + pause (repeating) | Filesystem init failed |
-| 5 rapid blinks + pause (repeating) | JavaScript engine init failed |
+Wait for `true` before `.ls`, `.run`, file reads or writes. A missing ownership
+method means the firmware's prerequisite differs; check `.info` and the matching
+manifest instead of assuming readiness. `/app` is the logical internal volume;
+USB-root `index.js` is `/app/index.js`, not `/app/app/index.js`.
 
-If you see repeating rapid blinks, try reflashing the firmware.
+## Board-specific safe boot and recovery
 
-## [UF2](./glossary.md#uf2) mode
+### RP2040 / RP2350
 
-- Use `.uf2` to reboot into [UF2](./glossary.md#uf2) mode (prompted)
-- Use `.uf2!` to reboot immediately
+The runtime checks BOOTSEL before application startup. **Holding BOOTSEL while
+attaching USB can enter the chip's ROM bootloader instead**, showing `RPI-RP2`
+or `RP2350`, not the MCU.js filesystem or REPL. Do not mistake the recovery
+volume for `MCUJS` or copy application files onto it.
 
-## Filesystem recovery
+A supported `.uf2` / `.uf2!` command enters that recovery transport from the
+running REPL. Verify the exact target and prepare backups/rollback before an
+update. Firmware-size changes can relocate the physical application filesystem;
+follow the [explicit migration procedure](./development/app-namespace.md#explicit-upgrade-procedure).
+Physical held-button recovery is a per-board hardware check, not proof supplied
+by a host test or a generic BOOTSEL instruction.
 
-The filesystem auto-formats on first boot or if corruption is detected. If you need to manually reset the filesystem:
+### XIAO ESP32-S3
 
-- Use `.format` for a prompted format (3-second countdown, press any key to cancel)
-- Use `.format!` for immediate format without confirmation
+XIAO has persistent failed-startup recovery. A failed or unqualified startup can
+leave safe mode enabled on the next reset. Inspect `require('board').safeMode()`
+only when the installed boot capability exposes it. Repair or deliberately remove
+the failing `/app/index.js` before clearing safe mode; preserve a copy first.
 
-**Warning:** Formatting erases all files on the device.
+`safeMode(false)` is not a bypass for an active qualification window: the current
+contract reports `EBUSY`, and persistence failures report `EIO`. Keep the serial
+error rather than retrying destructive operations. See the
+[XIAO recovery procedure](https://github.com/mcu-js/mcujs/blob/development/platform/esp32/README.md#indexjs-and-persistent-safe-mode).
+Its compatible TinyUF2 recovery volume is `XIAOS3BOOT`; stock ESP-IDF full flash,
+partition changes and Pico-specific button instructions are not substitutes.
 
-The filesystem size is automatically calculated based on the board's flash size minus the firmware and a small EEPROM reservation.
+## Formatting is destructive
 
-## REPL tips
+Use a format only after identifying actual filesystem damage, verifying backups
+and explicitly choosing to erase that volume. If the installed `.help` advertises
+`.format`, it is prompted; `.format!` skips confirmation. Both lose data.
+Platform first-boot and damaged-filesystem policies differ: do not infer a safe
+repair policy or filesystem capacity from another board. Formatting cannot fix
+USB host ownership, a wrong source/API version, or a missing capability.
 
-- Use the [REPL](./glossary.md#repl) for quick checks without editing files
-- `.info` shows firmware build IDs and board details
-- `.run` is a quick way to retry a script after edits
+## Checks to keep separate
 
-## Key terms
-
-- [UF2](./glossary.md#uf2)
-- [BOOTSEL](./glossary.md#bootsel)
-- [REPL](./glossary.md#repl)
-- [Firmware](./glossary.md#firmware)
+Serial responsiveness, software restart, USB reconnect, held-button recovery and
+a charger-powered cold start are different observations. Record the actual build
+and the operation performed; do not report an unperformed cold-start or electrical
+check as passed. See [Runtime Basics](./runtime-basics.md) and
+[the board inventory](./hardware-boards.md) for supported interfaces and limits.

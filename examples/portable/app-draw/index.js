@@ -1,7 +1,10 @@
 'use strict';
 // Install as /app/index.js, with pointer-draw/draw.js beside it as /app/draw.js.
+(function () {
+if (typeof globalThis.appDrawStop === 'function') globalThis.appDrawStop();
+var devices = require('mcujs:module').has('devices') ? require('devices') : {};
+if (!devices.display) { console.log('No configured display is enabled in this firmware.'); return; }
 var fs = require('fs');
-var devices = require('devices');
 var draw = require('./draw');
 var settingsPath = '/app/settings.json';
 var settings = { color: 'lime', lineWidth: 3, starts: 0 };
@@ -14,16 +17,18 @@ if (!settings || ['white', 'lime', 'aqua', 'yellow'].indexOf(settings.color) < 0
     settings.starts < 0 || settings.starts >= 1000000 || settings.starts % 1 !== 0) {
   throw new Error('Invalid /app/settings.json; refusing to overwrite it.');
 }
-if (!devices.display) throw new Error('This app needs a configured Canvas display.');
 var display = devices.display.open();
 var stopDraw, timer, done = false;
+function failed(event) { console.error('Pointer input failed:', event.error); finish(); }
 function finish() {
   if (done) return;
   done = true;
   if (timer !== undefined) clearTimeout(timer);
+  display.canvas.removeEventListener('error', failed);
   try { if (stopDraw) stopDraw(); } finally { display.close(); }
-  console.log('App drawing demo complete. Reset to run again.');
+  console.log('App drawing demo complete.');
 }
+globalThis.appDrawStop = finish;
 try {
   if (!display.canvas.maxTouchPoints) throw new Error('This app needs pointer input.');
   // Small persistent configuration write; errors such as USB ownership remain visible.
@@ -36,11 +41,9 @@ try {
   ctx.lineWidth = settings.lineWidth;
   ctx.fillRect(0, 0, display.canvas.width, 4); // Visible ready cue in the saved color.
   display.present();
-  display.canvas.addEventListener('error', function (event) {
-    console.error('Pointer input failed:', event.error);
-    finish();
-  });
+  display.canvas.addEventListener('error', failed);
   display.startPointer();
   console.log('APP_READY ' + JSON.stringify(settings));
   timer = setTimeout(finish, 60000);
 } catch (error) { finish(); throw error; }
+}());

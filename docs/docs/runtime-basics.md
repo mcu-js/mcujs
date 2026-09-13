@@ -32,7 +32,7 @@ This section covers how you interact with the runtime day to day: the [REPL](./g
 index.js
 lib/
 > .cat index.js
-const led = 25;
+console.log("Hello from /app");
 > .run index.js
 ```
 
@@ -56,40 +56,45 @@ before loading an optional module, and use `require('board').capability(name)` f
 its routes and limits. Unsupported modules are absent rather than registered as
 throwing stubs.
 
-- Relative paths (`./`, `../`) resolve from the current file
-- Absolute paths (`/`) resolve from the filesystem root
-- Bare imports resolve from `/lib/` (create it if you want shared modules)
-- JSON files are parsed into objects
-- If you know CommonJS from Node, this will feel familiar
+- Relative imports (`./`, `../`) resolve from the requiring file, including later callbacks.
+- Internal absolute paths use `/app/...`; old `/lib/...` and `/config.json` paths are not aliases.
+- Bare custom imports resolve from `/app/lib/`; built-ins retain precedence.
+- JSON files are parsed into objects. Dependencies remain cached until the existing cache-clear/reset path.
+- `.run` and startup execute CommonJS entries with local `require`, `module`, `exports`, `__filename` and `__dirname`. `.run` executes the entry again, not its cached dependencies.
+- Entry variables are not REPL globals. Export state or deliberately use `globalThis` for a documented stop/rerun control.
+- `..` cannot escape the `/app` mount. Relative `fs` paths start at `/app`, not the module's directory.
 
 ### Example filesystem layout
 
+USB volume root (do **not** add an extra physical `app/` directory):
+
 ```text
-/
-├── index.js
-├── config.json
-├── lib/
-│   ├── math.js
-│   └── blink.js
-└── apps/
-    └── status.js
+MCUJS/
+├── index.js          # runtime /app/index.js
+├── config.json       # runtime /app/config.json
+└── lib/
+    └── math.js       # runtime /app/lib/math.js
 ```
+
+For a complete copyable lesson, use the maintained
+[modules example](https://github.com/mcu-js/mcujs/tree/development/examples/modules).
 
 ### Example imports
 
 ```javascript
-// index.js
-const fs = require('fs');
-const math = require('math');
-const blink = require('/lib/blink');
-const status = require('./apps/status');
-const config = require('./config.json');
-
-const contents = fs.readFileSync('/apps/status.js');
-console.log({ config, contentsLength: contents.length, sum: math.add(2, 3) });
-blink.start(25);
-status.report();
+// /app/index.js; these dependencies must be copied with the entry.
+var fs = require('fs');
+var math = require('./lib/math');
+var sameMath = require('math');
+var config = require('./config.json');
+console.log(math === sameMath); // One canonical module cache key.
+console.log(math.add(2, 3));
+console.log(fs.readFileSync('/app/config.json', 'utf8'));
 ```
+
+Startup reads only `/app/index.js` and respects storage ownership and safe boot.
+The [migration procedure](./development/app-namespace.md#explicit-upgrade-procedure)
+explains application preservation and changes to old absolute paths.
 
 ## Filesystem behavior
 

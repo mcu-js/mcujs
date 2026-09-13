@@ -37,7 +37,7 @@ this source/API. Firmware installation is a separate prerequisite: see the
 
    ```text
    .ls
-   .run /first-light.js
+   .run /app/first-light.js
    ```
 
 Expected: `Blinking onboard LED every 500 ms.` The LED starts off, turns on
@@ -45,7 +45,7 @@ at the first timer tick, then alternates every 500 ms. After 30 seconds it
 turns off and prints `Demo complete!`. Timers let the REPL remain responsive;
 there is no blocking endless loop.
 
-**Run again:** enter `.run /first-light.js` again. You can also rerun while
+**Run again:** enter `.run /app/first-light.js` again. You can also rerun while
 it is blinking: the example replaces its old interval and stop timer, starts
 off, and gives the new run its own 30 seconds. Use `.run`, not `require()`
 (which caches file modules), and not `.load` (not a supported REPL command).
@@ -77,7 +77,7 @@ var blinkPeriodMs = 250; // Change this one value to adjust the blink.
 ```
 
 Stop the old run, copy the edited file over `first-light.js` on the host-mounted
-volume, eject it again, check `storageReady()`, and run `.run /first-light.js`.
+volume, eject it again, check `storageReady()`, and run `.run /app/first-light.js`.
 If the ejected volume is no longer accessible to your file manager, reconnect
 USB to obtain it again, then reopen the serial terminal before running.
 

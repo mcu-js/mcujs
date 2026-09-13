@@ -4,6 +4,12 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Make maintained newcomer examples bounded and safe to rerun; use bundled
+  relative config/helper modules instead of writing root-level files. Correct
+  `/app` paths, guard optional devices, and separate portable lessons from
+  board-specific experiments. Align installation, migration and recovery docs
+  with the development API; no runtime feature or release-version change.
+
 - Restore configured buzzer/speaker/microphone discovery in non-Canvas builds:
   runtime capabilities and public `devices` factories now agree with manifests.
   Expand the existing loader lane to all eleven package targets and both

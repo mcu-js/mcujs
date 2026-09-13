@@ -1,6 +1,6 @@
 # mcujs
 
-A JavaScript runtime for microcontrollers, currently shipping for RP2040,
+A JavaScript runtime for microcontrollers, targeting RP2040,
 RP2350, and ESP32-S3 boards, in the same spirit as Node.js for servers.
 
 Docs: https://mcujs.org/
@@ -10,7 +10,7 @@ Docs: https://mcujs.org/
 - **USB Flash Drive**: Mount your board as a USB drive and drop in your `index.js`
 - **Serial REPL**: Interactive JavaScript console over USB serial
 - **Hardware APIs**: GPIO, PWM, I2C, SPI, ADC, and NeoPixel
-- **CommonJS Modules**: Use `require()` for modular code with `/lib/` module resolution
+- **CommonJS Modules**: Use `require()` for modular code with relative imports and `/app/lib/` module resolution
 - **Minimal Footprint**: Built on JerryScript for embedded systems
 
 ## Supported Boards
@@ -60,28 +60,29 @@ full flash.
 
 ### Run JavaScript
 
-Create an `index.js` file on the `MCUJS` drive. This portable example uses the
-declared onboard-device API rather than a board-specific GPIO number:
+Use the [quick start](docs/docs/quick-start.md) and the maintained
+[first-light lesson](examples/blink/README.md), with examples matching the
+installed firmware's source/API. Check `.info` for the exact build ID; a
+`0.1.0` version prefix alone does not establish the development 0.2 API.
 
-```javascript
-const board = require('board');
+Copy `examples/blink/index.js` to the physical `MCUJS` volume root as
+`first-light.js`, preserving any existing startup file. Eject storage, check
+`require('board').storageReady()` is `true`, then run:
 
-if (!board.devices.led) {
-    console.log('This board has no onboard LED');
-} else {
-    let ledOn = false;
-    board.led(ledOn);
-
-    setInterval(() => {
-        ledOn = !ledOn;
-        board.led(ledOn);
-    }, 500);
-
-    console.log('Blinking!');
-}
+```text
+.run /app/first-light.js
 ```
 
-Eject the drive, then reset the board. Your code runs automatically.
+The same bounded, rerunnable example uses the declared LED and polarity on Pico
+and XIAO. After deliberately backing up/replacing an existing startup file, USB
+`index.js` maps to **`/app/index.js`**. Do not create another USB `app/` directory.
+Relative CommonJS imports resolve beside their module; see the
+[examples inventory](examples/README.md) for required capabilities and hardware.
+
+**Before a firmware update**, back up and verify application files. RP firmware
+size changes can relocate storage: preserve full-flash recovery and prepare
+explicit restoration. No automatic source migration or data-preserving flash
+is promised; follow the [migration procedure](docs/docs/development/app-namespace.md#explicit-upgrade-procedure).
 
 ## Serial REPL
 
@@ -124,13 +125,12 @@ The `.info` command includes the current build ID (version + git SHA).
 
 ### Safe Mode
 
-
-On RP2040 and RP2350 boards, hold **BOOTSEL** during power-on to skip
-`index.js` auto-run. The XIAO ESP32-S3 records failed boot scripts and enters
-persistent safe mode on the next reset; see its
-[recovery documentation](platform/esp32/README.md#indexjs-and-persistent-safe-mode).
-
-`index.js` runs immediately on boot; the REPL banner prints the first time a CDC serial connection is opened.
+Startup uses `/app/index.js` only when runtime storage is available. RP runtime
+safe boot samples BOOTSEL, but holding BOOTSEL while attaching USB can instead
+enter ROM recovery; it is not a portable promise of a running REPL. XIAO uses
+persistent failed-startup recovery and its separate TinyUF2 baseline. Follow
+[Debugging and Recovery](docs/docs/debugging-recovery.md) for the matching board;
+do not format storage merely to stop an example or resolve host ownership.
 
 ## JavaScript API
 

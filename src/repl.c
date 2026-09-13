@@ -853,8 +853,13 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("  .multiline [FILE] - Multi-line input (end with .end)\r\n");
         usb_cdc_puts("  .format     - Format filesystem (prompted)\r\n");
         usb_cdc_puts("  .format!    - Format filesystem immediately\r\n");
+        /* RP boards use ROM UF2; other boards may explicitly disable the updater. */
+#if !defined(MCUJS_HAS_TINYUF2) || MCUJS_HAS_TINYUF2
         usb_cdc_puts("  .uf2        - Reboot into UF2 mode (prompted)\r\n");
         usb_cdc_puts("  .uf2!       - Reboot into UF2 mode immediately\r\n");
+#else
+        usb_cdc_puts("  UF2 recovery is unavailable on this board.\r\n");
+#endif
         usb_cdc_puts("  .reset      - Reset the board\r\n");
         usb_cdc_puts("  .usbreset   - Reset USB connection (reboot)\r\n");
         usb_cdc_puts("\r\n");
@@ -866,7 +871,11 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts(", ledPin");
 #endif
         usb_cdc_puts("\r\n");
-        usb_cdc_puts("  board methods: freeMemory(), uniqueId(), reset(), enterUf2(), millis(), delay(), capability(), capabilities()\r\n");
+        usb_cdc_puts("  board methods: freeMemory(), uniqueId(), reset(), ");
+#if !defined(MCUJS_HAS_TINYUF2) || MCUJS_HAS_TINYUF2
+        usb_cdc_puts("enterUf2(), ");
+#endif
+        usb_cdc_puts("millis(), delay(), capability(), capabilities()\r\n");
         const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
         if (registry->onboard_led) usb_cdc_puts("  board onboard method: led()\r\n");
 #if MCUJS_REGISTRY_ONBOARD_BUTTON

@@ -230,6 +230,13 @@ static void test_help_matches_build_features(void) {
                        strcmp(help_board, "adafruit_feather_rp2040") == 0 ||
                        strcmp(help_board, "seeed_xiao_esp32s3") == 0;
     assert((strstr(s_output, "ledPin") != NULL) == has_led_pin);
+    /* These profiles have ROM recovery, but no installed UF2 updater. */
+    bool has_uf2 = strcmp(help_board, "seeed_reterminal_sticky") != 0 &&
+                   strcmp(help_board, "waveshare_esp32s3_epaper_1.54_v2") != 0;
+    assert((strstr(s_output, "Reboot into UF2 mode (prompted)") != NULL) == has_uf2);
+    assert((strstr(s_output, "Reboot into UF2 mode immediately") != NULL) == has_uf2);
+    assert((strstr(s_output, "enterUf2()") != NULL) == has_uf2);
+    assert((strstr(s_output, "UF2 recovery is unavailable on this board.\r\n") != NULL) == !has_uf2);
     assert(strstr(s_output, " led, ids") == NULL);
     const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
     // These are the two boards with the public read-only button API.

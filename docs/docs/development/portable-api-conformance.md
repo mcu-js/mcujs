@@ -123,11 +123,19 @@ rather than maintaining parallel API tables.
 
 ## Serial hardware evidence
 
+For the complete per-target release sequence (identity, preservation, update,
+physical protocols, recovery and disposition), use the
+[release qualification checklist](./release-qualification.md). This serial lane
+is one part of that protocol, not release qualification by itself.
+
 `tests/conformance/serial-hardware-probe.js` is ES5-compatible, rerunnable in the
-persistent MCU.js realm, and capability-driven. Copy it to the device and run:
+persistent MCU.js realm, and capability-driven. With a separately approved file
+copy, preserve any existing destination and copy the RC's probe to USB-root
+`serial-hardware-probe.js`. Eject host storage and confirm
+`require('board').storageReady()` before running:
 
 ```text
-.run /lib/serial-hardware-probe.js
+.run /app/serial-hardware-probe.js
 ```
 
 The first run emits discovery-only output. A host collector then calls

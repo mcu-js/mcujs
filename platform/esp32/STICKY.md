@@ -68,7 +68,7 @@ startup rendering before deliberately restarting.
 The onboard bridge uses UART0 TX43/RX44 at 115200. The private console ABI is
 implemented by `serial_uart.c`; TinyUSB CDC/MSC are disabled and never started
 on the microphone pins19/20. Filesystem ownership stays on the device, allowing
-existing fs APIs and /index.js. No USB mass-storage drive or TinyUF2. UART
+existing fs APIs and `/app/index.js`. No USB mass-storage drive or TinyUF2. UART
 connection state means initialized transport, not detected host attachment.
 
 The USB-UART bridge supports esptool default_reset/hard_reset without physical
@@ -127,5 +127,25 @@ cc -std=c11 -Wall -Wextra -Werror -Itests/canvas_epaper_stubs -Ihost/bindings -I
 
 The test models more than a watchdog window of acquisitions before any SPI
 transfer, checks both yield and subscribed-task service, rate limiting, and
-absence of early display updates. Physical acceptance still requires a normal
-startup scene, contrasting frames and settled restart checks.
+absence of early display updates. These native checks are separate from the
+physical evidence below.
+
+## Bounded physical qualification — 2026-09-13
+
+Exact firmware `0.1.0+37e3771` was built in the pinned lane, installed into the
+application slot only, and read back completely. Partition bytes matched the
+installed layout; protected prefix and internal filesystem were unchanged.
+BIN size: 900144 bytes; SHA-256:
+`aa75ec7cb06b884e99c2456158d558b3cb4803de3c7878440579044baef638a7`.
+
+Public `/sd` reads plus `devices` / `display.canvas` drew the existing BMP,
+contrasting white, then a reread BMP. Two settled software restarts each changed
+white to the original Night Ferry startup artwork and passed the healthy-loop
+window. All eight photographs, including final idle artwork, were inspected.
+Final safe mode was false, with one startup presentation and zero presentation
+failures; application files were unchanged. There were no SD writes or write
+attempts. This is new glass evidence, not merely retained artwork after flashing.
+
+This does not qualify partial refresh, long-term ghosting, battery life/cold
+power-on, arbitrary cards, hot-swap or power-loss safety. JPEG/text/circle and
+slideshow consumers remain separate bounded checks; no other panel is covered.

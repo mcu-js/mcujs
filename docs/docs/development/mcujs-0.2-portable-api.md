@@ -7,10 +7,17 @@ Goal: make ordinary JavaScript portable across shipping boards without pretendin
 ## 0.2.0 release checklist
 
 This is the current release checklist, not a claim that every design proposal
-below is implemented. Software backlog reconciled against development source
-`2366a60` and the preserved original task records on 2026-09-07. Hardware
-observations below remain bound to firmware `0.1.0+5fc1294`, not the current
-source or an unreleased display candidate.
+below is implemented. Source and issue status reconciled against development
+`37e3771da5bc704125b65aecaa77a7e31be2c1f4` on 2026-09-13. Hardware evidence is
+bound to each named firmware below; historical Pico/XIAO checks are not fresh
+observations of those boards or acceptance of this development tip.
+
+**Target inventory:** `runtime/board-registry.js` currently describes 13 board
+profiles. `scripts/lib/boards.sh` selects **11 release-package targets**: ten RP
+boards and XIAO ESP32-S3. Sticky and Waveshare ePaper 1.54 V2 are experimental
+profiles outside that release list. A historical “13-board build” is not a
+13-board shipping package or physical acceptance. The older ten-target build
+receipt below retains its original scope; it is not the current target count.
 
 **Working policy:** push ongoing work to GitHub's `development` branch. Source
 checks and docs builds run there; Pages deployment is skipped. Keep `main`,
@@ -25,9 +32,19 @@ runtime version remains `0.1.0` until the release-candidate versioning step.
 - **Implemented:** strict validation and portable GPIO, PWM, ADC, I2C, SPI, and
   external NeoPixel contracts. Native tests cover simulated backend behavior;
   these are not electrical measurements.
-- **Implemented:** runtime filesystem ownership handoff and current-image USB
-  and image-decoder capability metadata. Portable graphics/display API
-  normalization is still a later-0.x non-goal.
+- **Implemented:** runtime filesystem ownership handoff, logical `/app`, bounded
+  binary file handles and optional `/sd`. Sticky's `/sd` is read-only; the RP
+  1.47-A write-reliability question remains open in
+  [#7](https://github.com/mcu-js/mcujs/issues/7).
+- **Implemented:** configured `devices` handles and `display.canvas`, bounded
+  text/arcs, JPEG/BMP consumers, metadata and slideshow/composition examples.
+  These are an experimental bounded subset, not full browser Canvas parity.
+  Legacy drawing APIs are deprecated for new code, not removed; the
+  [#19 removal gate](https://github.com/mcu-js/mcujs/issues/19) is **before v1.0**,
+  not automatically a new requirement to finish every legacy removal in 0.2.0.
+- **Implemented:** bounded events/cancellation and cooperative Promise execution
+  batches. **Not implemented:** a separate pending Promise-job capacity or
+  overload contract ([#23](https://github.com/mcu-js/mcujs/issues/23)).
 - **Implemented:** registry-backed `.capabilities` and `.capabilities NAME`,
   migration documentation, and portable examples. Their final consistency
   audit remains open below; they do not need to be rebuilt from scratch.
@@ -35,15 +52,15 @@ runtime version remains `0.1.0` until the release-candidate versioning step.
   button-to-LED example for Pico and XIAO ESP32-S3.
 - **Native REPL verified:** `.help` advertises `buttonPressed()` only on Pico
   and XIAO, using the same generated flag as native binding registration.
-  `scripts/test-repl.sh` exercises actual REPL input/output for all ten shipping
-  board configurations with their board-specific headers. This is host-native
+  The original `scripts/test-repl.sh` receipt exercised actual REPL input/output
+  for the then-ten shipping configurations with board-specific headers. This is host-native
   coverage, not a new firmware build or an on-device test of the updated help.
 - **CI verified:** [source checks at d993b27](https://github.com/mcu-js/mcujs/actions/runs/34173032693)
   and [docs typecheck/build at d993b27](https://github.com/mcu-js/mcujs/actions/runs/34173032719)
   passed. Pages artifact upload and deployment were skipped. These checks do
   not build or physically test every shipping firmware image.
 
-### Development build and package evidence
+### Historical development build and package evidence
 
 Development commit `4a2bb00e05372c34b2ca8ad60adb7f4ec39fe1ad` passed fresh
 network-isolated builds for all nine RP boards and XIAO ESP32-S3 using the
@@ -62,7 +79,7 @@ exact commit; Pages deployment was skipped. These are development-build and
 packaging results, not a qualified 0.2.0 candidate or a repeated-build
 reproducibility result. The final-candidate and physical gates below stay open.
 
-### Hardware evidence recorded
+### Historical Pico/XIAO hardware evidence
 
 The same `examples/onboard-button/index.js` ran manually on both boards for
 60 seconds using firmware built from `5fc1294ad378e92356a7cbe16b182086309eef91`.
@@ -92,6 +109,32 @@ UF2 payloads were checked against their application binaries.
 This is hardware-executed button/demo evidence, not an all-peripheral pass,
 measured PWM waveform evidence, or qualification of a future release candidate.
 The firmware hashes above identify local test artifacts, not published assets.
+
+### Sticky hardware evidence — 2026-09-13
+
+Firmware `0.1.0+37e3771` passed a pinned build and application-only installation
+with complete written-region readback. The installed partition table matched;
+protected prefix and internal filesystem bytes were unchanged. Application BIN:
+900144 bytes, SHA-256
+`aa75ec7cb06b884e99c2456158d558b3cb4803de3c7878440579044baef638a7`.
+
+- Public `fs` reads from the inserted card and `devices` / `display.canvas`
+  drawing shared the SPI bus. Eight inspected photographs showed BMP → white →
+  BMP reread, white → Night Ferry on each of two software restarts, and final
+  Night Ferry after idle. This replaces the old “Sticky has no usable REPL”
+  blocker in [#22](https://github.com/mcu-js/mcujs/issues/22).
+- Both restarts passed the startup healthy-loop window; safe mode was false.
+  Final counters were one startup presentation and zero presentation failures.
+  Counters alone are not glass evidence; the contrasting photographs are.
+- Application files were unchanged. The run performed no SD writes or write
+  attempts; SD write/format/erase/host export remain unavailable by design.
+
+This qualifies one inserted card, bounded serialized display/read use and
+settled software restarts. It does **not** qualify other cards, hot-swap,
+power-loss safety, battery cold boot, battery life, long-term ghosting, partial
+refresh, or the Waveshare ePaper panel. Text/arcs/JPEG/metadata/slideshow on
+Sticky still need their own bounded consumer checks. #22 and #7 stay open.
+See [SD assets](sd-assets.md) and [Canvas migration](display-canvas.md).
 
 ### Software backlog reconciliation
 
@@ -130,7 +173,9 @@ qualification. The existing conformance suite remains the regression baseline.
    not a new `require('display')` module. Native tests check production
    graphics/screen exports and ESP absence; registry and REPL lanes include
    DVI availability. Physical display/output behavior remains unqualified.
-   Full portable graphics/display API redesign stays deferred to later 0.x.
+   This legacy capability-reporting milestone is integrated, not a candidate
+   awaiting recovery. Later configured-display/Canvas work is described above;
+   unrestricted browser graphics remain outside the bounded API contract.
 2. **0.2.13 — partial: REPL, manifests and documentation consistency.**
    `.capabilities [NAME]`, generated board tables and per-artifact JSON manifests
    already exist. Finish their agreement with actual registration, module
@@ -150,7 +195,8 @@ qualification. The existing conformance suite remains the regression baseline.
 4. **0.2.16 — partial: cross-board manual QA protocol and evidence template.**
    Reuse the existing ADC/PWM/I2C/SPI/NeoPixel protocols and serial conformance
    envelope. Complete one release-candidate procedure and compact per-target
-   template for all ten boards: inspect/backup/update/recovery, exact artifact
+   template for all 11 current release targets, with experimental profiles
+   recorded separately: inspect/backup/update/recovery, exact artifact
    identity, discovery, pins/onboard inventory, supported peripherals, USB/MSC
    persistence, reconnect/watchdog and user-data preservation. Specify wiring,
    serial logs, measurements, manual photos and explicit maintainer waivers for
@@ -164,7 +210,11 @@ qualification. The existing conformance suite remains the regression baseline.
    local packaging exercise do not constitute that candidate. No version bump
    or release action is authorized by this reconciliation.
 
-#### Recovered display candidate versus current development
+#### Historical display-candidate recovery (2026-09-07)
+
+The following comparison explains the earlier source gap. The capability slice
+is now integrated; do not replay these recovery instructions against today's
+development. It is not the later configured-display/Canvas implementation.
 
 The preserved uncommitted candidate was reconstructed in isolation on base
 `c76677159127881e6863ae51c1c1d0e7d9856882`. Its Git tree exactly matches the
@@ -179,12 +229,12 @@ four failures**: discovery descriptors, onboard panel inventory, native
 registration/stub expectations, and generated/schema/docs/example coverage.
 These tests confirm the software gap; they are not firmware or hardware tests.
 
-The saved patch does not apply directly to current development: board docs,
+The saved patch did not apply directly to the then-current development: board docs,
 `host/generated/runtime_registry_data.h` and `scripts/test-runtime-bindings.sh`
-have changed. Adapt source changes in isolation, regenerate outputs rather than
-copying stale generated files, and preserve later onboard-button and native
-build-script fixes. Historical test success is not approval of a rebased
-candidate. No recovered runtime code has been integrated by this reconciliation.
+had changed. The adaptation required regeneration rather than copying stale
+outputs, preserving later onboard-button and native build-script fixes.
+Historical test success was not approval of that adapted candidate. Today's
+reconciliation is documentation-only and integrates no recovered runtime code.
 
 ### Release verification gates (after the software backlog)
 
@@ -205,8 +255,9 @@ candidate. No recovered runtime code has been integrated by this reconciliation.
    excluded from its PWM capability. Investigate that restriction before
    promising a no-wiring two-board fade; do not silently widen the pin policy.
 3. **Open — prepare one immutable release candidate.** Finish the 0.2.0 version
-   and release notes, obtain the required independent review, and build all nine RP
-   targets plus XIAO ESP32-S3 from that exact commit. Verify packaging,
+   and release notes, obtain the required independent review, and build all ten RP
+   targets plus XIAO ESP32-S3 from that exact commit. Keep experimental profiles
+   and opt-in feature configurations explicit. Verify packaging,
    checksums, generated manifests, recovery/update layout, and applicable
    host/container reproducibility. Older builds remain historical evidence,
    not qualification of a different candidate.
@@ -226,11 +277,11 @@ candidate. No recovered runtime code has been integrated by this reconciliation.
    development pushes do not authorize any of these release actions.
 
 **Next software gate:** finish the `0.2.13` cross-surface consistency audit,
-then `0.2.14`
-and the QA-protocol package before the immutable RC. Updated Pico/XIAO flashing
-is a later hardware-verification step, not a substitute for these software
-tasks. The installed boards still run `5fc1294`; native help tests and successful
-`4a2bb00` builds do not close their on-device verification gap.
+then the `0.2.14` example audit and QA-protocol package before the immutable RC.
+Qualify Sticky's current consumer/lifecycle behavior in bounded slices; keep
+pending Promise-job admission/overload work separate from existing execution
+batching. Historical Pico/XIAO help/build evidence does not establish their
+current installed state. Release, updater and other-panel gates remain open.
 
 ## Design principles
 

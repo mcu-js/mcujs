@@ -4,6 +4,14 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Recorded exact Sticky `37e3771` qualification: application-only readback and
+  preserved internal files, photograph-verified SD BMP/white/BMP redraws and
+  two settled Night Ferry software restarts, with no SD writes. This supersedes
+  the earlier inaccessible-REPL blocker, not the remaining e-paper/card/battery
+  qualification gates. Reconciled the release checklist's 13 runtime profiles
+  versus 11 package targets; no release/version change. See the
+  [dated evidence and limits](docs/docs/development/mcujs-0.2-portable-api.md#sticky-hardware-evidence--2026-09-13).
+
 - Sticky: service the runtime watchdog and yield to the RTOS between bounded Canvas draws, without partial frame flushes or changing watchdog timeouts.
 
 - Sticky: expose the existing `/sd` filesystem root as read-only FAT on the

@@ -14,6 +14,13 @@ static char observed[256], second[256];
 static unsigned calls;
 static fs_result_t access_result = FS_OK;
 static fs_result_t ensure_initialized(void) { return access_result; }
+#if MCUJS_HAS_SD
+#define STICKY_SD_BASE_PATH "/mcujs-sd"
+static fs_result_t sd_access_result = FS_OK;
+static fs_result_t sticky_sd_mount(void) { return sd_access_result; }
+static fs_result_t sticky_sd_status(void) { return sd_access_result; }
+static bool is_device_task(void) { return true; }
+#endif
 static int test_stat(const char *path, struct stat *stats) {
     calls++; strcpy(observed, path); memset(stats, 0, sizeof(*stats)); return 0;
 }
@@ -36,7 +43,7 @@ static DIR *test_opendir(const char *path) { test_unlink(path); errno = ENOENT; 
 #define MCUJS_FS_BASE_PATH "/mcujs"
 #define MCUJS_FS_PATH_MAX 192
 static atomic_uint s_open_files;
-typedef struct { FILE *stream; } esp_fs_file_t;
+typedef struct { FILE *stream; bool sd; } esp_fs_file_t;
 #include "esp-path-functions.inc"
 static bool app_entry(const fs_entry_t *entry, void *data) {
     assert(!strcmp(entry->name, "app") && entry->is_dir && entry->size == 0);
@@ -65,8 +72,10 @@ static void test_esp(void) {
         assert(fs_rename(roots[i], "x") == FS_ERROR_INVALID);
         assert(fs_rename("x", roots[i]) == FS_ERROR_INVALID);
     }
+#if !MCUJS_HAS_SD
     assert(fs_remove("/sd/x") == FS_ERROR_NOT_FOUND);
     assert(fs_rename("x", "/sd/x") == FS_ERROR_NOT_FOUND);
+#endif
     assert(fs_mkdir("/lib") == FS_ERROR_NOT_FOUND);
     assert(fs_exists("/app/../app") == FS_ERROR_INVALID);
     assert(calls == before);
@@ -80,6 +89,44 @@ static void test_esp(void) {
     assert(calls == before);
     puts("ESP32 filesystem namespace native source-seam tests passed");
 }
+#if MCUJS_HAS_SD
+static bool root_entry(const fs_entry_t *entry, void *data) {
+    unsigned *index = data;
+    assert(!strcmp(entry->name, (*index)++ ? "sd" : "app"));
+    return true;
+}
+static void test_sd(void) {
+    access_result = FS_ERROR_BUSY;
+    assert(fs_exists("/sd/file.bin") == FS_OK);
+    assert(!strcmp(observed, "/mcujs-sd/file.bin"));
+    assert(fs_open(&(fs_file_t){0}, "/sd/file.bin", FS_MODE_READ) == FS_ERROR_NOT_FOUND);
+    assert(!strcmp(observed, "/mcujs-sd/file.bin"));
+    access_result = FS_OK;
+    unsigned before = calls, entries = 0;
+    assert(fs_list_dir("/", root_entry, &entries) == FS_OK && entries == 2);
+    assert(fs_exists("/sd") == FS_OK);
+    assert(fs_exists("/sd/../app") == FS_ERROR_INVALID);
+    assert(fs_exists("/sdfake/x") == FS_ERROR_NOT_FOUND);
+    assert(fs_open(&(fs_file_t){0}, "/sd", FS_MODE_READ) == FS_ERROR_INVALID);
+    const fs_mode_t modes[] = {FS_MODE_WRITE, FS_MODE_CREATE, FS_MODE_APPEND,
+        FS_MODE_TRUNCATE, FS_MODE_READ | FS_MODE_WRITE};
+    for (unsigned i=0; i<sizeof(modes)/sizeof(*modes); i++)
+        assert(fs_open(&(fs_file_t){0}, "/sd/file.bin", modes[i]) == FS_ERROR_READ_ONLY);
+    assert(fs_remove("/sd/file.bin") == FS_ERROR_READ_ONLY);
+    assert(fs_mkdir("/sd/new") == FS_ERROR_READ_ONLY);
+    assert(fs_rename("/sd/a", "/sd/b") == FS_ERROR_READ_ONLY);
+    assert(fs_rename("/sd/a", "/app/b") == FS_ERROR_CROSS_DEVICE);
+    assert(fs_rename("/app/a", "/sd/b") == FS_ERROR_CROSS_DEVICE);
+    assert(calls == before);
+    sd_access_result = FS_ERROR_NO_MEDIA;
+    assert(fs_exists("/sd") == FS_ERROR_NO_MEDIA);
+    assert(fs_list_dir("/sd", root_entry, &entries) == FS_ERROR_NO_MEDIA);
+    assert(fs_exists("/app") == FS_OK);
+    sd_access_result = FS_ERROR_UNSUPPORTED;
+    assert(fs_open(&(fs_file_t){0}, "/sd/file.bin", FS_MODE_READ) == FS_ERROR_UNSUPPORTED);
+    puts("ESP32 read-only SD namespace and independent ownership tests passed");
+}
+#endif
 #endif
 
 static void normalized(const char *path, const char *base, const char *expected) {
@@ -100,7 +147,11 @@ int main(void) {
         assert(fs_normalize_path(invalid[i], NULL, out, sizeof(out)) == FS_ERROR_INVALID);
         assert(!strcmp(out, "unchanged"));
     }
-    const char *missing[] = {"/index.js", "/lib/x", "/sd/x", "/application/x"};
+    const char *missing[] = {"/index.js", "/lib/x", "/application/x"
+#if !MCUJS_HAS_SD
+        , "/sd/x"
+#endif
+    };
     for (unsigned i = 0; i < sizeof(missing)/sizeof(*missing); i++)
         assert(fs_normalize_path(missing[i], NULL, out, sizeof(out)) == FS_ERROR_NOT_FOUND);
     assert(fs_normalize_path(NULL, NULL, out, sizeof(out)) == FS_ERROR_INVALID);
@@ -119,6 +170,9 @@ int main(void) {
     puts("shared filesystem path normalization tests passed");
 #ifdef TEST_ESP_PATHS
     test_esp();
+#if MCUJS_HAS_SD
+    test_sd();
+#endif
 #endif
     return 0;
 }

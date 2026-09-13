@@ -3,6 +3,9 @@
 #include "fs.h"
 #include "filesystem.h"
 #include "board_config.h"
+#if MCUJS_HAS_SD
+#include "sticky_sd.h"
+#endif
 
 #include "esp_err.h"
 #include "esp_partition.h"
@@ -41,6 +44,7 @@
 
 typedef struct {
     FILE *stream;
+    bool sd;
 } esp_fs_file_t;
 
 static const esp_vfs_fat_mount_config_t s_mount_config = {
@@ -129,6 +133,8 @@ bool mcujs_filesystem_partition_is_erased(void) {
     return true;
 }
 
+static fs_result_t ensure_initialized(void);
+
 static fs_result_t errno_to_fs(int error) {
     switch (error) {
         case 0:
@@ -139,6 +145,10 @@ static fs_result_t errno_to_fs(int error) {
             return FS_ERROR_EXISTS;
         case ENOSPC:
             return FS_ERROR_NO_SPACE;
+        case EROFS:
+            return FS_ERROR_READ_ONLY;
+        case EXDEV:
+            return FS_ERROR_CROSS_DEVICE;
         case EINVAL:
         case ENAMETOOLONG:
         case EACCES:
@@ -160,12 +170,60 @@ static fs_result_t translate_path(const char *path, char *translated, size_t tra
         translated[0] = '\0';
         return FS_OK;
     }
-    int written = snprintf(translated, translated_size, "%s%s", MCUJS_FS_BASE_PATH, logical + 4);
+    const char *base = MCUJS_FS_BASE_PATH;
+    const char *suffix = logical + 4;
+#if MCUJS_HAS_SD
+    if (!strncmp(logical, "/sd", 3) && (!logical[3] || logical[3] == '/')) {
+        base = STICKY_SD_BASE_PATH;
+        suffix = logical + 3;
+    }
+#endif
+    int written = snprintf(translated, translated_size, "%s%s", base, suffix);
     return written < 0 || (size_t)written >= translated_size ? FS_ERROR_INVALID : FS_OK;
 }
 
 static bool is_root_path(const char *translated) {
-    return !translated[0] || strcmp(translated, MCUJS_FS_BASE_PATH) == 0;
+    return !translated[0] || strcmp(translated, MCUJS_FS_BASE_PATH) == 0
+#if MCUJS_HAS_SD
+        || strcmp(translated, STICKY_SD_BASE_PATH) == 0
+#endif
+        ;
+}
+
+static bool is_sd_path(const char *translated) {
+#if MCUJS_HAS_SD
+    size_t n = strlen(STICKY_SD_BASE_PATH);
+    return !strncmp(translated, STICKY_SD_BASE_PATH, n) &&
+        (!translated[n] || translated[n] == '/');
+#else
+    (void)translated;
+    return false;
+#endif
+}
+
+static fs_result_t path_ready(const char *path) {
+#if MCUJS_HAS_SD
+    char translated[MCUJS_FS_PATH_MAX];
+    fs_result_t result = translate_path(path, translated, sizeof(translated));
+    if (result == FS_OK && is_sd_path(translated)) {
+        return is_device_task() ? sticky_sd_mount() : FS_ERROR_BUSY;
+    }
+#else
+    (void)path;
+#endif
+    return ensure_initialized();
+}
+
+static fs_result_t file_ready(const fs_file_t *file) {
+#if MCUJS_HAS_SD
+    if (file && file->is_open && file->internal &&
+        ((esp_fs_file_t *)file->internal)->sd) {
+        return is_device_task() ? sticky_sd_status() : FS_ERROR_BUSY;
+    }
+#else
+    (void)file;
+#endif
+    return ensure_initialized();
 }
 
 static fs_result_t ensure_initialized(void) {
@@ -558,7 +616,7 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     if (file == NULL) {
         return FS_ERROR_INVALID;
     }
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = path_ready(path);
     if (ready != FS_OK) {
         return ready;
     }
@@ -570,6 +628,8 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     }
 
     if (is_root_path(translated)) return FS_ERROR_INVALID;
+    if (is_sd_path(translated) && (mode & (FS_MODE_WRITE | FS_MODE_CREATE |
+        FS_MODE_APPEND | FS_MODE_TRUNCATE))) return FS_ERROR_READ_ONLY;
 
     const char *open_mode = "rb";
     if (mode & FS_MODE_APPEND) {
@@ -598,9 +658,10 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
         return FS_ERROR;
     }
     internal->stream = stream;
+    internal->sd = is_sd_path(translated);
     file->internal = internal;
     file->is_open = true;
-    atomic_fetch_add(&s_open_files, 1);
+    if (!internal->sd) atomic_fetch_add(&s_open_files, 1);
     return FS_OK;
 }
 
@@ -609,20 +670,20 @@ fs_result_t fs_close(fs_file_t *file) {
         return FS_ERROR_INVALID;
     }
     esp_fs_file_t *internal = file->internal;
-    int result = fflush(internal->stream);
-    if (result == 0) {
+    int result = internal->sd ? 0 : fflush(internal->stream);
+    if (!internal->sd && result == 0) {
         result = fsync(fileno(internal->stream));
     }
     int close_result = fclose(internal->stream);
+    if (!internal->sd) atomic_fetch_sub(&s_open_files, 1);
     free(internal);
     file->internal = NULL;
     file->is_open = false;
-    atomic_fetch_sub(&s_open_files, 1);
     return result == 0 && close_result == 0 ? FS_OK : FS_ERROR_IO;
 }
 
 fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_read) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -640,7 +701,7 @@ fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_re
 
 fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
                      size_t *bytes_written) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -648,6 +709,10 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
         return FS_ERROR_INVALID;
     }
     esp_fs_file_t *internal = file->internal;
+    if (internal->sd) {
+        if (bytes_written) *bytes_written = 0;
+        return FS_ERROR_READ_ONLY;
+    }
     errno = 0;
     size_t count = fwrite(buffer, 1, size, internal->stream);
     if (bytes_written != NULL) {
@@ -660,7 +725,7 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
 }
 
 fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -672,7 +737,7 @@ fs_result_t fs_seek(fs_file_t *file, uint32_t offset) {
 }
 
 fs_result_t fs_size(fs_file_t *file, size_t *size) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = file_ready(file);
     if (ready != FS_OK) {
         return ready;
     }
@@ -689,7 +754,7 @@ fs_result_t fs_size(fs_file_t *file, size_t *size) {
 }
 
 fs_result_t fs_exists(const char *path) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = path_ready(path);
     if (ready != FS_OK) {
         return ready;
     }
@@ -704,7 +769,7 @@ fs_result_t fs_exists(const char *path) {
 }
 
 fs_result_t fs_remove(const char *path) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = path_ready(path);
     if (ready != FS_OK) {
         return ready;
     }
@@ -714,6 +779,7 @@ fs_result_t fs_remove(const char *path) {
     if (is_root_path(translated)) {
         return FS_ERROR_INVALID;
     }
+    if (is_sd_path(translated)) return FS_ERROR_READ_ONLY;
     struct stat stats;
     if (stat(translated, &stats) != 0) {
         return errno_to_fs(errno);
@@ -723,7 +789,7 @@ fs_result_t fs_remove(const char *path) {
 }
 
 fs_result_t fs_rename(const char *old_path, const char *new_path) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = path_ready(old_path);
     if (ready != FS_OK) {
         return ready;
     }
@@ -736,11 +802,13 @@ fs_result_t fs_rename(const char *old_path, const char *new_path) {
     if (is_root_path(old_translated) || is_root_path(new_translated)) {
         return FS_ERROR_INVALID;
     }
+    if (is_sd_path(old_translated) != is_sd_path(new_translated)) return FS_ERROR_CROSS_DEVICE;
+    if (is_sd_path(old_translated)) return FS_ERROR_READ_ONLY;
     return rename(old_translated, new_translated) == 0 ? FS_OK : errno_to_fs(errno);
 }
 
 fs_result_t fs_mkdir(const char *path) {
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = path_ready(path);
     if (ready != FS_OK) {
         return ready;
     }
@@ -750,6 +818,7 @@ fs_result_t fs_mkdir(const char *path) {
     if (is_root_path(translated)) {
         return FS_ERROR_INVALID;
     }
+    if (is_sd_path(translated)) return FS_ERROR_READ_ONLY;
     return mkdir(translated, 0777) == 0 ? FS_OK : errno_to_fs(errno);
 }
 
@@ -757,7 +826,7 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
     if (callback == NULL) {
         return FS_ERROR_INVALID;
     }
-    fs_result_t ready = ensure_initialized();
+    fs_result_t ready = path_ready(path);
     if (ready != FS_OK) {
         return ready;
     }
@@ -769,7 +838,11 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
 
     if (!translated[0]) {
         const fs_entry_t app = {.name = "app", .size = 0, .is_dir = true};
-        (void)callback(&app, user_data);
+        if (!callback(&app, user_data)) return FS_OK;
+#if MCUJS_HAS_SD
+        const fs_entry_t sd = {.name = "sd", .size = 0, .is_dir = true};
+        (void)callback(&sd, user_data);
+#endif
         return FS_OK;
     }
     DIR *directory = opendir(translated);

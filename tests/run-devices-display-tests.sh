@@ -49,6 +49,7 @@ compile_and_run() {
         -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_EXPERIMENTAL_CANVAS=1
         "-D${adapter}=1" "-D${board}=1"
         "-I${TMP_ROOT}" "-I${ROOT}/host" "-I${ROOT}/host/bindings"
+        "-I${ROOT}/src/filesystem"
         "-I${ROOT}/tests" "-I${ROOT}/tests/canvas_epaper_stubs"
         "-I${JERRY_ROOT}/jerry-core/include" -isystem "${CTX_PATH}"
     )

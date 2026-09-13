@@ -11,3 +11,7 @@ CONFIG_SPIRAM_USE_MALLOC=y
 CONFIG_SPIRAM_MEMTEST=y
 # CONFIG_TINYUSB_CDC_ENABLED is not set
 # CONFIG_TINYUSB_MSC_ENABLED is not set
+
+# Variable 512-4096 byte FatFs sectors; preserve existing internal WL geometry.
+CONFIG_FATFS_SECTOR_512=y
+CONFIG_WL_SECTOR_SIZE_4096=y

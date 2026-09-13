@@ -68,9 +68,12 @@ if(MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2")
  list(APPEND MCUJS_SOURCES bindings/microphone.c)
 endif()
 
+set(MCUJS_SD_REQUIRES)
 if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
  list(REMOVE_ITEM MCUJS_SOURCES usb_cdc.c usb_msc.c)
  list(APPEND MCUJS_SOURCES serial_uart.c)
+ list(APPEND MCUJS_SOURCES sticky_sd.c)
+ list(APPEND MCUJS_SD_REQUIRES sdmmc esp_driver_sdspi)
 endif()
 if(MCUJS_EXPERIMENTAL_CANVAS)
  if(NOT MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2" AND NOT MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
@@ -131,7 +134,12 @@ idf_component_register(
     REQUIRES driver esp_adc esp_driver_gpio esp_driver_i2c esp_driver_ledc
         esp_driver_spi esp_driver_tsens esp_driver_uart esp_timer esp_system fatfs
         wear_levelling nvs_flash heap log freertos vfs espressif__led_strip esp_psram
+        ${MCUJS_SD_REQUIRES}
 )
+
+if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
+ target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_HAS_SD=1)
+endif()
 
 if(MCUJS_EXPERIMENTAL_CANVAS AND CMAKE_CROSSCOMPILING)
  target_include_directories(${COMPONENT_LIB} PRIVATE "$ENV{CTX_PATH}" "${CMAKE_CURRENT_BINARY_DIR}")

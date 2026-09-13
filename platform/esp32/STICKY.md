@@ -22,7 +22,11 @@ high: the inserted card shares MOSI/SCK and must be powered/deselected during
 display traffic. The TPS22916C switch is active-high despite the vendor comment.
 Unused microphone38, touch41/42 and buzzer48 stay low. Charger39 is untouched.
 No public GPIO, touch, sensors,
-audio, SD, Wi-Fi or BLE implementation is advertised in this first slice.
+audio, Wi-Fi or BLE implementation is advertised in this first slice. `/sd` is
+the existing removable FAT root, advertised read-only: writes, format, erase
+and USB host transfer are denied at the disk callbacks. `/app` remains the
+writable startup volume. The card is put into SPI mode with both CS lines high
+before display traffic; display close removes only the panel device.
 
 ## Memory and display
 

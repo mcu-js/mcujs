@@ -64,7 +64,7 @@ from pathlib import Path
 import sys
 root, tmp = map(Path, sys.argv[1:])
 source = (root / 'platform/esp32/main/filesystem.c').read_text()
-helpers = source[source.index('static fs_result_t errno_to_fs('):source.index('static fs_result_t ensure_initialized(')]
+helpers = source[source.index('static fs_result_t errno_to_fs('):source.index('static fs_result_t ensure_initialized(void) {')]
 operations = source[source.index('fs_result_t fs_open('):]
 (tmp / 'esp-path-functions.inc').write_text(helpers + operations)
 PY
@@ -72,6 +72,11 @@ cc -std=gnu17 -Wall -Wextra -Werror \
     -DTEST_ESP_PATHS -I"${ROOT}/src/filesystem" -I"${TMP_ROOT}" \
     "${ROOT}/tests/fs_path_test.c" -o "${TMP_ROOT}/fs-path-test"
 "${TMP_ROOT}/fs-path-test"
+
+cc -std=gnu17 -Wall -Wextra -Werror -Wno-unused-function \
+    -DTEST_ESP_PATHS -DMCUJS_HAS_SD=1 -I"${ROOT}/src/filesystem" -I"${TMP_ROOT}" \
+    "${ROOT}/tests/fs_path_test.c" -o "${TMP_ROOT}/fs-sd-path-test"
+"${TMP_ROOT}/fs-sd-path-test"
 
 if [[ "${1:-}" != "--native-only" ]]; then
     node --test "${ROOT}/tests/runtime-registry.test.js"

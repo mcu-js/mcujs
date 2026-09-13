@@ -9,32 +9,33 @@ static int pins[49], live, bus_owned, fail_alloc, fail_gpio, fail_bus, fail_add;
 static int fail_spi, stuck, busy_ticks, never_busy, busy_delay_ms, refresh_stuck;
 static int64_t busy_at;
 static unsigned transfers, services, watchdogs, updates, sleeps;
-static int watched=1;
+static int watched=1, display_devices;
 static int64_t now;
 static uint8_t command, control, ram[48000], old_ram[48000];
 static size_t ram_len, old_len;
 void vTaskDelay(unsigned ms) {now+=(int64_t)ms*1000;}
 int64_t esp_timer_get_time(void) {return now;}
 int gpio_get_level(int p) {assert(p==18);if(stuck || (refresh_stuck && command==0x20))return 1;if(busy_ticks){if(now<busy_at)return 0;busy_ticks--;return 1;}return 0;}
-int gpio_set_level(int p,int v) {assert(p!=15);if(fail_gpio)return -1;pins[p]=v;return 0;}
+int gpio_set_level(int p,int v) {if(p==15)assert(v==1);if(fail_gpio)return -1;pins[p]=v;return 0;}
 int gpio_config(const gpio_config_t *c) {assert(!(c->pin_bit_mask & ((1ULL<<15)|(1ULL<<19)|(1ULL<<20))));return fail_gpio?-1:0;}
 int esp_task_wdt_status(void *p) {(void)p;return watched?0:-1;}
 int esp_task_wdt_reset(void) {watchdogs++;return 0;}
 void usb_cdc_puts(const char *s) {assert(strstr(s,"\r\n"));}
 void usb_cdc_task(void) {services++;}
 int spi_bus_initialize(int h,const spi_bus_config_t *b,int dma) {
- assert(h==1 && dma==0 && b->sclk_io_num==13 && b->mosi_io_num==14 && b->miso_io_num==-1);
- assert(b->quadwp_io_num==-1 && b->quadhd_io_num==-1 && b->max_transfer_sz==64);
- if(fail_bus)return -1;
- bus_owned++;return 0;
+ (void)h;(void)b;(void)dma;assert(!"display must not initialize the shared bus");return -1;
+}
+bool sticky_sd_prepare(void) {
+ if(fail_bus)return false;
+ bus_owned=1;return true; /* Real bus/card lifecycle is covered in sticky_sd_test. */
 }
 int spi_bus_add_device(int h,const spi_device_interface_config_t *d,spi_device_handle_t *s) {
  assert(h==1 && d->mode==0 && d->clock_speed_hz==10000000 && d->spics_io_num==15);
  if(fail_add)return -1;
- *s=(void*)1;return 0;
+ display_devices++;assert(display_devices==1);*s=(void*)1;return 0;
 }
-int spi_bus_remove_device(spi_device_handle_t s) {assert(s);return 0;}
-int spi_bus_free(int h) {assert(h==1);bus_owned--;return 0;}
+int spi_bus_remove_device(spi_device_handle_t s) {assert(s && display_devices==1);display_devices--;return 0;}
+int spi_bus_free(int h) {(void)h;assert(!"display must not free the shared bus");return -1;}
 void *heap_caps_malloc(size_t n,int caps) {assert(n==768000 && caps==3);if(fail_alloc)return NULL;live++;return malloc(n);}
 static void tracked_free(void *p) {if(p)live--;free(p);}
 int spi_device_polling_transmit(spi_device_handle_t s,spi_transaction_t *t) {
@@ -101,16 +102,16 @@ int main(void) {
  assert(!d.present(&d));assert(now-before>=10000000 && now-before<11000000 && !pins[47] && updates==count);stuck=0;
  fail_spi=transfers+30;assert(!d.present(&d));assert(!pins[47] && updates==count);fail_spi=0;
  assert(d.present(&d));assert(updates==count+1);
- d.release(&d);assert(live==0 && bus_owned==0 && d.state==NULL && !pins[47]);
+ d.release(&d);assert(live==0 && bus_owned==1 && d.state==NULL && !pins[47] && pins[15]);
  int *failures[]={&fail_alloc,&fail_gpio,&fail_bus,&fail_add};
  for(unsigned i=0;i<sizeof(failures)/sizeof(*failures);i++) {
-  *failures[i]=1;assert(!canvas_display_sticky_init(&d));assert(!live && !bus_owned);*failures[i]=0;
+  *failures[i]=1;assert(!canvas_display_sticky_init(&d));assert(!live && bus_owned==1);*failures[i]=0;
   assert(canvas_display_sticky_init(&d));d.release(&d);
  }
  /* Every SPI failure position must unwind power, including sleep failure. */
  assert(canvas_display_sticky_init(&d));unsigned begin=transfers;assert(d.present(&d));unsigned total=transfers-begin;
  for(unsigned i=1;i<=total;i++) {fail_spi=transfers+i;assert(!d.present(&d));assert(!pins[47]);}
- fail_spi=0;d.release(&d);assert(!live && !bus_owned);
+ fail_spi=0;d.release(&d);assert(!live && bus_owned==1);
  puts("PASS Sticky: 800x480 PSRAM, full dual-plane pixels/orientation, <=64-byte SPI, BUSY timeout, watchdog service, sleep/power-off, all SPI failure positions, init unwind and reopen");
 }
 #endif

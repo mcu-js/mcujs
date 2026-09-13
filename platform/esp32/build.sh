@@ -138,6 +138,7 @@ from pathlib import Path
 lines = set(Path(sys.argv[1]).read_text().splitlines())
 required = {'CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y', 'CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240', 'CONFIG_SPIRAM=y',
  'CONFIG_SPIRAM_MODE_OCT=y', 'CONFIG_SPIRAM_BOOT_INIT=y', 'CONFIG_SPIRAM_USE_MALLOC=y',
+ 'CONFIG_FATFS_SECTOR_512=y', 'CONFIG_WL_SECTOR_SIZE=4096',
  '# CONFIG_TINYUSB_CDC_ENABLED is not set', '# CONFIG_TINYUSB_MSC_ENABLED is not set'}
 if not required <= lines:
     raise SystemExit(f'Sticky config missing: {sorted(required - lines)}')

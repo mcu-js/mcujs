@@ -1459,10 +1459,10 @@
 #define MCUJS_HAS_CONFIGURED_BUTTON 0
 #if MCUJS_HAS_CONFIGURED_DISPLAY
 #define MCUJS_RUNTIME_DEVICE_CAPABILITIES_JSON "{\"display\":{\"interface\":\"canvas-2d-subset\",\"maxOpenHandles\":1}}"
-#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"seeed_reterminal_sticky\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"epaper\",\"controller\":\"SSD1677\",\"width\":800,\"height\":480}}},\"capabilities\":{\"boot\":{\"safeMode\":true},\"fs\":{\"appRoot\":\"/app\",\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":false},\"usb\":{\"classes\":[]},\"devices\":{\"display\":{\"interface\":\"canvas-2d-subset\",\"maxOpenHandles\":1}}}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"seeed_reterminal_sticky\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"epaper\",\"controller\":\"SSD1677\",\"width\":800,\"height\":480}}},\"capabilities\":{\"boot\":{\"safeMode\":true},\"fs\":{\"appRoot\":\"/app\",\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":false,\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"sd\":{\"root\":\"/sd\",\"implementation\":\"fat\",\"writable\":false,\"hostTransfer\":false,\"removable\":true,\"formats\":[\"fat16\",\"fat32\"]}},\"usb\":{\"classes\":[]},\"devices\":{\"display\":{\"interface\":\"canvas-2d-subset\",\"maxOpenHandles\":1}}}}"
 #else
 #define MCUJS_RUNTIME_DEVICE_CAPABILITIES_JSON "{}"
-#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"seeed_reterminal_sticky\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"epaper\",\"controller\":\"SSD1677\",\"width\":800,\"height\":480}}},\"capabilities\":{\"boot\":{\"safeMode\":true},\"fs\":{\"appRoot\":\"/app\",\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":false},\"usb\":{\"classes\":[]}}}"
+#define MCUJS_RUNTIME_MANIFEST_JSON "{\"formatVersion\":1,\"apiVersion\":\"0.2\",\"board\":{\"name\":\"seeed_reterminal_sticky\",\"chip\":\"ESP32-S3\",\"firmwareVersion\":\"0.1.0\",\"exposedPins\":[],\"pins\":{},\"devices\":{\"display\":{\"type\":\"epaper\",\"controller\":\"SSD1677\",\"width\":800,\"height\":480}}},\"capabilities\":{\"boot\":{\"safeMode\":true},\"fs\":{\"appRoot\":\"/app\",\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":false,\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"sd\":{\"root\":\"/sd\",\"implementation\":\"fat\",\"writable\":false,\"hostTransfer\":false,\"removable\":true,\"formats\":[\"fat16\",\"fat32\"]}},\"usb\":{\"classes\":[]}}}"
 #endif
 #define MCUJS_RUNTIME_BUILTIN_MODULES(X) \
     X("board") \
@@ -1474,7 +1474,7 @@
     X("node:module")
 #define MCUJS_RUNTIME_CAPABILITIES(X) \
     X("boot", "{\"safeMode\":true}") \
-    X("fs", "{\"appRoot\":\"/app\",\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":false}") \
+    X("fs", "{\"appRoot\":\"/app\",\"implementation\":\"fat\",\"writable\":true,\"hostTransfer\":false,\"binary\":{\"buffer\":\"Uint8Array\",\"maxOpenFiles\":4,\"maxTransferBytes\":4096,\"maxPosition\":2147483647,\"flags\":[\"r\",\"w\"]},\"sd\":{\"root\":\"/sd\",\"implementation\":\"fat\",\"writable\":false,\"hostTransfer\":false,\"removable\":true,\"formats\":[\"fat16\",\"fat32\"]}}") \
     X("usb", "{\"classes\":[]}")
 #else
 #error "No explicit MCU.js board feature map selected"

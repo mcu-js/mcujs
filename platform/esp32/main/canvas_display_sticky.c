@@ -1,5 +1,6 @@
 /* Private SSD1677 full-frame backend. See ../STICKY.md for vendor provenance. */
 #include "canvas_display.h"
+#include "sticky_sd.h"
 #ifdef ESP_PLATFORM
 #include "sdkconfig.h"
 #if !defined(CONFIG_SPIRAM) || !defined(CONFIG_SPIRAM_MODE_OCT) || !defined(CONFIG_SPIRAM_BOOT_INIT) || !defined(CONFIG_SPIRAM_USE_MALLOC)
@@ -19,8 +20,7 @@
 
 #define DC 16
 #define CS 15
-#define SCK 13
-#define MOSI 14
+
 #define RST 17
 #define BUSY 18
 #define POWER 47
@@ -87,7 +87,7 @@ static bool write_plane(uint8_t command,const uint16_t *pixels) {
             unsigned r=((v>>11)&31)*255/31,g=((v>>5)&63)*255/63,b=(v&31)*255/31;
             if (299*r+587*g+114*b>=128000) row[x/8]|=0x80>>(x%8);
         }
-        /* 100-byte rows exceed IDF's non-DMA FIFO; send two 50-byte chunks. */
+        /* Preserve the qualified small polling transfers on the shared DMA bus. */
         if (!send(true,row,50) || !send(true,row+50,50)) return false;
         if ((y&15)==0) {service();delay_ms(1);}
     }
@@ -119,7 +119,7 @@ static void release(canvas_display_t *d) {
     (void)gpio_set_level(POWER,0);
     if (spi) {
         (void)spi_bus_remove_device(spi);spi=NULL;
-        (void)spi_bus_free(SPI2_HOST);
+        (void)gpio_set_level(CS,1);
     }
     free(d->state);d->state=NULL;owned=false;
 }
@@ -134,18 +134,12 @@ bool canvas_display_sticky_init(canvas_display_t *d) {
         gpio_config(&out)!=ESP_OK || gpio_config(&in)!=ESP_OK) {
         free(pixels);return false;
     }
-    /* Polling without DMA: every transfer is <=64 bytes, the IDF S3 FIFO limit.
-     * No PSRAM buffer is passed to SPI. Unused data pins MUST be -1. */
-    spi_bus_config_t bus={.mosi_io_num=MOSI,.miso_io_num=-1,.sclk_io_num=SCK,
-        .quadwp_io_num=-1,.quadhd_io_num=-1,
-#ifdef ESP_PLATFORM
-        .data4_io_num=-1,.data5_io_num=-1,.data6_io_num=-1,.data7_io_num=-1,
-#endif
-        .max_transfer_sz=64};
+    /* Put an inserted SD card in SPI mode before any display traffic.
+     * The board-private owner retains SPI2 across display close/reopen. */
     spi_device_interface_config_t dev={.clock_speed_hz=10000000,.mode=0,.spics_io_num=CS,.queue_size=1};
-    if (spi_bus_initialize(SPI2_HOST,&bus,0)!=ESP_OK) {free(pixels);return false;}
+    if (!sticky_sd_prepare()) {free(pixels);return false;}
     if (spi_bus_add_device(SPI2_HOST,&dev,&spi)!=ESP_OK) {
-        spi=NULL;(void)spi_bus_free(SPI2_HOST);free(pixels);return false;
+        spi=NULL;(void)gpio_set_level(CS,1);free(pixels);return false;
     }
     next_draw_service=esp_timer_get_time()+25000;
     owned=true;d->width=WIDTH;d->height=HEIGHT;d->state=pixels;

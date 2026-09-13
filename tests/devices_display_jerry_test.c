@@ -128,11 +128,13 @@ static unsigned io_count(void) {
 #endif
 }
 static void assert_released(void) {
-    assert(live == 0 && bus_owned == 0);
+    assert(live == 0);
 #ifdef MCUJS_CANVAS_STICKY
+    /* SD owns SPI2 until reset; Canvas must release its own device and PSRAM. */
+    assert(display_devices == 0 && !owned && !spi);
     assert(pins[47] == 0);
 #else
-    assert(pins[6] == 1);
+    assert(bus_owned == 0 && pins[6] == 1);
 #endif
 }
 static void assert_frame(void) {
@@ -178,6 +180,7 @@ static void setup_vm(void) {
 static void discovery_and_lifecycle(void) {
     phase = "discovery / explicit lifecycle";
     unsigned io = io_count(), refreshes = updates, allocs = native_alloc_calls;
+    int saved_bus = bus_owned;
     int saved_pins[49]; memcpy(saved_pins, pins, sizeof(pins));
     evaluate("var module={exports:{}};");
     evaluate(portable_draw_source);
@@ -197,7 +200,7 @@ static void discovery_and_lifecycle(void) {
         "eq(desc.capabilities.maxOpenHandles,1,'exclusive lease');"
         "eq(desc.capabilities.interface,board.capability('devices').display.interface,'real registry');"
         "eq(desc.state,'idle','discovery is not physical readiness');");
-    assert(live == 0 && bus_owned == 0 && native_alloc_calls == allocs);
+    assert(live == 0 && bus_owned == saved_bus && native_alloc_calls == allocs);
     assert(io_count() == io && updates == refreshes);
     assert(memcmp(saved_pins, pins, sizeof(pins)) == 0);
     evaluate(

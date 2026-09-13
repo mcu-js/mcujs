@@ -6,10 +6,14 @@ All notable changes to mcujs will be documented in this file.
 
 - Sticky: service the runtime watchdog and yield to the RTOS between bounded Canvas draws, without partial frame flushes or changing watchdog timeouts.
 
+- Sticky: expose the existing `/sd` filesystem root as read-only FAT on the
+  shared display SPI bus. The card is powered and deselected before display
+  traffic; writes, format, erase and USB host transfer stay denied. `/app`
+  remains the writable startup volume.
+
 - Fixed experimental Sticky display setup with an inserted SD card: keep its
   shared-bus power on and chip select high, retain hardware-controlled display
-  CS, and reject refreshes when BUSY never asserts. SD storage access is not
-  enabled by this fix.
+  CS, and reject refreshes when BUSY never asserts.
 
 - Added a bounded baseline JPEG reader and portable Canvas example: a native
   snapshot up to 16 KiB, dimensions up to 320x320, and one RGB block per read.

@@ -4,11 +4,18 @@ title: Removable SD assets
 
 # Optional `/sd` assets — first hardware slice
 
-On the configured **Waveshare RP2350 LCD 1.47 A**, `/sd` is a separate removable
-FAT volume. `/app` remains internal flash; relative `fs` paths and automatic
-startup still use `/app`. A card never replaces `/app` or supplies an automatic
-`index.js`. Absolute `require('/sd/module')` and imports within that module are
-explicit opt-ins, not a second startup search.
+On boards that advertise `fs.sd`, `/sd` is a separate removable FAT volume.
+`/app` remains internal flash; relative `fs` paths and automatic startup still
+use `/app`. A card never replaces `/app` or supplies an automatic `index.js`.
+Absolute `require('/sd/module')` and imports within that module are explicit
+opt-ins, not a second startup search.
+
+Configured boards:
+
+- **Waveshare RP2350 LCD 1.47 A**: writable `/sd` on a dedicated SPI bus.
+- **Seeed reTerminal Sticky**: read-only `/sd` on the shared display SPI bus.
+  Writes, format, erase and USB host transfer are denied. Power/select of the
+  inserted card is required for display traffic even when no file is opened.
 
 ```js
 var fs = require('fs');
@@ -18,10 +25,11 @@ var asset = JSON.parse(fs.readFileSync('/sd/mcujs-proof.json', 'utf8'));
 ```
 
 `board.capability('fs').sd` describes configured support: root `/sd`, FAT,
-removable, writable, no USB host transfer, FAT16/FAT32 formats. It does **not**
-claim a card is present, healthy or writable right now. The mount is attempted
-lazily when accessing `/sd`; absence or unsupported formatting does not block
-internal application startup. Other boards do not advertise this adapter.
+removable, no USB host transfer, FAT16/FAT32 formats. `writable` is board
+policy, not live media state. It does **not** claim a card is present, healthy
+or writable right now. The mount is attempted lazily when accessing `/sd`;
+absence or unsupported formatting does not block internal application startup.
+Other boards do not advertise this adapter.
 
 ## Preservation and ownership
 

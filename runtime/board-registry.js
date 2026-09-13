@@ -501,7 +501,9 @@ boardDescriptors.seeed_reterminal_sticky = {
  board:{name:"seeed_reterminal_sticky",chip:"ESP32-S3",firmwareVersion,
  exposedPins:[],pins:{},devices:{display:{type:"epaper",controller:"SSD1677",width:800,height:480}}},
  features:epaperFeatures,modules:modulesFor(epaperFeatures),
- capabilities:{boot:{safeMode:true},fs:{appRoot:"/app",implementation:"fat",writable:true,hostTransfer:false},usb:usbCapability([])}
+ capabilities:{boot:{safeMode:true},fs:{appRoot:"/app",implementation:"fat",writable:true,hostTransfer:false,
+  binary:{buffer:"Uint8Array",maxOpenFiles:4,maxTransferBytes:4096,maxPosition:2147483647,flags:["r","w"]},
+  sd:{root:"/sd",implementation:"fat",writable:false,hostTransfer:false,removable:true,formats:["fat16","fat32"]}},usb:usbCapability([])}
 };
 for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
   const presentation = boardPresentation[boardId];

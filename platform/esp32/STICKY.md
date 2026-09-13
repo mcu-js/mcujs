@@ -102,3 +102,26 @@ Native tests cover full-frame far-edge rendering, literal byte orientation,
 BUSY/transport failures and power-off. Hardware acceptance must separately prove
 embedded build identity, PSRAM startup/allocation, UART file roundtrip, a real
 completed presentation, reset/startup and continued watchdog-clean operation.
+
+## Long-scene scheduling
+
+Refresh waits already service the task watchdog and yield to IDLE0. Drawing a
+large scene must do so too: Sticky services a rate-limited 25 ms checkpoint at
+surface acquisition, before each bounded native draw. The checkpoint neither
+invokes JavaScript nor touches panel RAM, so the completed scene is still one
+presentation. It is not a background watchdog feeder; a stalled native call or
+CPU-only JS loop still receives no service. Applications must still return to
+the event loop rather than use infinite synchronous loops. Watchdog timeouts
+and safe-boot protection are unchanged.
+
+Focused regression (no hardware):
+
+```sh
+cc -std=c11 -Wall -Wextra -Werror -Itests/canvas_epaper_stubs -Ihost/bindings -Isrc/usb tests/canvas_sticky_test.c -o /tmp/mcujs-sticky-test
+/tmp/mcujs-sticky-test
+```
+
+The test models more than a watchdog window of acquisitions before any SPI
+transfer, checks both yield and subscribed-task service, rate limiting, and
+absence of early display updates. Physical acceptance still requires a normal
+startup scene, contrasting frames and settled restart checks.

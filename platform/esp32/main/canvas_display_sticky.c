@@ -28,14 +28,24 @@
 #define HEIGHT 480
 static spi_device_handle_t spi;
 static bool owned;
-
-static uint16_t *acquire(canvas_display_t *d) {return d->state;}
+static int64_t next_draw_service;
 static void delay_ms(unsigned ms) {
     vTaskDelay(pdMS_TO_TICKS(ms) ? pdMS_TO_TICKS(ms) : 1);
 }
 static void service(void) {
     usb_cdc_task();
     if (esp_task_wdt_status(NULL)==ESP_OK) (void)esp_task_wdt_reset();
+}
+/* Each Canvas draw is bounded, but an entire scene can outlast the watchdog.
+ * Service only at real drawing checkpoints, never from a background feeder.
+ * A nonzero RTOS tick lets IDLE0 run; reset alone only services this task.
+ * No JS callbacks, panel writes or partial presentation occur here. */
+static uint16_t *acquire(canvas_display_t *d) {
+    if (esp_timer_get_time()>=next_draw_service) {
+        service();delay_ms(1);
+        next_draw_service=esp_timer_get_time()+25000;
+    }
+    return d->state;
 }
 static bool idle(void) {
     int64_t deadline=esp_timer_get_time()+10000000;
@@ -137,6 +147,7 @@ bool canvas_display_sticky_init(canvas_display_t *d) {
     if (spi_bus_add_device(SPI2_HOST,&dev,&spi)!=ESP_OK) {
         spi=NULL;(void)spi_bus_free(SPI2_HOST);free(pixels);return false;
     }
+    next_draw_service=esp_timer_get_time()+25000;
     owned=true;d->width=WIDTH;d->height=HEIGHT;d->state=pixels;
     d->acquire=acquire;d->present=present;d->release=release;
     return true;

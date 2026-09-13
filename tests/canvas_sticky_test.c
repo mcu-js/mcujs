@@ -9,6 +9,7 @@ static int pins[49], live, bus_owned, fail_alloc, fail_gpio, fail_bus, fail_add;
 static int fail_spi, stuck, busy_ticks, never_busy, busy_delay_ms, refresh_stuck;
 static int64_t busy_at;
 static unsigned transfers, services, watchdogs, updates, sleeps;
+static int watched=1;
 static int64_t now;
 static uint8_t command, control, ram[48000], old_ram[48000];
 static size_t ram_len, old_len;
@@ -17,7 +18,7 @@ int64_t esp_timer_get_time(void) {return now;}
 int gpio_get_level(int p) {assert(p==18);if(stuck || (refresh_stuck && command==0x20))return 1;if(busy_ticks){if(now<busy_at)return 0;busy_ticks--;return 1;}return 0;}
 int gpio_set_level(int p,int v) {assert(p!=15);if(fail_gpio)return -1;pins[p]=v;return 0;}
 int gpio_config(const gpio_config_t *c) {assert(!(c->pin_bit_mask & ((1ULL<<15)|(1ULL<<19)|(1ULL<<20))));return fail_gpio?-1:0;}
-int esp_task_wdt_status(void *p) {(void)p;return 0;}
+int esp_task_wdt_status(void *p) {(void)p;return watched?0:-1;}
 int esp_task_wdt_reset(void) {watchdogs++;return 0;}
 void usb_cdc_puts(const char *s) {assert(strstr(s,"\r\n"));}
 void usb_cdc_task(void) {services++;}
@@ -71,6 +72,19 @@ int main(void) {
  assert(canvas_display_sticky_init(&d));assert(d.width==800 && d.height==480 && pins[47]==0 && live==1 && transfers==0);
  assert(!canvas_display_sticky_init(&second));
  uint16_t *p=d.acquire(&d);assert(p[0]==0xffff && p[383999]==0xffff);
+ /* Drawing a large scene must yield/feed before present, not only in SPI.
+  * Hot acquire calls are cheap; no panel transaction or early flush. */
+ assert(!services && !watchdogs && !now);
+ now=24999;assert(d.acquire(&d)==p);assert(!services && !watchdogs);
+ now=25000;assert(d.acquire(&d)==p);assert(services==1 && watchdogs==1 && now>25000);
+ unsigned serviced=services, fed=watchdogs;
+ for(unsigned i=0;i<100;i++)assert(d.acquire(&d)==p);
+ assert(services==serviced && watchdogs==fed);
+ for(unsigned i=0;i<600;i++){now+=25000;assert(d.acquire(&d)==p);}
+ assert(services==serviced+600 && watchdogs==fed+600);
+ watched=0;now+=25000;assert(d.acquire(&d)==p);
+ assert(services==serviced+601 && watchdogs==fed+600);watched=1;
+ assert(transfers==0 && updates==0 && sleeps==0 && pins[47]==0);
  /* Dashboard landscape: 180-degree rotation followed by controller mirror-X,
   * so logical top row is last in RAM; MSB-first with white=1. */
  p[0]=0xf800;p[1]=0x07e0;p[2]=0x001f;p[7]=0;p[8]=0;p[799]=0;p[383999]=0;

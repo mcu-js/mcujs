@@ -4,6 +4,8 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Sticky: service the runtime watchdog and yield to the RTOS between bounded Canvas draws, without partial frame flushes or changing watchdog timeouts.
+
 - Fixed experimental Sticky display setup with an inserted SD card: keep its
   shared-bus power on and chip select high, retain hardware-controlled display
   CS, and reject refreshes when BUSY never asserts. SD storage access is not

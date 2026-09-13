@@ -78,6 +78,7 @@ static jerry_value_t create_error(const char *code, const char *message) {
 }
 
 static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
+    if (result == FS_ERROR_NOT_FOUND) return create_error("ENOENT", "no such file or directory");
     if (result == FS_ERROR_BUSY) {
         const mcujs_error_details_t details = {
             .resource = "filesystem",

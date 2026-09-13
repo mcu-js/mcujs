@@ -190,17 +190,17 @@ bool mcujs_boot_safe_mode(void) {
     return s_safe_mode;
 }
 
-bool mcujs_boot_set_safe_mode(bool enabled) {
+mcujs_boot_safe_mode_result_t mcujs_boot_set_safe_mode(bool enabled) {
     if (!enabled && s_boot_attempt_active) {
-        return false;
+        return MCUJS_BOOT_SAFE_MODE_BUSY;
     }
     if (!nvs_write_state(enabled ? 1 : 0, 0, 0)) {
-        return false;
+        return MCUJS_BOOT_SAFE_MODE_IO;
     }
     s_safe_mode = enabled;
     if (enabled) {
         s_boot_attempt_active = false;
     }
     s_health_pending = false;
-    return true;
+    return MCUJS_BOOT_SAFE_MODE_OK;
 }

@@ -57,23 +57,91 @@ require_command() {
     command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
-check_url() {
+check_url() (
     local url="$1"
-    local expected_prefix="$2"
+    local expected_url="$2"
     local label="$3"
     local result
     local code
     local effective
+    local content_type
+    local body
+    body="$(mktemp)"
+    trap 'rm -f "${body}"' EXIT
 
-    result="$(curl -sS -L -o /dev/null -w '%{http_code} %{url_effective}' "${url}")"
+    result="$(curl -sS -L --proto '=https' --proto-redir '=https' -o "${body}" \
+        -w '%{http_code} %{url_effective} %{content_type}' "${url}")" || fail "${label} HTTPS request failed"
     code="${result%% *}"
     effective="${result#* }"
+    content_type="${effective#* }"
+    effective="${effective%% *}"
 
     printf '%s: %s -> %s (%s)\n' "${label}" "${url}" "${effective}" "${code}"
 
     [[ "${code}" == "200" ]] || fail "${label} returned HTTP ${code}"
-    [[ "${effective}" == "${expected_prefix}"* ]] || fail "${label} ended at ${effective}, expected ${expected_prefix}"
-}
+    [[ "${effective}" == "${expected_url}" ]] && return
+
+    # curl follows HTTP redirects, not the .com site's browser-side refresh.
+    # Only inspect a trusted .com response, never follow a URL supplied by HTML.
+    case "${url}" in
+        https://mcujs.com/|https://www.mcujs.com/) ;;
+        *) fail "${label} ended at ${effective}, expected ${expected_url}" ;;
+    esac
+    case "${effective}" in
+        https://mcujs.com/|https://www.mcujs.com/) ;;
+        *) fail "${label} ended at untrusted redirect page ${effective}" ;;
+    esac
+    case "${content_type}" in
+        text/html|text/html\;*) ;;
+        *) fail "${label} is not an HTML redirect page (${content_type})" ;;
+    esac
+    require_command python3
+    python3 - "${body}" "${CANONICAL_DOCS}" <<'PY' || fail "${label} lacks an exact canonical meta-refresh"
+from html.parser import HTMLParser
+import re
+import sys
+
+class RedirectParser(HTMLParser):
+    # Treat raw-text/RCDATA elements as text, not executable refresh markup.
+    CDATA_CONTENT_ELEMENTS = (*HTMLParser.CDATA_CONTENT_ELEMENTS, "title", "textarea",
+                              "xmp", "iframe", "noembed", "noframes", "noscript", "plaintext")
+
+    def __init__(self):
+        super().__init__()
+        self.targets = []
+        self.templates = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "template":
+            self.templates += 1
+        if tag != "meta" or self.templates:
+            return
+        if len(dict(attrs)) != len(attrs):
+            self.targets.append(None)  # Ambiguous attributes are not trustworthy.
+            return
+        attrs = dict(attrs)
+        if (attrs.get("http-equiv") or "").lower() == "refresh":
+            match = re.fullmatch(r"0;\s*url=(.*)", attrs.get("content") or "", re.I)
+            self.targets.append(match[1] if match else None)
+
+    def handle_startendtag(self, tag, attrs):
+        # In HTML a slash does not close template or raw-text elements.
+        self.handle_starttag(tag, attrs)
+        if tag in self.CDATA_CONTENT_ELEMENTS:
+            self.set_cdata_mode(tag)
+
+    def handle_endtag(self, tag):
+        if tag == "template" and self.templates:
+            self.templates -= 1
+
+parser = RedirectParser()
+with open(sys.argv[1], encoding="utf-8") as page:
+    parser.feed(page.read())
+sys.exit(0 if parser.targets == [sys.argv[2]] else 1)
+PY
+    printf '%s: meta-refresh -> %s\n' "${label}" "${CANONICAL_DOCS}"
+    check_url "${CANONICAL_DOCS}" "${CANONICAL_DOCS}" "${label} destination"
+)
 
 check_pages_https() {
     require_command gh

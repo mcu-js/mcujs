@@ -247,6 +247,8 @@ check_runtime_registry() {
 check_release_artifacts() {
     node --test "${ROOT_DIR}/tests/release-artifacts.test.js" "${ROOT_DIR}/tests/release-board-registry.test.js"
     pass 'release orchestration and XIAO artifact freshness checks passed'
+    node --test "${ROOT_DIR}/tests/pages-cutover.test.js"
+    pass 'Pages cutover verification tests passed'
 }
 
 check_platform_boundaries() {

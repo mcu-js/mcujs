@@ -49,7 +49,13 @@ python3 - "$ROOT" "$TMP_ROOT" <<'PY'
 from pathlib import Path
 import sys
 root, out = map(Path, sys.argv[1:])
-for name in ['events', 'devices', 'button']:
+# The real PWM/buzzer factory needs SDK alarm declarations in the host lane.
+for name, text in {
+ 'pico/time.h': '#pragma once\n#include <stdint.h>\n#include <stdbool.h>\ntypedef int32_t alarm_id_t;\ntypedef int64_t (*alarm_callback_t)(alarm_id_t,void*);\nalarm_id_t add_alarm_in_ms(uint32_t,alarm_callback_t,void*,bool);\nbool cancel_alarm(alarm_id_t);\n',
+ 'hardware/sync.h': '#pragma once\n#include <stdint.h>\nstatic inline uint32_t save_and_disable_interrupts(void){return 0;}\nstatic inline void restore_interrupts(uint32_t n){(void)n;}\n',
+}.items():
+ path = out/name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(text)
+for name in ['events', 'devices', 'button', 'buzzer', 'speaker', 'microphone']:
  source = (root/('lib/'+name+'.js')).read_bytes()
  (out/(name+'_source.h')).write_text('static const jerry_char_t '+name+'_source[] = {' + ','.join(str(b) for b in source) + '};\n')
 tests = (root/'tests/events.test.js').read_text()
@@ -124,60 +130,44 @@ compile_binding_test() {
         -o "${output}"
 }
 
-FULL="${TMP_ROOT}/runtime-bindings-full"
-CONSTRAINED_RP="${TMP_ROOT}/runtime-bindings-constrained-rp"
-CONSTRAINED="${TMP_ROOT}/runtime-bindings-constrained"
-
-compile_binding_test "${FULL}" platform/rp2 \
-    -DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 \
-    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_PICO=1 \
-    -I"${ROOT}/tests/native_stubs/rp2"
-for factory in gpio graphics i2c neopixel pwm screen; do
-    nm -g "${FULL}" | grep -E " T js_create_${factory}_module$" >/dev/null
+# Exercise the production loader/registry on every default configuration, not
+# just representative Pico/RP2350/XIAO profiles. Physical drivers remain stubbed;
+# configured-display opt-ins are exercised by the separate native tests below.
+source "${ROOT}/scripts/lib/boards.sh"
+BINDING_BOARDS=("${MCUJS_RELEASE_BOARDS[@]}" waveshare_esp32s3_epaper_1.54_v2 seeed_reterminal_sticky)
+for board in "${BINDING_BOARDS[@]}"; do
+    define="${board^^}"
+    define="${define//./_}"
+    binary="${TMP_ROOT}/runtime-bindings-${board}"
+    flags=(-DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 "-DMCUJS_BOARD_${define}=1")
+    case "${board}" in
+        seeed_xiao_esp32s3|waveshare_esp32s3_epaper_1.54_v2|seeed_reterminal_sticky)
+            backend=platform/esp32/main
+            flags+=(-DMCUJS_PLATFORM_ESP32=1 -I"${ROOT}/tests/native_stubs/esp32" -I"${ROOT}/platform/esp32/main/bindings") ;;
+        *)
+            backend=platform/rp2
+            flags+=(-DMCUJS_PLATFORM_RP2=1 -I"${ROOT}/tests/native_stubs/rp2" -I"${ROOT}/board/${board}") ;;
+    esac
+    compile_binding_test "${binary}" "${backend}" "${flags[@]}"
+    nm -g "${binary}" > "${binary}.nm"
+    modules="$(node -e 'console.log(require(process.argv[1]).boardDescriptors[process.argv[2]].modules.join(" "))' "${ROOT}/runtime/board-registry.js" "${board}")"
+    for factory in gpio i2c neopixel pwm keyboard mouse graphics screen; do
+        if [[ " ${modules} " == *" ${factory} "* ]]; then
+            grep -Eq " T js_create_${factory}_module$" "${binary}.nm"
+        elif grep -Eq " T js_create_${factory}_module$" "${binary}.nm"; then
+            printf 'Unavailable factory was linked for %s: %s\n' "${board}" "${factory}" >&2
+            exit 1
+        fi
+    done
+    "${binary}"
 done
-for factory in keyboard mouse; do
-    nm -g "${FULL}" | grep -E " T js_create_${factory}_module$" >/dev/null
-done
-"${FULL}"
-
-compile_binding_test "${CONSTRAINED_RP}" platform/rp2 \
-    -DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 \
-    -DMCUJS_PLATFORM_RP2=1 -DMCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A=1 \
-    -I"${ROOT}/tests/native_stubs/rp2"
-for factory in gpio graphics i2c neopixel pwm screen; do
-    nm -g "${CONSTRAINED_RP}" | grep -E " T js_create_${factory}_module$" >/dev/null
-done
-for factory in keyboard mouse; do
-    nm -g "${CONSTRAINED_RP}" | grep -E " T js_create_${factory}_module$" >/dev/null
-done
-"${CONSTRAINED_RP}"
-
-compile_binding_test "${CONSTRAINED}" platform/esp32/main \
-    -DMCUJS_USE_PRODUCTION_BINDING_HELPERS=1 \
-    -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1 \
-    -I"${ROOT}/tests/native_stubs/esp32" \
-    -I"${ROOT}/platform/esp32/main/bindings"
-for factory in gpio i2c neopixel pwm; do
-    nm -g "${CONSTRAINED}" | grep -E " T js_create_${factory}_module$" >/dev/null
-done
-for factory in keyboard mouse; do
-    if nm -g "${CONSTRAINED}" | grep -E " T js_create_${factory}_module$" >/dev/null; then
-        printf 'Unavailable ESP32 HID factory was linked: %s\n' "${factory}" >&2
-        exit 1
-    fi
-done
-for factory in graphics screen; do
-    if nm -g "${CONSTRAINED}" | grep -E " T js_create_${factory}_module$" >/dev/null; then
-        printf 'Unavailable ESP32 display factory was linked: %s\n' "${factory}" >&2
-        exit 1
-    fi
-done
-"${CONSTRAINED}"
 
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-devices-display-tests.sh"
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-buttons-tests.sh"
+JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
+    bash "${ROOT}/tests/run-esp-safe-mode-tests.sh"
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-canvas-pointer-tests.sh"
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \

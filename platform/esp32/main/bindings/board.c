@@ -102,8 +102,15 @@ static jerry_value_t board_safe_mode(const jerry_call_info_t *info,
     if (!jerry_value_is_boolean(args[0])) {
         return jerry_throw_sz(JERRY_ERROR_TYPE, "safeMode value must be boolean");
     }
-    if (!mcujs_boot_set_safe_mode(jerry_value_is_true(args[0]))) {
-        return jerry_throw_sz(JERRY_ERROR_COMMON, "Unable to persist safe mode");
+    mcujs_boot_safe_mode_result_t result =
+        mcujs_boot_set_safe_mode(jerry_value_is_true(args[0]));
+    if (result == MCUJS_BOOT_SAFE_MODE_BUSY) {
+        return mcujs_throw_operational_error(MCUJS_ERROR_BUSY,
+            "Boot qualification window is active", NULL);
+    }
+    if (result != MCUJS_BOOT_SAFE_MODE_OK) {
+        return mcujs_throw_operational_error(MCUJS_ERROR_IO,
+            "Unable to persist safe mode", NULL);
     }
     return jerry_undefined();
 }

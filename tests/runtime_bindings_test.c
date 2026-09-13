@@ -45,6 +45,25 @@ jerry_value_t js_create_keyboard_module(void) { return stub_module(); }
 #if MCUJS_FEATURE_MOUSE
 jerry_value_t js_create_mouse_module(void) { return stub_module(); }
 #endif
+/* These fixtures prove production loader/JS-module availability only. DVI and
+ * audio hardware behavior belongs to their separate driver/native suites. */
+#if MCUJS_HAS_DVI
+jerry_value_t js_create_dvi_module(void) { return stub_module(); }
+#endif
+#if MCUJS_HAS_CONFIGURED_BUZZER
+#include "pico/time.h"
+/* PWM supplies the real buzzer factory; physical alarms are not scheduled here. */
+alarm_id_t add_alarm_in_ms(uint32_t delay, alarm_callback_t callback, void *data, bool past) {
+    (void)delay; (void)callback; (void)data; (void)past; return -1;
+}
+bool cancel_alarm(alarm_id_t alarm) { (void)alarm; return true; }
+#endif
+#if MCUJS_HAS_CONFIGURED_SPEAKER
+jerry_value_t js_create_speaker_native_module(void) { return stub_module(); }
+#endif
+#if MCUJS_HAS_CONFIGURED_MICROPHONE
+jerry_value_t js_create_microphone_native_module(void) { return stub_module(); }
+#endif
 
 static fs_result_t s_fs_operation_result = FS_ERROR_NOT_FOUND;
 static const struct { const char *path, *source; } app_files[] = {
@@ -344,6 +363,13 @@ static const char s_test_source[] =
     "  assertFrozenTree(gpioCapability, 'board.capability(\\'gpio\\')');\n"
     "  attackFrozenTree(gpioCapability, 'board.capability(\\'gpio\\')');\n"
     "  var capabilities = board.capabilities();\n"
+    "  var audio = {'waveshare_rp2350_touch_lcd_1.69': 'buzzer', 'waveshare_rp2350_touch_lcd_2.8': 'speaker', 'waveshare_esp32s3_epaper_1.54_v2': 'microphone'}[board.name];\n"
+    "  ['buzzer', 'speaker', 'microphone'].forEach(function (name) {\n"
+    "    assert(Boolean(capabilities.devices && capabilities.devices[name]) === (audio === name), name + ' capability availability');\n"
+    "    var device = require('devices')[name];\n"
+    "    if (audio === name) assert(device && typeof device.open === 'function', name + ' missing from public devices');\n"
+    "    else assert(device === undefined, name + ' unsupported public device leaked');\n"
+    "  });\n"
     "  assertFrozenTree(capabilities, 'board.capabilities()');\n"
     "  attackFrozenTree(capabilities, 'board.capabilities()');\n"
     "  assert(JSON.stringify(capabilities.gpio) === JSON.stringify(gpioCapability), 'singular and snapshot capabilities diverged');\n"

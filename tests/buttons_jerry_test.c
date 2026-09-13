@@ -51,6 +51,7 @@ bool board_enter_uf2(void) {
     assert(!"button tests must not enter UF2"); return false;
 }
 #else
+#include "boot.h"
 #include "board_config.h"
 #include "driver/gpio.h"
 #include "esp_system.h"
@@ -72,7 +73,9 @@ void esp_reset_reason_set_hint(esp_reset_reason_t hint) {
 }
 void vTaskDelay(TickType_t ticks) { (void)ticks; assert(!"button sampling must not block"); }
 bool mcujs_boot_safe_mode(void) { return false; }
-bool mcujs_boot_set_safe_mode(bool enabled) { (void)enabled; return true; }
+mcujs_boot_safe_mode_result_t mcujs_boot_set_safe_mode(bool enabled) {
+    (void)enabled; return MCUJS_BOOT_SAFE_MODE_OK;
+}
 esp_err_t gpio_config(const gpio_config_t *config) {
 #if MCUJS_REGISTRY_ONBOARD_BUTTON
     assert(MCUJS_BUTTON_PIN == 0); /* Only qualified BOOT, never RESET. */

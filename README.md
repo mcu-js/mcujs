@@ -15,7 +15,10 @@ Docs: https://mcujs.org/
 
 ## Supported Boards
 
-Current release board IDs are:
+Current development release-package targets are listed below. This is not a
+claim that a qualified 0.2.0 release has been published; use the actual asset list
+on [Releases](https://github.com/mcu-js/mcujs/releases) for released firmware.
+Capabilities vary by board and build configuration.
 
 - `pico`
 - `pico2`
@@ -25,6 +28,7 @@ Current release board IDs are:
 - `waveshare_rp2040_touch_lcd_1.28`
 - `waveshare_rp2350_lcd_1.47_a`
 - `waveshare_rp2350_touch_lcd_1.69`
+- `waveshare_rp2350_touch_lcd_2.8`
 - `adafruit_feather_rp2040`
 - `seeed_xiao_esp32s3`
 

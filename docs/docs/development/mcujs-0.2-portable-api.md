@@ -24,6 +24,50 @@ checks and docs builds run there; Pages deployment is skipped. Keep `main`,
 release tags, and published firmware unchanged until release approval. The
 runtime version remains `0.1.0` until the release-candidate versioning step.
 
+### Consistency audit scope (0.2.13)
+
+[#27](https://github.com/mcu-js/mcujs/issues/27) owns source/native/build
+agreement, not physical acceptance or publication. Its closing evidence must
+name the exact source commit and tested configurations. The release queue is
+[#27](https://github.com/mcu-js/mcujs/issues/27) →
+[#28 examples/migration](https://github.com/mcu-js/mcujs/issues/28) →
+[#29 QA procedure](https://github.com/mcu-js/mcujs/issues/29) →
+[#30 immutable RC](https://github.com/mcu-js/mcujs/issues/30) →
+[#31 hardware qualification](https://github.com/mcu-js/mcujs/issues/31) →
+[#32 approved publication](https://github.com/mcu-js/mcujs/issues/32).
+
+- **Default profiles:** the eleven package targets above plus the two explicitly
+  experimental ESP profiles. Registry/manifest/module-list comparisons cover
+  all thirteen. Native production-loader tests check every default profile;
+  REPL tests independently check their help and recovery command presence.
+- **Opt-in display configurations:** Canvas remains separate from a board's
+  physical panel inventory. PiZero DVI, RP LCD 1.47/1.69/2.8, ePaper 1.54 V2 and
+  Sticky have configured display adapters. Registry tests compare Canvas-off
+  and Canvas-on metadata; dedicated native display suites test configured
+  factories/drivers. This does not qualify any physical panel.
+- **Independent capabilities:** legacy graphics/screen are available on nine RP
+  profiles, DVI only on PiZero; neither implies a configured Canvas display.
+  LCD 2.8 omits the generic peripheral modules. The LCD 1.69 buzzer, LCD 2.8
+  speaker and ePaper microphone must remain discoverable even without Canvas.
+- **Test boundaries:** the loader lane uses real JerryScript, production module
+  registration and embedded JS. SPI/ADC, image/JPEG/HID, DVI and native audio
+  factories have labelled fixtures there; their separate backend/native suites
+  supply behavior evidence. The generic board fixture does not prove physical
+  boot/storage behavior or every platform board handler.
+- **Foundation reconciliation:** [#5](https://github.com/mcu-js/mcujs/issues/5)
+  retains configured-handle acceptance; [#6](https://github.com/mcu-js/mcujs/issues/6)
+  retains async acceptance. Bounded execution batches do not bound Promise
+  admission; [#23](https://github.com/mcu-js/mcujs/issues/23) remains an RC gate.
+  [#7](https://github.com/mcu-js/mcujs/issues/7) covers `/app` and recovery;
+  [#26](https://github.com/mcu-js/mcujs/issues/26) covers optional SD reliability.
+  LCD 1.47 SD is enabled by default: shipped-default hazards are not waived by
+  the experimental label. Sticky SD stays read-only.
+- **Recovery and public links:** [#25](https://github.com/mcu-js/mcujs/issues/25)
+  retains hardware acceptance of recovery; unsupported UF2 methods stay absent
+  on Sticky/ePaper. [#1](https://github.com/mcu-js/mcujs/issues/1) checks the
+  existing HTTPS `.com` browser redirect to `https://mcujs.org/`; verifier changes
+  do not authorize DNS, Pages settings, main-branch deployment or publication.
+
 ### Implemented in development
 
 - **Implemented:** canonical `require('board')`, `board.apiVersion`, pin/device

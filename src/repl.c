@@ -805,7 +805,8 @@ static void repl_paste_finish(void) {
         } else {
             size_t bytes_written = 0;
             result = fs_write(&file, repl_state.paste_buffer, repl_state.paste_len, &bytes_written);
-            fs_close(&file);
+            fs_result_t close_result = fs_close(&file);
+            if (result == FS_OK && close_result != FS_OK) result = close_result;
             if (result == FS_OK && bytes_written == repl_state.paste_len) {
                 fs_sync();
                 fs_notify_host();

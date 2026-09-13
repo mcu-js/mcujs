@@ -53,6 +53,12 @@ Other boards do not advertise this adapter.
 - Errors distinguish `ENOMEDIUM` (unavailable/not ready), `ENOTSUP` (unsupported
   filesystem), `EROFS` (write-protected), `EIO` (failed transport/filesystem),
   `ENOSPC` (short/full write), and `EXDEV` (cross-mount rename).
+  `ENOENT` covers a missing file/path or a build without a configured `/sd`.
+  `existsSync` is not a media-health probe: false does not diagnose absence.
+  On the RP SPI adapter, initialization failures currently share a not-ready
+  status, so `ENOMEDIUM` alone cannot distinguish an empty socket from failed
+  card initialization. Preserve the operation and diagnostic trace when
+  investigating; do not infer a physical cause from the public code alone.
 
 The existing synchronous file size and memory limits still apply. The current
 JS API is string-based; the demonstration uses a small ASCII JSON pixel asset,

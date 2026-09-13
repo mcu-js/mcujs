@@ -32,6 +32,7 @@ cc -std=gnu17 -Wall -Wextra -Werror -DMCUJS_HAS_SD=1 \
     "${ROOT}/tests/fs_ownership_test.c" "${ROOT}/src/filesystem/fs.c" \
     -o "${TMP_ROOT}/fs-sd-test"
 "${TMP_ROOT}/fs-sd-test" sd
+"${TMP_ROOT}/fs-sd-test" sd-write
 
 cc -std=gnu17 -Wall -Wextra -Werror \
     -I"${ROOT}/tests/native_stubs/usb" \

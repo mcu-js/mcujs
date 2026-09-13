@@ -20,6 +20,8 @@ static bool s_fail_unmount;
 static FATFS s_test_fs = {.csize = 2};
 static FRESULT sd_mount_result = FR_OK;
 static FRESULT io_result = FR_OK;
+static FRESULT write_result = FR_OK, close_result = FR_OK;
+static bool short_write;
 static unsigned sd_mounts;
 static bool last_open_sd;
 static bool fail_dir_read;
@@ -61,7 +63,7 @@ FRESULT f_setlabel(const char *label) {
 }
 FRESULT f_close(FIL *file) {
     (void)file;
-    return FR_OK;
+    return close_result;
 }
 FRESULT f_sync(FIL *file) {
     (void)file;
@@ -99,8 +101,8 @@ FRESULT f_read(FIL *file, void *buffer, UINT size, UINT *read) {
 FRESULT f_write(FIL *file, const void *buffer, UINT size, UINT *written) {
     (void)file;
     (void)buffer;
-    *written = size;
-    return FR_OK;
+    *written = write_result != FR_OK ? 0 : short_write && size ? size - 1 : size;
+    return write_result;
 }
 FRESULT f_stat(const char *path, FILINFO *info) {
     observe(path);
@@ -321,10 +323,10 @@ static void test_sd_mount(void) {
     io_result=FR_DISK_ERR;
     assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_ERROR_IO);
     io_result=FR_OK;sd_mount_result=FR_NO_FILESYSTEM;
-    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)!=FS_OK);
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_ERROR_UNSUPPORTED);
     assert(s_format_calls==0);
     sd_mount_result=FR_NOT_READY;
-    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)!=FS_OK);
+    assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_ERROR_NO_MEDIA);
     assert(fs_open(&app,"/app/open.js",FS_MODE_READ)==FS_OK);
     assert(fs_close(&app)==FS_OK);
     sd_mount_result=FR_OK;
@@ -341,12 +343,61 @@ static void test_sd_mount(void) {
     assert(s_format_calls==0);
     puts("SD mount separation, recovery and no-format tests passed");
 }
+
+static void test_sd_write_failures(void) {
+    assert(fs_init() == FS_OK);
+    const struct {
+        FRESULT write, close;
+        bool short_count;
+        fs_result_t expected_write, expected_close;
+    } cases[] = {
+        {FR_OK, FR_OK, false, FS_OK, FS_OK},
+        {FR_OK, FR_OK, true, FS_ERROR_NO_SPACE, FS_OK},
+        {FR_WRITE_PROTECTED, FR_OK, false, FS_ERROR_READ_ONLY, FS_OK},
+        {FR_DISK_ERR, FR_DISK_ERR, false, FS_ERROR_IO, FS_ERROR_IO},
+        {FR_OK, FR_DISK_ERR, false, FS_OK, FS_ERROR_IO},
+    };
+    for (unsigned i = 0; i < sizeof(cases)/sizeof(*cases); i++) {
+        fs_file_t file = {0}, peer = {0}, app = {0}, retry = {0};
+        size_t written = 99, size;
+        assert(fs_open(&file, "/sd/asset.json", FS_MODE_WRITE | FS_MODE_CREATE | FS_MODE_TRUNCATE) == FS_OK);
+        assert(fs_open(&peer, "/sd/asset.json", FS_MODE_READ) == FS_OK);
+        unsigned mounts_before = sd_mounts;
+        write_result = cases[i].write;
+        close_result = cases[i].close;
+        short_write = cases[i].short_count;
+        assert(fs_write(&file, "data", 4, &written) == cases[i].expected_write);
+        assert(written == (write_result != FR_OK ? 0u : short_write ? 3u : 4u));
+        assert(fs_close(&file) == cases[i].expected_close);
+        assert(!file.is_open && file.internal == NULL);
+        bool invalidated = write_result == FR_DISK_ERR || close_result == FR_DISK_ERR;
+        write_result = close_result = FR_OK;
+        short_write = false;
+        if (invalidated) {
+            assert(fs_size(&peer, &size) == FS_ERROR_IO);
+            assert(fs_open(&retry, "/sd/asset.json", FS_MODE_READ) == FS_ERROR_IO);
+            assert(sd_mounts == mounts_before); /* Wait for every stale handle. */
+        } else {
+            assert(fs_size(&peer, &size) == FS_OK);
+        }
+        assert(fs_open(&app, "/app/open.js", FS_MODE_READ) == FS_OK);
+        assert(fs_close(&app) == FS_OK);
+        assert(fs_close(&peer) == FS_OK);
+        assert(fs_open(&retry, "/sd/asset.json", FS_MODE_WRITE | FS_MODE_CREATE | FS_MODE_TRUNCATE) == FS_OK);
+        assert(sd_mounts == mounts_before + (invalidated ? 1u : 0u));
+        assert(fs_write(&retry, "data", 4, &written) == FS_OK && written == 4);
+        assert(fs_close(&retry) == FS_OK);
+        assert(s_format_calls == 0);
+    }
+    puts("SD write/short-write/close faults, peer invalidation and retry: PASS");
+}
 #endif
 
 int main(int argc, char **argv) {
     assert(argc == 2);
 #if MCUJS_HAS_SD
     if (!strcmp(argv[1], "sd")) { test_sd_mount(); return 0; }
+    if (!strcmp(argv[1], "sd-write")) { test_sd_write_failures(); return 0; }
 #endif
     if (strcmp(argv[1], "namespace") == 0) {
         test_namespace();

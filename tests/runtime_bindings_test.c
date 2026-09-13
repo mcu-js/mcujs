@@ -508,17 +508,32 @@ int main(void) {
     assert(!jerry_value_is_exception(entry));jerry_value_free(entry);
     assert(eval_source("if(appRuns!==2||appEntry.later()!=='white'||appEntry.filename!=='/app/nested/main.js')throw Error('entry rerun and callback import');"));
     js_require_clear_cache();
-    const struct { fs_result_t result; const char *code; } media_errors[] = {
-        {FS_ERROR_NO_MEDIA,"ENOMEDIUM"}, {FS_ERROR_UNSUPPORTED,"ENOTSUP"},
-        {FS_ERROR_READ_ONLY,"EROFS"}, {FS_ERROR_CROSS_DEVICE,"EXDEV"},
-        {FS_ERROR_NO_SPACE,"ENOSPC"}, {FS_ERROR_INVALID,"EINVAL"},
+    const struct { fs_result_t result; const char *code, *message; } media_errors[] = {
+        {FS_ERROR_NO_MEDIA,"ENOMEDIUM","not ready"},
+        {FS_ERROR_UNSUPPORTED,"ENOTSUP","FAT16/FAT32"},
+        {FS_ERROR_READ_ONLY,"EROFS","write-protected"},
+        {FS_ERROR_CROSS_DEVICE,"EXDEV","across mounts"},
+        {FS_ERROR_NO_SPACE,"ENOSPC","no space"},
+        {FS_ERROR_INVALID,"EINVAL","invalid filesystem"},
+        {FS_ERROR_NOT_FOUND,"ENOENT","no such file"},
+        {FS_ERROR_IO,"EIO","failed"},
+    };
+    const char *fs_operations[] = {
+        "readFileSync('/sd/a')", "writeFileSync('/sd/a','x')",
+        "appendFileSync('/sd/a','x')", "openSync('/sd/a','r')",
+        "openSync('/sd/a','w')", "readdirSync('/sd')", "statSync('/sd/a')",
+        "unlinkSync('/sd/a')", "mkdirSync('/sd/a')", "renameSync('/sd/a','/sd/b')",
     };
     for (unsigned i=0;i<sizeof(media_errors)/sizeof(media_errors[0]);i++) {
         s_fs_operation_result=media_errors[i].result;
-        char check[256];
-        snprintf(check,sizeof(check),"(function(){try{require('fs').readFileSync('/sd/a');}catch(e){if(e.code==='%s')return;throw e;}throw Error('missing SD error');})()",media_errors[i].code);
-        assert(eval_source(check));
+        for (unsigned j=0;j<sizeof(fs_operations)/sizeof(fs_operations[0]);j++) {
+            char check[512];
+            snprintf(check,sizeof(check),"(function(){try{require('fs').%s;}catch(e){if(e instanceof Error&&e.code==='%s'&&e.message.indexOf('%s')>=0)return;throw Error('%s: '+e.code+' '+e.message);}throw Error('missing filesystem error');})()",fs_operations[j],media_errors[i].code,media_errors[i].message,media_errors[i].code);
+            if (!eval_source(check)) { fprintf(stderr,"filesystem operation: %s\n",fs_operations[j]); abort(); }
+        }
+        assert(s_open_files == 0);
     }
+    puts("public filesystem operation/error matrix: PASS");
     s_fs_operation_result = FS_ERROR_BUSY;
     assert(eval_source(s_busy_test_source));
     assert(eval_source("globalThis.eventsBeforeClear = require('events');"));

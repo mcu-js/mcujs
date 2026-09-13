@@ -24,6 +24,8 @@ static int s_format_count;
 static int s_reset_count;
 static bool s_cdc_connected;
 static bool s_fs_host_owned;
+static fs_result_t s_open_result, s_write_result, s_close_result;
+static unsigned s_close_count, s_notify_count;
 
 static void reset_io(void) {
     memset(s_input, 0, sizeof(s_input));
@@ -37,6 +39,9 @@ static void reset_io(void) {
     s_reset_count = 0;
     s_cdc_connected = true;
     s_fs_host_owned = false;
+    s_open_result = FS_ERROR_NOT_FOUND;
+    s_write_result = s_close_result = FS_OK;
+    s_close_count = s_notify_count = 0;
 }
 
 static void feed_bytes(const char *bytes) {
@@ -103,14 +108,14 @@ bool js_engine_suggest_method(const char *source, char *suggestion,
 fs_result_t fs_format(void) { s_format_count++; return FS_OK; }
 fs_result_t fs_sync(void) { return FS_OK; }
 fs_result_t fs_invalidate(void) { return FS_OK; }
-void fs_notify_host(void) {}
+void fs_notify_host(void) { s_notify_count++; }
 uint32_t fs_get_free_space(void) { return 4096; }
 bool fs_host_owned(void) { return s_fs_host_owned; }
 fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     (void)file; (void)path; (void)mode;
-    return FS_ERROR_NOT_FOUND;
+    return s_open_result;
 }
-fs_result_t fs_close(fs_file_t *file) { (void)file; return FS_OK; }
+fs_result_t fs_close(fs_file_t *file) { (void)file; s_close_count++; return s_close_result; }
 fs_result_t fs_read(fs_file_t *file, void *buffer, size_t size, size_t *bytes_read) {
     (void)file; (void)buffer; (void)size;
     *bytes_read = 0;
@@ -120,7 +125,7 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
                      size_t *bytes_written) {
     (void)file; (void)buffer;
     *bytes_written = size;
-    return FS_OK;
+    return s_write_result;
 }
 fs_result_t fs_remove(const char *path) { (void)path; return FS_OK; }
 fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback,
@@ -363,7 +368,28 @@ static void test_multiline_rejects_long_filename(void) {
     assert(strcmp(s_executed, "4+4") == 0);
 }
 
+static void test_paste_reports_close_failure(void) {
+    const char *paths[] = {"/app/paste.js", "/sd/paste.js"};
+    for (unsigned path = 0; path < 2; path++) {
+        for (unsigned failure = 0; failure < 3; failure++) {
+            reset_io();
+            s_open_result = FS_OK;
+            s_write_result = failure == 1 ? FS_ERROR_IO : FS_OK;
+            s_close_result = failure == 2 ? FS_ERROR_IO : FS_OK;
+            repl_init();
+            char input[128];
+            snprintf(input, sizeof(input), ".multiline %s\r123\r.end\r", paths[path]);
+            feed_bytes(input);
+            assert(s_close_count == 1);
+            assert((strstr(s_output, "Paste saved") != NULL) == (failure == 0));
+            assert((strstr(s_output, "Failed to write paste") != NULL) == (failure != 0));
+            assert(s_notify_count == (failure == 0 ? 1u : 0u));
+        }
+    }
+}
+
 int main(void) {
+    test_paste_reports_close_failure();
     test_multiline_rejects_long_filename();
     test_crlf_is_one_enter();
     test_tab_completion_with_crlf();

@@ -243,6 +243,43 @@ With an approved unused scratch filename and verified original-file inventory:
    still check device-side persistence through its approved console. Optional
    `/sd` is not a fallback for an unavailable `/app`.
 
+#### Q5-SD — configured, read-only and absent adapters
+
+Record each operation, precondition, expected code/message, actual result and
+evidence separately. Run the no-SD cases on RP and ESP profiles too; feature
+absence is a tested result, not permission to skip the whole filesystem surface.
+
+- **No configured SD:** capability has no `sd`; `/sd` access must not fall back
+  to `/app`. Throwing file operations report `ENOENT`; `existsSync` returns false.
+- **Configured SD, unavailable media:** test first access with the slot empty,
+  and repeat with independently identified, pre-prepared unsupported-format
+  media only when authorized. Record the actual failure stage. `ENOMEDIUM`
+  currently means unavailable/not ready, not proof of physical absence;
+  `ENOTSUP` identifies a recognized unsupported filesystem. No auto-format.
+- **Valid media:** separate cold/first access, first create, warm rewrite, binary
+  handles, close, fresh-runtime readback and hash comparison. Run read-only
+  profiles without writing: attempted mutators must report `EROFS` when media is
+  ready. Repeat permitted SD operations while `/app` is USB-host-owned.
+- **Failure and recovery:** use native fault injection for short/full writes
+  (`ENOSPC`), transport/write/close errors (`EIO`), peer-handle invalidation and
+  retry after all outstanding handles close. Verify `/app` remains usable.
+  Capture public string/binary `fs`, explicit file-backed `require`, REPL load
+  and multiline-save boundaries where applicable. A failed close must not
+  produce `Paste saved`. Retain the primary write error when cleanup also fails.
+- **Boundary cases:** capture `EINVAL` for mount-escaping paths, `EXDEV` for
+  cross-mount rename and `EBUSY` for host-owned `/app`; record error precedence
+  when conditions overlap. Do not reinterpret intentionally non-throwing
+  `existsSync` results as a media-health diagnostic.
+
+Assert meaningful message content, not just any exception. Do not replace
+stable public codes with raw SDK/FatFs statuses or recommend formatting as
+recovery. Native fixtures test a specific software boundary: stubbed FatFs
+operations and separate SPI-driver tests are **not** composed first-write or
+physical-card qualification. Track that distinction and all NOT_RUN cases.
+Preserve original card and `/app` hashes; power off before card swaps. Do not
+create physical corruption, full-media or live-removal faults to stand in for
+native injection. See [SD limits and evidence](./sd-assets.md).
+
 ### Q6 — reconnect, watchdog and responsiveness
 
 After safe sync/eject, perform three USB disconnect/reconnect cycles; record mode,

@@ -24,13 +24,16 @@ compile_repl_test() {
         -o "${output}"
 }
 
-for board in "${MCUJS_RELEASE_BOARDS[@]}"; do
+# Experimental runtime profiles need the same help/editor contract as release boards.
+REPL_BOARDS=("${MCUJS_RELEASE_BOARDS[@]}" waveshare_esp32s3_epaper_1.54_v2 seeed_reterminal_sticky)
+for board in "${REPL_BOARDS[@]}"; do
     define="${board^^}"
     define="${define//./_}"
     flags=("-DMCUJS_BOARD_${define}=1" "-I${ROOT}/board/${board}")
-    if [[ "$(mcujs_board_chip "${board}")" == "ESP32-S3" ]]; then
-        flags+=(-DMCUJS_PLATFORM_ESP32=1)
-    fi
+    case "${board}" in
+        seeed_xiao_esp32s3|waveshare_esp32s3_epaper_1.54_v2|seeed_reterminal_sticky)
+            flags+=(-DMCUJS_PLATFORM_ESP32=1) ;;
+    esac
     compile_repl_test "${BINARY}" "${flags[@]}"
     printf '%s: ' "${board}"
     "${BINARY}"

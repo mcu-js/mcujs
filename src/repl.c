@@ -861,7 +861,11 @@ static void repl_handle_command(const char* cmd) {
         usb_cdc_puts("JavaScript APIs:\r\n");
         usb_cdc_puts("  console.log(), console.warn(), console.error()\r\n");
         usb_cdc_puts("  setTimeout(), clearTimeout(), setInterval(), clearInterval()\r\n");
-        usb_cdc_puts("  board: name, chip, version, flashSize, ramSize, cpuFreq, ledPin\r\n");
+        usb_cdc_puts("  board: name, chip, version, flashSize, ramSize, cpuFreq");
+#if MCUJS_REGISTRY_LED_PIN
+        usb_cdc_puts(", ledPin");
+#endif
+        usb_cdc_puts("\r\n");
         usb_cdc_puts("  board methods: freeMemory(), uniqueId(), reset(), enterUf2(), millis(), delay(), capability(), capabilities()\r\n");
         const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
         if (registry->onboard_led) usb_cdc_puts("  board onboard method: led()\r\n");

@@ -223,6 +223,13 @@ static void test_help_matches_build_features(void) {
     repl_init();
     feed_bytes(".help\r");
     assert(strstr(s_output, "uniqueId()") != NULL);
+    /* Boards with a GPIO LED pin property; managed Pico 2 W LED has no pin. */
+    const char *help_board = mcujs_runtime_registry()->board_id;
+    bool has_led_pin = strcmp(help_board, "pico") == 0 ||
+                       strcmp(help_board, "pico2") == 0 ||
+                       strcmp(help_board, "adafruit_feather_rp2040") == 0 ||
+                       strcmp(help_board, "seeed_xiao_esp32s3") == 0;
+    assert((strstr(s_output, "ledPin") != NULL) == has_led_pin);
     assert(strstr(s_output, " led, ids") == NULL);
     const mcujs_runtime_registry_t *registry = mcujs_runtime_registry();
     // These are the two boards with the public read-only button API.

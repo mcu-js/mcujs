@@ -112,8 +112,8 @@ undefined
 | `.rm FILE` | Delete a file |
 | `.run FILE` | Execute a JavaScript file |
 | `.multiline [FILE]` | Multi-line input (end with `.end`) |
-| `.uf2` | Reboot into UF2 mode (prompted) |
-| `.uf2!` | Reboot into UF2 mode immediately |
+| `.uf2` | Reboot into UF2 mode (prompted, supported boards only) |
+| `.uf2!` | Reboot into UF2 mode immediately (supported boards only) |
 | `.usbreset` | Reset USB connection (reboot) |
 
 The `.info` command includes the current build ID (version + git SHA).
@@ -252,7 +252,8 @@ board.uniqueId();                 // Board unique ID (hex string)
 board.millis();                   // Milliseconds since boot
 board.delay(ms);                  // Blocking delay
 board.reset();                    // Reset USB connection (reboot)
-board.enterUf2();                 // Reboot into UF2 bootloader
+// Only on boards advertising boot.enterUf2 (RP and XIAO, not Sticky/ePaper154):
+if (typeof board.enterUf2 === 'function') board.enterUf2();
 ```
 
 Missing color values default to 0. Color arrays longer than three bytes and pixel lists longer than the onboard length throw `RangeError`; they are never truncated. Object inputs are RGB; array inputs follow the active `neopixel.init()` order. Array-of-objects stays RGB.

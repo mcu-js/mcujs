@@ -17,6 +17,9 @@
     }
   },
   "capabilities": {
+    "boot": {
+      "enterUf2": true
+    },
     "fs": {
       "appRoot": "/app",
       "binary": {

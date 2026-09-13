@@ -55,7 +55,13 @@ The schema defines these always-present board fields and methods:
 - identity and limits: `name`, `chip`, `version`, `apiVersion`, `flashSize`, `ramSize`, and `cpuFreq`;
 - immutable maps: `pins` and `devices`;
 - discovery: `capability(name)` and `capabilities()`;
-- shared board services: `freeMemory()`, `uniqueId()`, `reset()`, `millis()`, `delay(ms)`, and `enterUf2()`.
+- shared board services: `freeMemory()`, `uniqueId()`, `reset()`, `millis()`, and `delay(ms)`.
+
+`enterUf2()` exists only when `board.capability('boot').enterUf2 === true`.
+Feature-detect the method or guard the descriptor before reading that field.
+RP boards and XIAO expose it; Sticky and ePaper154 omit both the method and
+the field, rather than exporting an unavailable throwing stub. This changes
+discovery only, not the supported recovery paths or REPL command handlers.
 
 `board.capability(name)` returns one descriptor or `undefined`, which avoids constructing the complete object on a small JerryScript heap. `board.capabilities()` returns the complete immutable snapshot for diagnostics and tooling.
 
@@ -96,7 +102,7 @@ The JSON schema closes every 0.2 descriptor with `additionalProperties: false`; 
 | `gpio` | `pins`, `outputPins`, `modes` |
 | `pwm` | `pins`, `maxOutputs`, `timerCount`, `duty`, `frequency` |
 | `adc` | `resolutionBits`, non-empty `pins` and `channels`, `voltage`, `temperature`, `vsys` |
-| `boot` | `safeMode` (capability omitted when persistent safe mode is unavailable) |
+| `boot` | At least one of the independently optional true-only `safeMode` and `enterUf2` fields; omitted if neither control is available |
 | `i2c` | `buses`, `routes`, `defaultBus`, `defaultRoute`, `frequency`, `maxTransferBytes` |
 | `spi` | `buses`, `routes`, `defaultBus`, `defaultRoute`, `frequency`, `maxTransferBytes`, `modes`, fixed `bitsPerWord: [8]`, fixed `bitOrders: ['msb']`, `fullDuplex`, `dma`; optional `compatibilityExtensions` |
 | `neopixel` | `pins`, `maxLength`, `orders` |

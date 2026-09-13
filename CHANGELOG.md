@@ -4,6 +4,11 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Omit unsupported `board.enterUf2` on Sticky and ePaper154 instead of exposing
+  a throwing stub. The independently optional `boot.enterUf2` capability now
+  describes RP/XIAO availability; safe-mode behavior and REPL recovery handlers
+  are unchanged. Native/schema coverage is separate from pending device updates.
+
 - Recorded exact Sticky `37e3771` qualification: application-only readback and
   preserved internal files, photograph-verified SD BMP/white/BMP redraws and
   two settled Night Ferry software restarts, with no SD writes. This supersedes

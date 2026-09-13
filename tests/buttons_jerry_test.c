@@ -1,6 +1,7 @@
 /* Native button integration, 64 KiB Jerry, no hardware or SDK installation.
  * Real production: devices/button/events factories, board registry, board.c and
- * timers.c, for Pico and XIAO. Only SDK clock/electrical input are simulated.
+ * timers.c, for Pico and XIAO; board smoke also covers Sticky and ePaper154.
+ * Only SDK clock/electrical input are simulated.
  * require below is a small cached factory router, NOT the production loader.
  * Failure tests additionally decorate the REAL board.buttonPressed function
  * with an EIO injection switch: neither hardware sampler exposes poll failures.
@@ -12,6 +13,7 @@
 #include "bindings.h"
 #include "jerryscript.h"
 #include "runtime_registry.h"
+#include "runtime_features.h"
 #include "runtime_validation_backend_stubs.h"
 #include "validation.h"
 #include <assert.h>
@@ -53,7 +55,13 @@ bool board_enter_uf2(void) {
 #include "driver/gpio.h"
 #include "esp_system.h"
 #include "freertos/task.h"
+#if defined(MCUJS_BOARD_SEEED_RETERMINAL_STICKY)
+#define TARGET "reTerminal Sticky"
+#elif defined(MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2)
+#define TARGET "ePaper154"
+#else
 #define TARGET "XIAO ESP32-S3"
+#endif
 int64_t esp_timer_get_time(void) { return (int64_t)now_ms * 1000; }
 size_t heap_caps_get_free_size(unsigned caps) { (void)caps; return 65536; }
 esp_err_t esp_efuse_mac_get_default(uint8_t *mac) { memset(mac, 0, 6); return ESP_OK; }
@@ -66,19 +74,27 @@ void vTaskDelay(TickType_t ticks) { (void)ticks; assert(!"button sampling must n
 bool mcujs_boot_safe_mode(void) { return false; }
 bool mcujs_boot_set_safe_mode(bool enabled) { (void)enabled; return true; }
 esp_err_t gpio_config(const gpio_config_t *config) {
+#if MCUJS_REGISTRY_ONBOARD_BUTTON
     assert(MCUJS_BUTTON_PIN == 0); /* Only qualified BOOT, never RESET. */
     assert(config->pin_bit_mask == (UINT64_C(1) << MCUJS_BUTTON_PIN));
     assert(config->mode == GPIO_MODE_INPUT);
     assert(config->pull_up_en == GPIO_PULLUP_ENABLE);
     assert(config->pull_down_en == GPIO_PULLDOWN_DISABLE);
     assert(config->intr_type == GPIO_INTR_DISABLE);
+#else
+    (void)config; assert(!"board without a button must not configure input");
+#endif
     return ESP_OK;
 }
 extern int __real_gpio_get_level(gpio_num_t pin);
 int __wrap_gpio_get_level(gpio_num_t pin) {
+#if MCUJS_REGISTRY_ONBOARD_BUTTON
     if (pin != MCUJS_BUTTON_PIN) return __real_gpio_get_level(pin);
     samples++;
     return physical_pressed ? 0 : 1; /* Electrical level, board.c decodes polarity. */
+#else
+    return __real_gpio_get_level(pin);
+#endif
 }
 #endif
 
@@ -196,6 +212,11 @@ static void setup_vm(void) {
 
 static void board_timer_smoke(void) {
     phase = "real board / timer smoke (not button factory coverage)";
+#if defined(MCUJS_BOARD_SEEED_RETERMINAL_STICKY) || defined(MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2)
+    evaluate("eq('buttonPressed' in board,false,'no onboard button');"
+             "var fired=0,id=setInterval(function(){fired++;},10);");
+    assert(samples == 0);
+#else
     evaluate("eq(board.buttonPressed(),false,'real released input');"
              "typeError(function(){board.buttonPressed(true);});"
              "typeError(function(){board.buttonPressed(undefined);});");
@@ -206,10 +227,33 @@ static void board_timer_smoke(void) {
     evaluate("eq(board.buttonPressed(),false,'real released input again');"
              "var fired=0,id=setInterval(function(){fired++;},10);");
     assert(samples == 3);
+#endif
     advance(9); evaluate("eq(fired,0,'timer not early');");
     advance(1); evaluate("eq(fired,1,'timer due');clearInterval(id);");
     ticks(2); assert(!js_timers_process());
     evaluate("eq(fired,1,'timer cleared');");
+}
+
+static void recovery_surface(void) {
+    phase = "recovery availability (never invoke recovery)";
+    publish("boardModule", js_create_board_module());
+    evaluate("eq(boardModule,board,'board module is the global board');");
+#if defined(MCUJS_BOARD_SEEED_RETERMINAL_STICKY) || defined(MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2)
+    evaluate("eq('enterUf2' in board,false,'unsupported recovery is absent');"
+             "eq(board.capability('boot').enterUf2,undefined,'no UF2 capability');");
+#else
+    evaluate("eq(typeof board.enterUf2,'function','supported recovery exists');"
+             "eq(board.capability('boot').enterUf2,true,'UF2 capability');");
+#endif
+#if defined(MCUJS_PLATFORM_RP2)
+    evaluate("eq('safeMode' in board,false,'RP safeMode remains absent');"
+             "eq(board.capability('boot').safeMode,undefined,'no RP safeMode capability');");
+#else
+    evaluate("eq(typeof board.safeMode,'function','ESP safeMode retained');"
+             "eq(board.capability('boot').safeMode,true,'ESP safeMode capability');");
+#endif
+    evaluate("eq(Object.isFrozen(board.capability('boot')),true,'boot descriptor frozen');"
+             "eq(JSON.stringify(board.capabilities().boot),JSON.stringify(board.capability('boot')),'boot snapshots agree');");
 }
 
 #ifndef MCUJS_BUTTONS_BOARD_SMOKE
@@ -396,6 +440,7 @@ int main(void) {
     mcujs_test_reset_backend();
     for (unsigned vm = 1; vm <= 2; vm++) {
         setup_vm();
+        recovery_surface();
         board_timer_smoke();
 #ifndef MCUJS_BUTTONS_BOARD_SMOKE
         discovery();

@@ -1377,11 +1377,12 @@
       "type": "object",
       "description": "Static boot and recovery controls compiled into this firmware. Dynamic safe-mode state is queried through board.safeMode().",
       "additionalProperties": false,
-      "required": [
-        "safeMode"
-      ],
+      "minProperties": 1,
       "properties": {
         "safeMode": {
+          "const": true
+        },
+        "enterUf2": {
           "const": true
         }
       }
@@ -2343,7 +2344,8 @@
           },
           "enterUf2": {
             "kind": "method",
-            "availability": "required",
+            "availability": "capabilityField",
+            "capabilityField": "boot.enterUf2",
             "signatures": [
               {
                 "arguments": [],

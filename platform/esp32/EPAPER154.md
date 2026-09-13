@@ -74,7 +74,8 @@ After a verified full 8 MB backup, parent may selectively write bootloader at
 0x0, partition table at 0x8000, application at 0x10000. Confirm generated flash
 metadata before writing. Do not erase/write old NVS or PHY. Do not restore old
 factory app tails over FFAT. First runtime boot formats FFAT as needed.
-TinyUF2 recovery is explicitly unavailable: `board.enterUf2()` throws and the
+TinyUF2 recovery is explicitly unavailable: `board.enterUf2` and the
+`boot.enterUf2` capability field are absent. The
 shared REPL board service returns failure, never a XIAO loader reset hint.
 Use BOOT held during a PWR off/on cycle to enter Espressif ROM. After flashing, release BOOT and cycle PWR normally if USB reset leaves the board waiting for download.
 

@@ -287,6 +287,7 @@ function rpDescriptor({
   neopixelPins = gpioPins,
 }) {
   const capabilities = {
+    boot: { enterUf2: true },
     ...(features.gpio ? { gpio: gpioCapability(gpioPins, gpioOutputPins) } : {}),
     ...(features.pwm ? { pwm: pwmCapability(pwmPins, chip) } : {}),
     fs: { appRoot: "/app", binary: { buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096, maxPosition: 2147483647, flags: ["r", "w"] }, implementation: "fat", writable: true, hostTransfer: true },
@@ -479,7 +480,7 @@ boardDescriptors.seeed_xiao_esp32s3 = {
     adc: adcCapability(pinsBetween(1, 9), Object.fromEntries(pinsBetween(1, 9).map((pin) => [pin, `A${pin - 1}`])), {
       calibrated: true, rawChannel: false, vsys: false,
     }),
-    boot: { safeMode: true },
+    boot: { safeMode: true, enterUf2: true },
     i2c: i2cCapability([{ bus: 0, sda: 5, scl: 6 }, { bus: 1, sda: 3, scl: 4 }], 0),
     spi: spiCapability([{ bus: 0, sck: 7, mosi: 9, miso: 8 }, { bus: 1, sck: 4, mosi: 6, miso: 5 }], 0, {
       dma: false, maxHz: 40000000, maxTransferBytes: 64,

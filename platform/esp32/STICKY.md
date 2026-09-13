@@ -163,11 +163,18 @@ Four strict-mode mutation attempts and missing/wrong/empty module-name probes
 returned the expected TypeError/RangeError; original module/device data remained
 unchanged. This is a bounded sample, not exhaustive mutation conformance.
 
-Two help/recovery gaps remain: `.help` lists `ledPin` although it is undefined,
+That exact build had two help/recovery gaps: `.help` lists `ledPin` although it is undefined,
 and advertises UF2 commands although this target has no TinyUF2. The exported
 `board.enterUf2` function throws an unavailable error in source; it was not
 invoked. Do not follow the generic UF2 help on Sticky or call discovery fully
 qualified until these unsupported surfaces are corrected.
+
+Subsequent development source corrects the optional `ledPin` help and states
+that UF2 is unavailable. It also omits `board.enterUf2` and the `boot.enterUf2`
+capability field on Sticky (and ePaper154), while preserving safe-mode controls
+and the REPL recovery handlers. Native binding and schema tests cover this
+surface correction; the live `37e3771` image above has not been updated or
+physically requalified for these changes.
 
 `jpeg` and legacy `image` are **absent** in this firmware, consistently with
 `modules.has()` and actual `require()` failure. The native JPEG registration

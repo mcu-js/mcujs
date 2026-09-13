@@ -342,6 +342,19 @@ test("schema availability drives absent modules and optional methods without boa
   }
 });
 
+test("recovery exports agree with supported boards including both experimental profiles", () => {
+  const unsupported = ["seeed_reterminal_sticky", "waveshare_esp32s3_epaper_1.54_v2"];
+  for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
+    const available = !unsupported.includes(boardId);
+    const surface = expectedRuntimeSurface(contract, descriptor);
+    assert.equal(surface.exports.board.includes("enterUf2"), available, boardId);
+    assert.equal(descriptor.capabilities.boot.enterUf2, available ? true : undefined, boardId);
+    const safeMode = boardId === "seeed_xiao_esp32s3" || unsupported.includes(boardId);
+    assert.equal(surface.exports.board.includes("safeMode"), safeMode, boardId);
+    assert.equal(descriptor.capabilities.boot.safeMode, safeMode ? true : undefined, boardId);
+  }
+});
+
 test("touch and IMU interrupt endpoints remain input-only GPIO capabilities", () => {
   for (const boardId of [
     "waveshare_rp2040_touch_lcd_1.28",

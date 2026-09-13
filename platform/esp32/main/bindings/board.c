@@ -78,12 +78,11 @@ static jerry_value_t board_delay(const jerry_call_info_t *info,
     return jerry_undefined();
 }
 
+#if MCUJS_HAS_TINYUF2
 static jerry_value_t board_enter_uf2(const jerry_call_info_t *info,
                                      const jerry_value_t args[], jerry_length_t argc) {
     (void)info; (void)args; (void)argc;
-#if !MCUJS_HAS_TINYUF2
-    return jerry_throw_sz(JERRY_ERROR_COMMON, "UF2 unavailable; use BOOT/reset ROM esptool recovery");
-#else
+
     enum { APP_REQUEST_UF2_RESET_HINT = 0x11F2 };
     /* TinyUF2 requires this reference so IDF links the hint implementation. */
     (void)esp_reset_reason();
@@ -91,8 +90,8 @@ static jerry_value_t board_enter_uf2(const jerry_call_info_t *info,
     vTaskDelay(pdMS_TO_TICKS(20));
     esp_restart();
     return jerry_undefined();
-#endif
 }
+#endif
 
 static jerry_value_t board_safe_mode(const jerry_call_info_t *info,
                                      const jerry_value_t args[], jerry_length_t argc) {
@@ -182,7 +181,9 @@ void js_bind_board(void) {
     js_set_function(board, "reset", board_reset);
     js_set_function(board, "millis", board_millis);
     js_set_function(board, "delay", board_delay);
+#if MCUJS_HAS_TINYUF2
     js_set_function(board, "enterUf2", board_enter_uf2);
+#endif
 #if MCUJS_REGISTRY_ONBOARD_BUTTON
     js_set_function(board, "buttonPressed", board_button_pressed);
 #endif

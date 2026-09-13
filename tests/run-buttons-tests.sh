@@ -30,7 +30,7 @@ python3 - "$ROOT" "$TMP_ROOT" "$mode" <<'PY'
 from pathlib import Path
 import sys
 root, out = map(Path, sys.argv[1:3])
-for name in ('devices', 'events', 'button'):
+for name in ('devices', 'events', 'button', 'microphone'):
     data = (root / 'lib' / (name + '.js')).read_bytes()
     # Production builtin_modules.c passes sizeof(array), without a trailing NUL.
     (out / (name + '_source.h')).write_text(
@@ -119,5 +119,14 @@ compile_target xiao platform/esp32/main MCUJS_BOARD_SEEED_XIAO_ESP32S3 \
     "-I${ROOT}/platform/esp32/main" "-I${ROOT}/src/filesystem" \
     "-I${ROOT}/platform/esp32/main/bindings" \
     "-I${ROOT}/tests/native_stubs/esp32"
+for entry in 'sticky MCUJS_BOARD_SEEED_RETERMINAL_STICKY' \
+             'epaper MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2'; do
+    read -r target macro <<< "$entry"
+    compile_target "$target" platform/esp32/main "$macro" \
+        -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_BUTTONS_BOARD_SMOKE=1 \
+        "-I${ROOT}/platform/esp32/main" "-I${ROOT}/src/filesystem" \
+        "-I${ROOT}/platform/esp32/main/bindings" \
+        "-I${ROOT}/tests/native_stubs/esp32"
+done
 # Bounded even if a regression accidentally introduces an infinite JS loop.
-for target in pico xiao; do timeout 30s "${TMP_ROOT}/${target}"; done
+for target in sticky epaper pico xiao; do timeout 30s "${TMP_ROOT}/${target}"; done

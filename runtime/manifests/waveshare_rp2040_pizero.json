@@ -61,6 +61,9 @@
     "devices": {}
   },
   "capabilities": {
+    "boot": {
+      "enterUf2": true
+    },
     "gpio": {
       "pins": [
         0,

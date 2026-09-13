@@ -131,7 +131,7 @@ function validManifest() {
         temperature: { supported: false },
         vsys: false,
       },
-      boot: { safeMode: true },
+      boot: { safeMode: true, enterUf2: true },
       i2c: {
         buses: [0],
         routes: [{ bus: 0, sda: 2, scl: 3 }],
@@ -1216,6 +1216,23 @@ test("an advertised ADC capability has executable raw pin and channel operations
     result.errors.some((error) => error.keyword === "minItems"),
     JSON.stringify(result.errors),
   );
+});
+
+test("boot controls are independent optional true-only capabilities", () => {
+  for (const boot of [{ safeMode: true }, { enterUf2: true }, { safeMode: true, enterUf2: true }]) {
+    const manifest = validManifest();
+    manifest.capabilities.boot = boot;
+    const result = validatePortableApiManifest(manifest);
+    assert.equal(result.valid, true, JSON.stringify(result.errors));
+  }
+  for (const boot of [{}, { safeMode: false }, { enterUf2: false }, { enterUf2: 1 }, { other: true }]) {
+    const manifest = validManifest();
+    manifest.capabilities.boot = boot;
+    assert.equal(validatePortableApiManifest(manifest).valid, false, JSON.stringify(boot));
+  }
+  const recovery = loadSchema()["x-mcujs-contract"].modules.board.exports.enterUf2;
+  assert.equal(recovery.availability, "capabilityField");
+  assert.equal(recovery.capabilityField, "boot.enterUf2");
 });
 
 test("every export uses a complete and unambiguous availability shape", () => {

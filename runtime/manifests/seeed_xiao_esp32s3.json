@@ -206,7 +206,8 @@
       "vsys": false
     },
     "boot": {
-      "safeMode": true
+      "safeMode": true,
+      "enterUf2": true
     },
     "i2c": {
       "buses": [

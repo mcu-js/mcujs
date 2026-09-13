@@ -39,6 +39,83 @@ static void expect(const char *expression, const char *expected) {
         assert(0);
     }
 }
+/* A host-owned counter outlives every VM: discarded callbacks cannot hide by
+ * writing only to globals that disappear during cleanup. */
+static unsigned observed_jobs;
+static jerry_value_t record_job(const jerry_call_info_t *info,
+                                const jerry_value_t args[], jerry_length_t argc) {
+    (void)info; (void)args; (void)argc;
+    observed_jobs++;
+    return jerry_undefined();
+}
+static void install_job_recorder(void) {
+    jerry_value_t global = jerry_current_realm();
+    jerry_value_t callback = jerry_function_external(record_job);
+    jerry_value_t result = jerry_object_set_sz(global, "recordJob", callback);
+    assert(!jerry_value_is_exception(result) && jerry_value_is_true(result));
+    jerry_value_free(result);
+    jerry_value_free(callback);
+    jerry_value_free(global);
+}
+static void expect_pending(bool expected) {
+    bool pending = !expected;
+    jerry_value_t result = mcujs_jerry_run_jobs(0, &pending);
+    assert(!jerry_value_is_exception(result));
+    jerry_value_free(result);
+    if (pending != expected) {
+        fprintf(stderr, "Pending expected %d, got %d; observed callbacks %u\n",
+                expected, pending, observed_jobs);
+    }
+    assert(pending == expected);
+}
+static void queued_family_cleanup(void) {
+    const struct { const char *name; const char *source; } cases[] = {
+        {"reaction", "Promise.resolve().then(recordJob);"},
+        {"async reaction", "(async function(){await Promise.resolve(1);recordJob();})();"},
+        {"async generator continuation",
+         "(async function*(){await Promise.resolve(1);recordJob();yield 1;})().next();"},
+        {"thenable", "Promise.resolve({then:recordJob});"},
+    };
+    for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        fprintf(stderr, "Checking queued %s teardown\n", cases[i].name);
+        unsigned before = observed_jobs;
+        unsigned cleanups = require_cleanup_calls;
+        assert(js_engine_init() == JS_OK);
+        install_job_recorder();
+        exec(cases[i].source);
+        expect_pending(true);
+        assert(observed_jobs == before); /* Not inline. */
+        /* Positive control: the public producer really schedules our callback. */
+        jerry_value_t result = jerry_run_jobs();
+        assert(!jerry_value_is_exception(result));
+        jerry_value_free(result);
+        assert(observed_jobs == before + 1);
+        expect_pending(false);
+
+        exec(cases[i].source);
+        expect_pending(true);
+        js_engine_gc(); /* Keep queued roots alive until actual teardown. */
+        js_engine_cleanup();
+        assert(observed_jobs == before + 1); /* Cleanup never executes jobs. */
+        assert(require_cleanup_calls == cleanups + 1);
+        assert(fs_cleanup_calls == cleanups + 1);
+        assert(!js_engine_process_timers());
+
+        assert(js_engine_init() == JS_OK);
+        expect_pending(false);
+        assert(!js_engine_process_timers());
+        assert(observed_jobs == before + 1); /* No stale cross-context work. */
+        install_job_recorder();
+        exec("Promise.resolve().then(recordJob);");
+        js_engine_process_timers();
+        assert(observed_jobs == before + 2);
+        expect_pending(false);
+        js_engine_cleanup();
+        assert(require_cleanup_calls == cleanups + 2);
+        assert(fs_cleanup_calls == cleanups + 2);
+        printf("Queued %s cleanup and fresh VM: PASS\n", cases[i].name);
+    }
+}
 int main(void) {
     assert(js_engine_init() == JS_OK);
     exec("var answer = 0; Promise.resolve(42).then(function(v) { answer = v; });");
@@ -140,6 +217,7 @@ int main(void) {
     js_engine_cleanup();
     assert(require_cleanup_calls == 2);
     assert(fs_cleanup_calls == 2);
+    queued_family_cleanup();
     puts("Promise scheduling: PASS");
     return 0;
 }

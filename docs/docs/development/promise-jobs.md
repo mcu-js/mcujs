@@ -98,6 +98,12 @@ time and unrelated binding/module initialization are stubbed. Tests cover:
   turns; sustained turns with bounded retained heap usage after GC.
 - Zero/one-job extension boundaries and unchanged upstream drain-to-empty.
 - Callback slot reuse, pending work at cleanup, and engine reinitialization.
+- Separate queued reaction, async-function, suspended async-generator and thenable
+  lifecycle cases. A host-owned callback counter survives VM teardown; positive
+  controls execute each callback, while cleanup must discard the queued repeat
+  without running it, and the fresh VM must start empty and accept new work.
+  These are public producer-workflow tests, not instrumentation of every internal
+  queue-item type or proof of overload/backpressure semantics.
 - Pin validation, repeat configure and staged mutation rejection.
 
 Host tests are not physical USB, display, watchdog or cold-boot qualification.

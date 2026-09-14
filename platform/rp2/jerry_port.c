@@ -6,9 +6,11 @@
 
 #include "jerryscript.h"
 #include "jerryscript-port.h"
+#include "fatal_recovery.h"
 
 #include "pico/stdlib.h"
 #include "hardware/timer.h"
+#include "hardware/watchdog.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,14 +26,28 @@ void jerry_port_init(void) {
 /*
  * Fatal error handler
  */
-void jerry_port_fatal(jerry_fatal_code_t code) {
-    printf("mcujs: Fatal error %d\n", code);
-    
-    /* Blink LED rapidly to indicate error */
-    while (1) {
-        /* Halt - in production, could trigger watchdog reset */
-        tight_loop_contents();
+#define MCUJS_FATAL_RESET_MAGIC 0x4D435546u
+static int s_fatal_recovery_code = -1;
+
+void mcujs_fatal_recovery_init(void) {
+    s_fatal_recovery_code = -1;
+    if (watchdog_caused_reboot() &&
+        watchdog_hw->scratch[1] == MCUJS_FATAL_RESET_MAGIC) {
+        s_fatal_recovery_code = (int)watchdog_hw->scratch[2];
     }
+    /* Scratch 0 is Canvas diagnostics; 4..7 belong to the Pico SDK reboot. */
+    watchdog_hw->scratch[1] = 0;
+    watchdog_hw->scratch[2] = 0;
+}
+
+int mcujs_fatal_recovery_code(void) { return s_fatal_recovery_code; }
+
+void jerry_port_fatal(jerry_fatal_code_t code) {
+    /* No JS cleanup, allocation, logging or flash writes in a failed VM. */
+    watchdog_hw->scratch[2] = (uint32_t)code;
+    watchdog_hw->scratch[1] = MCUJS_FATAL_RESET_MAGIC;
+    watchdog_reboot(0, 0, 10);
+    while (1) tight_loop_contents();
 }
 
 /*

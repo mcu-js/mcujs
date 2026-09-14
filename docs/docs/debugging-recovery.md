@@ -16,6 +16,26 @@ need not release a display, input handle or peripheral pin; close/stop the owned
 resource too. `.run FILE` executes an entry again, while `require()` caches its
 dependencies. Do not use a format or firmware update as a normal stop button.
 
+## Fatal engine recovery
+
+A fatal engine error (including JavaScript heap exhaustion) requests a hardware
+restart, not a catchable Promise rejection. The next warm boot skips
+`/app/index.js` and reports the retained engine error code at the REPL. Repair the
+app, release USB host ownership if needed, and explicitly `.run /app/index.js` to
+retry. The failed VM does not run `catch`, `finally`, or queued callbacks as part
+of recovery; its in-memory state is lost.
+
+The reset handoff uses RP watchdog scratch registers or ESP RTC memory, not a
+filesystem or an allocation/NVS write in the failed engine. It is consumed on
+the recovery boot: a later deliberate reset or power cycle can retry startup.
+ESP's existing persistent failed-startup safe-mode latch may also apply; use its
+documented procedure below. No new RP `board.safeMode()` API is implied.
+
+This does not add a Promise capacity limit, callback preemption, transactional
+rollback of file writes or physical outputs, or recovery from every hardware or
+engine-initialization failure. Board reset/USB reconnection still needs exact-build
+hardware qualification; host reset simulations are not that qualification.
+
 ## Storage busy is not corruption
 
 When USB storage belongs to the host, runtime file access may report `EBUSY`.

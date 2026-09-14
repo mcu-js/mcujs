@@ -22,6 +22,8 @@ static char s_executed[256];
 static int s_exec_count;
 static int s_format_count;
 static int s_reset_count;
+static int s_fatal_code = -1;
+int mcujs_fatal_recovery_code(void) { return s_fatal_code; }
 static bool s_cdc_connected;
 static bool s_fs_host_owned;
 static fs_result_t s_open_result, s_write_result, s_close_result;
@@ -37,6 +39,7 @@ static void reset_io(void) {
     s_exec_count = 0;
     s_format_count = 0;
     s_reset_count = 0;
+    s_fatal_code = -1;
     s_cdc_connected = true;
     s_fs_host_owned = false;
     s_open_result = FS_ERROR_NOT_FOUND;
@@ -388,7 +391,27 @@ static void test_paste_reports_close_failure(void) {
     }
 }
 
+static void test_fatal_recovery_notice_and_usable_repl(void) {
+    reset_io();
+    s_fatal_code = 10;
+    s_cdc_connected = false;
+    repl_init(); repl_task();
+    assert(strstr(s_output, "Fatal engine error 10") != NULL);
+    assert(strstr(s_output, "/app/index.js skipped") != NULL);
+    assert(strstr(s_output, ".run /app/index.js") != NULL);
+    assert(strstr(s_output, "\r\n") != NULL);
+    size_t before = s_output_len;
+    feed_bytes("true\r");
+    assert(s_exec_count == 1 && !strcmp(s_executed, "true"));
+    assert(strstr(s_output + before, "Fatal engine error") == NULL);
+    before = s_output_len;
+    s_cdc_connected = true; repl_task();
+    assert(strstr(s_output + before, "Fatal engine error 10") != NULL);
+    assert(s_format_count == 0 && s_reset_count == 0);
+}
+
 int main(void) {
+    test_fatal_recovery_notice_and_usable_repl();
     test_paste_reports_close_failure();
     test_multiline_rejects_long_filename();
     test_crlf_is_one_enter();

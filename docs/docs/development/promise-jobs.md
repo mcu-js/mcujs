@@ -52,11 +52,12 @@ ordering beyond the documented FIFO and checkpoints.
 
 The budget counts jobs, not milliseconds or instructions. An individual
 callback, native operation or synchronous loop can still block. There is no
-preemption. The queue consumes the existing JS heap; this slice does not add
-an independent queue-length cap, backpressure or recoverable out-of-memory
-handling. A workload that creates jobs faster than it consumes them can still
-exhaust memory. Neither a Promise wrapper nor `await` makes synchronous file
-I/O asynchronous.
+preemption. The queue consumes the existing JS heap; there is no independent
+queue-length cap or backpressure. A workload that creates jobs faster than it
+consumes them can still exhaust memory. A detected fatal engine error requests
+restart into recovery, not a catchable Promise rejection or continued execution
+of the exhausted VM. See the selected contract below. Neither a Promise wrapper
+nor `await` makes synchronous file I/O asynchronous.
 
 Timer callbacks retain their function independently while running, so clearing
 and reusing their slot is safe. Engine cleanup releases active timer references
@@ -112,13 +113,30 @@ candidate on RP2040, RP2350 and ESP32 hardware. Record board, artifact/build ID,
 pass/fail and limitations. Verify the example above, timer/Promise progress,
 REPL commands between turns, filesystem persistence, relevant display work and
 recovery. Do not flash or change startup files without the device-specific
-approval and preservation plan. Existing safe-boot behavior is unchanged;
-completion of an asynchronous startup task is not a new healthy-boot signal.
+approval and preservation plan. Existing safe-boot controls remain, with the
+fatal-startup bypass described below; completion of an asynchronous startup task
+is not a new healthy-boot signal.
 
-## Pending-job admission follow-up (#23)
+## Selected fatal-recovery contract (#23)
 
-**A queue cap and overload/recovery policy are still unimplemented.** The native
-lifecycle tests above are prerequisites, not proof of safe overload handling.
+The 0.2.0 development contract is **stop and restart on a detected fatal engine
+error**, including fatal JavaScript heap exhaustion. The failed VM does not run
+recovery callbacks or JS cleanup. The next warm boot skips `/app/index.js` and
+reports the prior fatal code at the native REPL. Edit the app and explicitly
+`.run /app/index.js` to retry. The one-shot handoff is consumed on that boot;
+a later deliberate reset or power cycle can retry startup. ESP's existing
+persistent failed-startup safe-mode latch may also apply.
+
+This implements fatal recovery, **not a Promise admission quota**, a catchable
+OOM error, callback preemption, file/output rollback, or a guarantee against
+every hang or hardware failure. Ordinary exceptions, FIFO order and cooperative
+checkpoints are unchanged. See [debugging and recovery](../debugging-recovery.md#fatal-engine-recovery)
+for the reset handoff and storage-ownership procedure.
+
+## Historical admission audit
+
+The following audit explains why an enqueue-only cap was not selected. Its
+native lifecycle probes are not evidence of a capacity limit.
 
 The admission audit uses JerryScript commit
 `50200152feb724a74a5f64e44d7885151537cfad` and MCU.js
@@ -159,16 +177,14 @@ order. A separate 200-reaction pending-Promise fixture retained heap while the
 runnable queue was empty, then completed all callbacks after settlement. These
 characterize the current build, not a promised capacity or hardware result.
 
-The next implementation needs one coherent observable policy, not an enqueue
-counter alone. If terminal context cancellation is chosen, prove pre-allocation,
-context-local admission/accounting; abort propagation through all producers;
-no further user callbacks after failure (including timer, cleanup and diagnostic
-paths); fully unwound native-resource release; and explicit fresh-VM recovery.
-Use finite real-engine boundary tests, including fulfilled/rejected async paths,
-in-flight enqueue, pending collections, excess work and teardown. Preserve normal
-FIFO/draining behavior and the upstream API below the chosen limit. No terminal
-policy has been selected or approved by this audit; do not stress a live board to
-choose one.
+Any future admission-limit implementation would need one coherent observable
+policy, not an enqueue counter alone: pre-allocation, context-local accounting;
+consistent abort propagation; no later callbacks after terminal cancellation;
+safe native-resource release; and explicit fresh-VM recovery. That alternative
+was not selected for #23. The implemented hardware-reset route above abandons
+the failed VM rather than attempting to unwind it. Future admission work needs
+finite real-engine boundary tests and must preserve normal FIFO behavior; do not
+stress a live board to choose that policy.
 
 The next [bounded events slice](./bounded-events.md) supplies module-scoped
 EventTarget and AbortSignal subsets. Queue backpressure, unhandled-rejection

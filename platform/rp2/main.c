@@ -18,6 +18,7 @@
 #include "usb_msc.h"
 #include "repl.h"
 #include "boot.h"
+#include "fatal_recovery.h"
 
 #if MCUJS_HAS_NEOPIXEL
 #include "neopixel.h"
@@ -60,10 +61,11 @@ volatile uint32_t mcujs_canvas_failure_stage __attribute__((section(".uninitiali
 #endif
 
 int main(void) {
+    mcujs_fatal_recovery_init();
 #ifdef MCUJS_EXPERIMENTAL_CANVAS
     /* Diagnostic candidate only: a stalled experiment returns to ROM USB
      * recovery instead of requiring another physical power/BOOTSEL cycle. */
-    if (watchdog_enable_caused_reboot()) {
+    if (watchdog_enable_caused_reboot() && mcujs_fatal_recovery_code() < 0) {
         mcujs_canvas_failure_stage = watchdog_hw->scratch[0];
         /* Consume the diagnostic marker so a ROM reboot can retry the app. */
         watchdog_hw->scratch[4] = 0;

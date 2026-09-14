@@ -1,9 +1,11 @@
 /* Actual ESP port and JerryScript; fake only the ESP-IDF memory/timer boundary. */
 #include "jerryscript.h"
 #include "jerryscript-port.h"
+#include "fatal_recovery.h"
+#include "esp_system.h"
 #include "canvas_epaper_stubs/fake_idf.h"
 #include <assert.h>
-#include <signal.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,13 +48,25 @@ void heap_caps_free(void *p) {
 void vTaskDelay(unsigned ticks) { (void)ticks; }
 int64_t esp_timer_get_time(void) { return 0; }
 
+int esp_reset_reason(void) { return ESP_RST_SW; }
+void esp_restart(void) {
+    /* Fake only the SDK reset. Check the real RTC handoff then terminate this
+     * failed process; do not try to clean up or reuse its exhausted JS heap. */
+    mcujs_fatal_recovery_init();
+    assert(mcujs_fatal_recovery_code() == JERRY_FATAL_OUT_OF_MEMORY);
+    mcujs_fatal_recovery_init();
+    assert(mcujs_fatal_recovery_code() == -1);
+    static const char message[] = "FATAL_RESET_HANDOFF_OOM\n";
+    assert(write(STDOUT_FILENO, message, sizeof(message)-1) == sizeof(message)-1);
+    _Exit(86);
+}
+
 #if MCUJS_JS_HEAP_EXTERNAL
-static void aborted(int sig) { (void)sig; _Exit(86); }
 static void allocation_failure(bool overflow) {
     pid_t pid = fork();
     assert(pid >= 0);
     if (!pid) {
-        signal(SIGABRT, aborted);
+
         fail_allocation = true;
         if (overflow) jerry_port_context_alloc(SIZE_MAX);
         else jerry_init(JERRY_INIT_EMPTY);

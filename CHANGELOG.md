@@ -4,6 +4,10 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased — 0.2.0]
 
+- Restart into recovery after a detected fatal engine error on RP/ESP, skipping
+  `/app/index.js` on the recovery boot and reporting the fatal code at the REPL.
+  Repair and explicitly rerun the app; no Promise quota or catchable-OOM promise.
+
 - Make maintained newcomer examples bounded and safe to rerun; use bundled
   relative config/helper modules instead of writing root-level files. Correct
   `/app` paths, guard optional devices, and separate portable lessons from

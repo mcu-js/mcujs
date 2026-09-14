@@ -176,6 +176,8 @@ JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-esp-safe-mode-tests.sh"
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
+    python3 "${ROOT}/tests/test-fatal-recovery.py"
+JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-canvas-pointer-tests.sh"
 JERRYSCRIPT_PATH="${JERRY_ROOT}" JERRYSCRIPT_BUILD="${JERRY_BUILD}" \
     bash "${ROOT}/tests/run-buzzer-tests.sh"

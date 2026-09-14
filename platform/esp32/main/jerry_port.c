@@ -2,6 +2,9 @@
 
 #include "jerryscript-port.h"
 #include "jerryscript.h"
+#include "fatal_recovery.h"
+#include "esp_attr.h"
+#include "esp_system.h"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -23,9 +26,8 @@
 #endif
 #endif
 
-static const char *TAG = "jerryscript";
-
 #if MCUJS_JS_HEAP_EXTERNAL
+static const char *TAG = "jerryscript";
 static struct jerry_context_t *s_context;
 
 size_t jerry_port_context_alloc(size_t context_size) {
@@ -63,9 +65,28 @@ void jerry_port_context_free(void) {
 void jerry_port_init(void) {
 }
 
+#define MCUJS_FATAL_RESET_MAGIC 0x4D435546u
+static RTC_NOINIT_ATTR volatile uint32_t s_fatal_reset[2];
+static int s_fatal_recovery_code = -1;
+
+void mcujs_fatal_recovery_init(void) {
+    s_fatal_recovery_code = -1;
+    if (esp_reset_reason() == ESP_RST_SW &&
+        s_fatal_reset[0] == MCUJS_FATAL_RESET_MAGIC) {
+        s_fatal_recovery_code = (int)s_fatal_reset[1];
+    }
+    s_fatal_reset[0] = 0;
+    s_fatal_reset[1] = 0;
+}
+
+int mcujs_fatal_recovery_code(void) { return s_fatal_recovery_code; }
+
 void jerry_port_fatal(jerry_fatal_code_t code) {
-    ESP_LOGE(TAG, "fatal error: %d", (int)code);
-    abort();
+    /* RTC handoff avoids trying to allocate or commit NVS after heap failure. */
+    s_fatal_reset[1] = (uint32_t)code;
+    s_fatal_reset[0] = MCUJS_FATAL_RESET_MAGIC;
+    esp_restart();
+    while (1) { }
 }
 
 void jerry_port_log(const char *message_p) {

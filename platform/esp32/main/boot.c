@@ -1,6 +1,7 @@
 /* Persistent safe boot and /app/index.js startup for MCU.js on ESP32-S3. */
 
 #include "boot.h"
+#include "fatal_recovery.h"
 
 #include "engine.h"
 #include "fs.h"
@@ -94,7 +95,8 @@ static void initialize_boot_state(void) {
         return;
     }
 
-    s_safe_mode = explicit_safe != 0 || failures != 0;
+    s_safe_mode = explicit_safe != 0 || failures != 0 ||
+                  mcujs_fatal_recovery_code() >= 0;
 }
 
 bool mcujs_boot_init(void) {

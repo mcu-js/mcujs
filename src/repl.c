@@ -6,6 +6,7 @@
 #include "repl.h"
 #include "usb_cdc.h"
 #include "engine.h"
+#include "fatal_recovery.h"
 #include "fs.h"
 #include "board.h"
 #include "board_config.h"
@@ -56,6 +57,7 @@ typedef struct {
     bool prompt_shown;
     bool initialized;
     bool cdc_connected;
+    bool recovery_reported;
     bool ignore_lf_after_cr;
     esc_state_t esc_state;
 
@@ -131,10 +133,21 @@ void repl_task(void) {
     if (cdc_connected != repl_state.cdc_connected) {
         repl_state.cdc_connected = cdc_connected;
         repl_state.prompt_shown = false;
+        if (cdc_connected) repl_state.recovery_reported = false;
     }
     
     // Show prompt if needed
     if (!repl_state.prompt_shown) {
+        int fatal_code = mcujs_fatal_recovery_code();
+        if (fatal_code >= 0 && !repl_state.recovery_reported) {
+            char message[192];
+            snprintf(message, sizeof(message),
+                     "\r\nFatal engine error %d; restarted, /app/index.js skipped.\r\n"
+                     "Edit the app, then use .run /app/index.js to retry.\r\n",
+                     fatal_code);
+            usb_cdc_puts(message);
+            repl_state.recovery_reported = true;
+        }
         repl_show_prompt();
         repl_state.prompt_shown = true;
     }

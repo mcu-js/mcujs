@@ -4,7 +4,7 @@
   "board": {
     "name": "seeed_reterminal_sticky",
     "chip": "ESP32-S3",
-    "firmwareVersion": "0.1.0",
+    "firmwareVersion": "0.2.0-rc.1",
     "exposedPins": [],
     "pins": {},
     "devices": {

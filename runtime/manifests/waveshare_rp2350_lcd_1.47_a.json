@@ -4,7 +4,7 @@
   "board": {
     "name": "waveshare_rp2350_lcd_1.47_a",
     "chip": "RP2350",
-    "firmwareVersion": "0.1.0",
+    "firmwareVersion": "0.2.0-rc.1",
     "exposedPins": [
       0,
       1,

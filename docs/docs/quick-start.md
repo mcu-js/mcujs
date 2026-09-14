@@ -5,8 +5,9 @@ sidebar_position: 2
 # Quick Start
 
 Select matching firmware, run a bounded example, then make it your startup app.
-These instructions describe the **development 0.2 API**, not a claim that 0.2.0
-has been released. Published assets are listed on
+These instructions describe the **development 0.2 API**. This source prepares
+**0.2.0-rc.1** for qualification, not a published or hardware-qualified 0.2.0
+release. Published assets are listed on
 [GitHub Releases](https://github.com/mcu-js/mcujs/releases); do not combine an old
 release image with examples from a newer source revision.
 
@@ -21,7 +22,8 @@ require('board').capability('fs')
 ```
 
 The application namespace below requires `fs.appRoot` to be `/app`. The version
-banner alone is insufficient: development builds can still say `0.1.0+<commit>`.
+banner alone is insufficient: older development builds say `0.1.0+<commit>`;
+candidate builds use `0.2.0-rc.1+<commit>` and still need exact-byte qualification.
 Use that exact build's board-qualified capability manifest and matching examples.
 For build instructions, see [Building from source](./advanced-building.md).
 

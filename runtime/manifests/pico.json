@@ -4,7 +4,7 @@
   "board": {
     "name": "pico",
     "chip": "RP2040",
-    "firmwareVersion": "0.1.0",
+    "firmwareVersion": "0.2.0-rc.1",
     "exposedPins": [
       0,
       1,

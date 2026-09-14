@@ -2,7 +2,38 @@
 
 All notable changes to mcujs will be documented in this file.
 
-## [Unreleased — 0.2.0]
+## [0.2.0-rc.1] — candidate preparation (unpublished)
+
+This is the portable-contract foundation candidate, **not a hardware-qualified
+release**. Freeze evidence belongs to [#30](https://github.com/mcu-js/mcujs/issues/30);
+exact-byte hardware qualification and publication remain separate gates.
+
+### Candidate summary and upgrade limits
+
+- **Breaking:** internal files use `/app`; startup is `/app/index.js`, relative
+  imports are CommonJS/module-relative, and no old root aliases or automatic
+  app migration are supplied. Back up and verify files and full-flash recovery
+  before updates: RP firmware growth can relocate storage.
+- Canonical board/capability discovery, configured device handles and
+  `display.canvas` make support explicit. Promise jobs, timers, events and
+  cancellation are cooperative; ordinary exceptions remain catchable.
+- Detected fatal engine exhaustion resets into a one-shot startup bypass and
+  usable native REPL. Repair and explicitly rerun the app. No Promise admission
+  quota, callback preemption or guaranteed/catchable OOM recovery is claimed.
+- The package contains ten RP targets plus XIAO ESP32-S3. Its application-only
+  UF2 needs an existing compatible TinyUF2 baseline; never substitute a full
+  flash for the documented update/recovery procedure.
+- Keep the configured 1.47-A `/sd` backend enabled alongside `/app`. SD and
+  audio remain experimental and require their supported exact-RC cases; this
+  does not promise hot-swap, unsupported formats or lossless interrupted writes.
+- Panel inventory does not enable Canvas. Default LCD images keep Canvas off;
+  opted-in display builds need their own artifact identity and qualification.
+  Sticky and ePaper 1.54 V2 remain experimental, outside the eleven-target package.
+- Existing development hardware results below are historical evidence, not
+  qualification of these new versioned firmware bytes. Maintained examples and
+  migration/recovery docs must match the exact installed source/API.
+
+### Integrated development changes
 
 - Restart into recovery after a detected fatal engine error on RP/ESP, skipping
   `/app/index.js` on the recovery boot and reporting the fatal code at the REPL.
@@ -147,8 +178,8 @@ All notable changes to mcujs will be documented in this file.
   unresolved, and physical held-BOOTSEL recovery is not yet verified.
   See [application namespace and upgrade procedure](docs/docs/development/app-namespace.md).
 
-Development work toward the portable API release. **Not a published release or
-qualified release candidate.** `version.txt` still reads `0.1.0`; check the
+Integrated work toward the portable API release. **Not a published release or
+hardware-qualified candidate.** `version.txt` reads `0.2.0-rc.1`; check the
 installed firmware build ID and `board.apiVersion` before using these APIs.
 
 Bounded hardware acceptance: Sticky PSRAM/display/restart and vanilla Pico

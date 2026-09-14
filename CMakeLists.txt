@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.13)
 # Read version from file
 file(READ "${CMAKE_CURRENT_LIST_DIR}/version.txt" MCUJS_VERSION)
 string(STRIP "${MCUJS_VERSION}" MCUJS_VERSION)
+# CMake project versions are numeric; retain the full RC identity everywhere else.
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" MCUJS_PROJECT_VERSION "${MCUJS_VERSION}")
 
 # Board selection (default to pico)
 if(NOT DEFINED BOARD)
@@ -50,7 +52,7 @@ if(MCUJS_EXPERIMENTAL_CANVAS)
     add_compile_definitions(MCUJS_EXPERIMENTAL_CANVAS=1 PICO_STACK_SIZE=12288 PICO_CORE1_STACK_SIZE=2048)
 endif()
 
-project(mcujs VERSION ${MCUJS_VERSION} LANGUAGES C CXX ASM)
+project(mcujs VERSION ${MCUJS_PROJECT_VERSION} LANGUAGES C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)

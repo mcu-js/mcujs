@@ -18,7 +18,9 @@ Docs: https://mcujs.org/
 Current development release-package targets are listed below. This is not a
 claim that a qualified 0.2.0 release has been published; use the actual asset list
 on [Releases](https://github.com/mcu-js/mcujs/releases) for released firmware.
-Capabilities vary by board and build configuration.
+Capabilities vary by board and build configuration. This source prepares
+**0.2.0-rc.1** for exact-candidate qualification; it is not a published or
+hardware-qualified release. See the [candidate notes](CHANGELOG.md).
 
 - `pico`
 - `pico2`
@@ -63,7 +65,7 @@ full flash.
 Use the [quick start](docs/docs/quick-start.md) and the maintained
 [first-light lesson](examples/blink/README.md), with examples matching the
 installed firmware's source/API. Check `.info` for the exact build ID; a
-`0.1.0` version prefix alone does not establish the development 0.2 API.
+version prefix alone does not establish the API or qualification status.
 
 Copy `examples/blink/index.js` to the physical `MCUJS` volume root as
 `first-light.js`, preserving any existing startup file. Eject storage, check

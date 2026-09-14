@@ -2,7 +2,8 @@
 
 Board ID `seeed_reterminal_sticky`; ESP32-S3, 8MB octal PSRAM, 32MB quad flash.
 Not a release-qualified target and excluded from shipping board packaging.
-`version.txt` remains 0.1.0. The standard JavaScript Canvas API is unchanged.
+It shares `version.txt` with the runtime; an RC version does not qualify this
+experimental profile. The standard JavaScript Canvas API is unchanged.
 
 ## Hardware and source provenance
 

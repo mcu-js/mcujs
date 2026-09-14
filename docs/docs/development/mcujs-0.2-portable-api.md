@@ -1,6 +1,6 @@
 # MCU.js 0.2 portable API and capability-discovery design
 
-Status: implementation in progress; release qualification pending
+Status: 0.2.0-rc.1 preparation; exact-candidate qualification pending
 Target: MCU.js 0.2.0
 Goal: make ordinary JavaScript portable across shipping boards without pretending unavailable hardware exists.
 
@@ -8,7 +8,7 @@ Goal: make ordinary JavaScript portable across shipping boards without pretendin
 
 This is the current release checklist, not a claim that every design proposal
 below is implemented. Source and issue status reconciled against development
-`37e3771da5bc704125b65aecaa77a7e31be2c1f4` on 2026-09-13. Hardware evidence is
+`d9447163380f2432398927786270bc56798fd83e` before RC versioning. Hardware evidence is
 bound to each named firmware below; historical Pico/XIAO checks are not fresh
 observations of those boards or acceptance of this development tip.
 
@@ -22,7 +22,8 @@ receipt below retains its original scope; it is not the current target count.
 **Working policy:** push ongoing work to GitHub's `development` branch. Source
 checks and docs builds run there; Pages deployment is skipped. Keep `main`,
 release tags, and published firmware unchanged until release approval. The
-runtime version remains `0.1.0` until the release-candidate versioning step.
+runtime version is `0.2.0-rc.1`; this versioning step is not qualification or
+publication. #30 records the eventual immutable commit and artifact hashes.
 
 ### Consistency audit scope (0.2.13)
 
@@ -57,11 +58,14 @@ name the exact source commit and tested configurations. The release queue is
 - **Foundation reconciliation:** [#5](https://github.com/mcu-js/mcujs/issues/5)
   retains configured-handle acceptance; [#6](https://github.com/mcu-js/mcujs/issues/6)
   retains async acceptance. Bounded execution batches do not bound Promise
-  admission; [#23](https://github.com/mcu-js/mcujs/issues/23) remains an RC gate.
+  admission. [#23](https://github.com/mcu-js/mcujs/issues/23) is resolved by
+  detected-fatal reset, one-shot startup bypass and explicit rerun, not a quota.
   [#7](https://github.com/mcu-js/mcujs/issues/7) covers `/app` and recovery;
-  [#26](https://github.com/mcu-js/mcujs/issues/26) covers optional SD reliability.
-  LCD 1.47 SD is enabled by default: shipped-default hazards are not waived by
-  the experimental label. Sticky SD stays read-only.
+  [#26](https://github.com/mcu-js/mcujs/issues/26) is closed on the reviewed
+  filesystem fixes and maintainer-accepted bounded evidence; the historical
+  first-write failure was not reproduced, not assigned an invented root cause.
+  LCD 1.47 SD stays enabled by default. #31 still requires exact-RC SD cases;
+  the experimental label is not a waiver. Sticky SD stays read-only.
 - **Recovery and public links:** [#25](https://github.com/mcu-js/mcujs/issues/25)
   retains hardware acceptance of recovery; unsupported UF2 methods stay absent
   on Sticky/ePaper. [#1](https://github.com/mcu-js/mcujs/issues/1) checks the
@@ -78,8 +82,8 @@ name the exact source commit and tested configurations. The release queue is
   these are not electrical measurements.
 - **Implemented:** runtime filesystem ownership handoff, logical `/app`, bounded
   binary file handles and optional `/sd`. Sticky's `/sd` is read-only; the RP
-  1.47-A write-reliability question remains open in
-  [#7](https://github.com/mcu-js/mcujs/issues/7).
+  1.47-A keeps its configured read/write adapter. #26's bounded disposition
+  does not replace exact-RC storage qualification under #31.
 - **Implemented:** configured `devices` handles and `display.canvas`, bounded
   text/arcs, JPEG/BMP consumers, metadata and slideshow/composition examples.
   These are an experimental bounded subset, not full browser Canvas parity.

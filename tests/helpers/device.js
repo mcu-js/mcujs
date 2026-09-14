@@ -44,7 +44,7 @@ export function buildFirmware() {
 }
 
 export function uf2Path() {
-  return new URL("../../build/mcujs-0.1.0-pico.uf2", import.meta.url).pathname;
+  return new URL(`../../build/mcujs-${readVersion()}-pico.uf2`, import.meta.url).pathname;
 }
 
 export function findSerialPort() {

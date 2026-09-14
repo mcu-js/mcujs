@@ -4,7 +4,7 @@
   "board": {
     "name": "pico2",
     "chip": "RP2350",
-    "firmwareVersion": "0.1.0",
+    "firmwareVersion": "0.2.0-rc.1",
     "exposedPins": [
       0,
       1,

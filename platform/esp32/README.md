@@ -181,7 +181,7 @@ The normal Milestone 4 update path is application-only UF2:
 board.enterUf2()
 
 # Then copy the generated file to the XIAOS3BOOT volume:
-cp platform/esp32/build/mcujs-0.1.0-seeed_xiao_esp32s3.uf2 /path/to/XIAOS3BOOT/
+cp "platform/esp32/build/mcujs-$(tr -d '[:space:]' < version.txt)-seeed_xiao_esp32s3.uf2" /path/to/XIAOS3BOOT/
 ```
 
 The UF2 filename follows the release convention

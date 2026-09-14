@@ -4,7 +4,7 @@
   "board": {
     "name": "waveshare_esp32s3_epaper_1.54_v2",
     "chip": "ESP32-S3",
-    "firmwareVersion": "0.1.0",
+    "firmwareVersion": "0.2.0-rc.1",
     "exposedPins": [],
     "pins": {},
     "devices": {

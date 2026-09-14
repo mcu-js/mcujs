@@ -284,6 +284,7 @@ function rpDescriptor({
   spiRoutes,
   spiDefaultBus = 0,
   sd = false,
+  sdHostTransfer = false,
   neopixelPins = gpioPins,
 }) {
   const capabilities = {
@@ -295,7 +296,7 @@ function rpDescriptor({
       name === "keyboardHid" ? features.keyboard : name === "mouseHid" ? features.mouse : true)),
   };
   if (sd) capabilities.fs.sd = { root: "/sd", implementation: "fat", writable: true,
-    hostTransfer: false, removable: true, formats: ["fat16", "fat32"] };
+    hostTransfer: sdHostTransfer, removable: true, formats: ["fat16", "fat32"] };
   if (features.adc) capabilities.adc = adcCapability(adcPins, adcAliases, adcOptions);
   if (features.i2c) capabilities.i2c = i2cCapability(i2cRoutes, i2cDefaultBus);
   if (features.spi) capabilities.spi = spiCapability(spiRoutes, spiDefaultBus, { dma: true });
@@ -394,6 +395,7 @@ const boardDescriptors = {
     name: "waveshare_rp2350_lcd_1.47_a", chip: "RP2350",
     features: rpFeatureMaps["waveshare_rp2350_lcd_1.47_a"],
     sd: true,
+    sdHostTransfer: true,
     exposedPins: [...pinsBetween(0, 9), 14, 16, 17, 18, 19, 20, 21, 22],
     aliases: pinAliases([...pinsBetween(0, 9), 14, 16, 17, 18, 19, 20, 21, 22], {
       SDA: 4, SCL: 5, SCK: 18, MOSI: 19, MISO: 0, NEOPIXEL: 22,

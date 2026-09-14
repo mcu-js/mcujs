@@ -396,6 +396,7 @@ static const char s_busy_test_source[] =
     "    assert(error.code === 'EBUSY', label + ' code');\n"
     "    assert(error.resource === 'filesystem', label + ' resource');\n"
     "    assert(error.owner === 'usb-host', label + ' owner');\n"
+    "    assert(error.message.indexOf('affected volume') !== -1, label + ' eject guidance');\n"
     "  }\n"
     "  var filesystem = require('fs');\n"
     "  expectBusy(function () { filesystem.readFileSync('/busy.js'); }, 'readFileSync');\n"

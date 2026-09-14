@@ -1,5 +1,6 @@
 #include "fs.h"
 #include "ff.h"
+#include "diskio.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -22,7 +23,29 @@ static FRESULT sd_mount_result = FR_OK;
 static FRESULT io_result = FR_OK;
 static FRESULT write_result = FR_OK, close_result = FR_OK;
 static bool short_write;
-static unsigned sd_mounts;
+static unsigned sd_mounts, sd_unmounts, sd_syncs, sd_reads, sd_writes, closes;
+static bool sd_unmount_fail;
+static DRESULT sd_sync_result = RES_OK, sd_read_result = RES_OK, sd_write_result = RES_OK;
+static DSTATUS sd_status;
+static BYTE sd_sectors[2][512];
+DSTATUS disk_status(BYTE drive) { assert(drive == 1); return sd_status; }
+DRESULT disk_ioctl(BYTE drive, BYTE cmd, void *buffer) {
+    assert(drive == 1);
+    if (cmd == CTRL_SYNC) { sd_syncs++; return sd_sync_result; }
+    assert(cmd == GET_SECTOR_COUNT); *(LBA_t *)buffer = 2; return RES_OK;
+}
+DRESULT disk_read(BYTE drive, BYTE *buffer, LBA_t sector, UINT count) {
+    assert(drive == 1 && sector < 2 && count == 1);
+    sd_reads++;
+    if (sd_read_result == RES_OK) memcpy(buffer, sd_sectors[sector], 512);
+    return sd_read_result;
+}
+DRESULT disk_write(BYTE drive, const BYTE *buffer, LBA_t sector, UINT count) {
+    assert(drive == 1 && sector < 2 && count == 1);
+    sd_writes++;
+    if (sd_write_result == RES_OK) memcpy(sd_sectors[sector], buffer, 512);
+    return sd_write_result;
+}
 static bool last_open_sd;
 static bool fail_dir_read;
 
@@ -31,7 +54,8 @@ FRESULT f_mount(FATFS *fs, const char *path, BYTE option) {
     (void)option;
     if (!strcmp(path, "1:")) {
         if (fs) sd_mounts++;
-        return fs ? sd_mount_result : FR_OK;
+        if (!fs) sd_unmounts++;
+        return fs ? sd_mount_result : sd_unmount_fail ? FR_DISK_ERR : FR_OK;
     }
     if (fs == NULL) {
         s_unmount_calls++;
@@ -63,6 +87,7 @@ FRESULT f_setlabel(const char *label) {
 }
 FRESULT f_close(FIL *file) {
     (void)file;
+    closes++;
     return close_result;
 }
 FRESULT f_sync(FIL *file) {
@@ -148,9 +173,128 @@ int diskio_write_sector(uint32_t sector, uint32_t offset,
 void diskio_sync(void) {
     s_disk_sync_calls++;
 }
+#ifndef MCUJS_TEST_DUAL_MSC
 void usb_msc_media_changed(void) {
     s_media_changed_calls++;
 }
+#else
+#include "usb_msc.h"
+#include "tusb.h"
+bool tud_msc_test_unit_ready_cb(uint8_t lun);
+bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power, bool start, bool eject);
+extern bool tud_msc_prevent_allow_medium_removal_cb(uint8_t, uint8_t, uint8_t) __attribute__((weak));
+uint8_t tud_msc_get_maxlun_cb(void);
+void tud_msc_capacity_cb(uint8_t, uint32_t *, uint16_t *);
+bool tud_msc_is_writable_cb(uint8_t);
+int32_t tud_msc_read10_cb(uint8_t, uint32_t, uint32_t, void *, uint32_t);
+int32_t tud_msc_write10_cb(uint8_t, uint32_t, uint32_t, uint8_t *, uint32_t);
+int32_t tud_msc_scsi_cb(uint8_t, const uint8_t[16], void *, uint16_t);
+static uint8_t sense_key, sense_asc;
+void tud_msc_set_sense(uint8_t lun, uint8_t key, uint8_t asc, uint8_t ascq) {
+    (void)lun; (void)ascq; sense_key = key; sense_asc = asc;
+}
+static void test_dual_msc(void) {
+    (void)s_media_changed_calls;
+    assert(fs_init() == FS_OK);
+    usb_msc_init();
+    assert(usb_msc_expose());
+    assert(tud_msc_test_unit_ready_cb(0));
+    assert(tud_msc_test_unit_ready_cb(1));
+    /* Exercise real MSC callbacks AND real filesystem ownership. */
+    assert(fs_exists("/app/open.js") == FS_ERROR_BUSY);
+    assert(fs_exists("/sd/asset.json") == FS_ERROR_BUSY);
+    assert(tud_msc_get_maxlun_cb() == 2); /* COUNT, not highest LUN. */
+    /* Pinned TinyUSB dispatches PREVENT to this weak hook, NOT scsi_cb. */
+    if (tud_msc_prevent_allow_medium_removal_cb)
+        assert(tud_msc_prevent_allow_medium_removal_cb(1, 1, 0));
+    assert(!tud_msc_start_stop_cb(1, 0, false, true));
+    assert(sense_key == SCSI_SENSE_ILLEGAL_REQUEST && sense_asc == 0x53);
+    assert(tud_msc_prevent_allow_medium_removal_cb(1, 0, 0));
+    assert(tud_msc_start_stop_cb(1, 0, false, true));
+    usb_msc_task();
+    assert(fs_exists("/sd/asset.json") == FS_OK);
+    assert(fs_exists("/app/open.js") == FS_ERROR_BUSY);
+    assert(s_format_calls == 0);
+    /* LOAD then EJECT before the supervisor runs must cancel the load. */
+    fs_file_t file = {0};
+    assert(fs_open(&file, "/sd/asset.json", FS_MODE_READ) == FS_OK);
+    assert(tud_msc_start_stop_cb(1, 0, true, true));
+    usb_msc_task(); /* Busy open handle: retry, do not drop accepted load. */
+    assert(!tud_msc_test_unit_ready_cb(1));
+    assert(tud_msc_start_stop_cb(1, 0, false, true));
+    assert(fs_close(&file) == FS_OK);
+    usb_msc_task();
+    assert(!fs_volume_host_owned(1));
+    assert(fs_exists("/sd/asset.json") == FS_OK);
+    assert(tud_msc_start_stop_cb(1, 0, true, true));
+    usb_msc_task();
+    assert(tud_msc_test_unit_ready_cb(1));
+    /* EJECT readiness drops immediately; LOAD cannot overtake remount. */
+    assert(tud_msc_start_stop_cb(1, 0, false, true));
+    assert(!tud_msc_start_stop_cb(1, 0, true, true));
+    assert(!tud_msc_test_unit_ready_cb(1));
+    usb_msc_task();
+    assert(fs_exists("/sd/asset.json") == FS_OK);
+    assert(tud_msc_start_stop_cb(1, 0, true, true));
+    usb_msc_task();
+    uint8_t data[512], original[512], command[16] = {0x35};
+    memset(sd_sectors, 0x36, sizeof(sd_sectors));
+    memcpy(original, sd_sectors[0], 512);
+    memset(data, 0xa5, sizeof(data));
+    assert(tud_msc_write10_cb(1, 0, 17, data, 23) == 23);
+    assert(!memcmp(sd_sectors[0], original, 17));
+    assert(!memcmp(sd_sectors[0]+17, data, 23));
+    assert(!memcmp(sd_sectors[0]+40, original+40, 472));
+    assert(!memcmp(sd_sectors[1], original, 512));
+    assert(tud_msc_read10_cb(1, 0, 17, data, 23) == 23);
+    unsigned writes = sd_writes;
+    assert(tud_msc_write10_cb(1, 0, 511, data, 2) == -1);
+    assert(tud_msc_write10_cb(1, 0, UINT32_MAX, data, 2) == -1);
+    assert(tud_msc_write10_cb(1, UINT32_MAX, 0, data, 1) == -1);
+    assert(tud_msc_write10_cb(1, 2, 0, data, 1) == -1);
+    assert(tud_msc_write10_cb(1, 0, 0, NULL, 1) == -1);
+    assert(sd_writes == writes);
+    for (unsigned lun = 2; lun <= 255; lun += 253) {
+        uint32_t count = 99; uint16_t size = 99;
+        assert(!tud_msc_test_unit_ready_cb(lun));
+        assert(!tud_msc_is_writable_cb(lun));
+        tud_msc_capacity_cb(lun, &count, &size);
+        assert(count == 0);
+        assert(tud_msc_read10_cb(lun, 0, 0, data, 1) == -1);
+        assert(tud_msc_write10_cb(lun, 0, 0, data, 1) == -1);
+        assert(!tud_msc_start_stop_cb(lun, 0, true, true));
+        assert(!tud_msc_prevent_allow_medium_removal_cb(lun, 1, 0));
+        assert(tud_msc_scsi_cb(lun, command, NULL, 0) == -1);
+        assert(sense_key == SCSI_SENSE_ILLEGAL_REQUEST && sense_asc == 0x25);
+    }
+    sd_status = STA_PROTECT;
+    assert(!tud_msc_is_writable_cb(1));
+    assert(tud_msc_write10_cb(1, 0, 0, data, 1) == -1);
+    assert(sense_key == 7 && sense_asc == 0x27 && sd_writes == writes);
+    assert(tud_msc_read10_cb(1, 0, 0, data, 1) == 1);
+    sd_status = 0;
+    assert(tud_msc_start_stop_cb(1, 0, false, false)); /* STOP sync, no eject */
+    assert(fs_volume_host_owned(1));
+    usb_msc_event(MCUJS_MSC_EVENT_DETACH);
+    usb_msc_event(MCUJS_MSC_EVENT_RESET);
+    usb_msc_event(MCUJS_MSC_EVENT_SUSPEND);
+    usb_msc_task();
+    assert(tud_msc_test_unit_ready_cb(1));
+    /* Failed RMW read cannot overwrite even one byte or retry the lease. */
+    memcpy(original, sd_sectors[0], 512);
+    sd_read_result = RES_ERROR;
+    assert(tud_msc_write10_cb(1, 0, 13, data, 1) == -1);
+    assert(sd_writes == writes && !memcmp(original, sd_sectors[0], 512));
+    sd_read_result = RES_OK;
+    assert(!tud_msc_test_unit_ready_cb(1));
+    assert(tud_msc_scsi_cb(1, command, NULL, 0) == -1);
+    assert(!tud_msc_start_stop_cb(1, 0, false, true));
+    assert(fs_exists("/sd/asset.json") == FS_ERROR_BUSY);
+    assert(tud_msc_test_unit_ready_cb(0)); /* Peer remains healthy. */
+    assert(s_format_calls == 0);
+    puts("dual RP2 MSC / filesystem ownership: PASS");
+}
+#endif
 void usb_cdc_puts(const char *text) {
     (void)text;
 }
@@ -335,7 +479,7 @@ static void test_sd_mount(void) {
     assert(fs_read(&sd,b,4,&n)==FS_ERROR_IO);
     io_result=FR_OK;
     assert(fs_read(&sd,b,4,&n)!=FS_OK); /* Failed live handle cannot silently switch cards. */
-    assert(fs_close(&sd)==FS_OK);
+    assert(fs_close(&sd)==FS_ERROR_IO);
     assert(fs_open(&sd,"/sd/asset.json",FS_MODE_READ)==FS_OK);
     assert(fs_close(&sd)==FS_OK);
     fail_dir_read=true;
@@ -382,7 +526,7 @@ static void test_sd_write_failures(void) {
         }
         assert(fs_open(&app, "/app/open.js", FS_MODE_READ) == FS_OK);
         assert(fs_close(&app) == FS_OK);
-        assert(fs_close(&peer) == FS_OK);
+        assert(fs_close(&peer) == (invalidated ? FS_ERROR_IO : FS_OK));
         assert(fs_open(&retry, "/sd/asset.json", FS_MODE_WRITE | FS_MODE_CREATE | FS_MODE_TRUNCATE) == FS_OK);
         assert(sd_mounts == mounts_before + (invalidated ? 1u : 0u));
         assert(fs_write(&retry, "data", 4, &written) == FS_OK && written == 4);
@@ -395,6 +539,9 @@ static void test_sd_write_failures(void) {
 
 int main(int argc, char **argv) {
     assert(argc == 2);
+#ifdef MCUJS_TEST_DUAL_MSC
+    if (!strcmp(argv[1], "dual")) { test_dual_msc(); return 0; }
+#endif
 #if MCUJS_HAS_SD
     if (!strcmp(argv[1], "sd")) { test_sd_mount(); return 0; }
     if (!strcmp(argv[1], "sd-write")) { test_sd_write_failures(); return 0; }

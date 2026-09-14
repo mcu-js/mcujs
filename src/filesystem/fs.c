@@ -11,6 +11,9 @@
 #include "fs.h"
 #include "storage.h"
 #include "ff.h"
+#if MCUJS_HAS_SD
+#include "diskio.h"
+#endif
 #include "../usb/usb_msc.h"
 #include "../usb/usb_cdc.h"
 
@@ -38,9 +41,15 @@ static storage_state_t s_storage_state = STORAGE_UNINITIALIZED;
 static FIL s_fil_pool[MAX_OPEN_FILES];
 static bool s_fil_used[MAX_OPEN_FILES];
 static bool s_fil_sd[MAX_OPEN_FILES];
+/* Directory callbacks can service USB; reject handoff until iteration ends. */
+static unsigned s_directories[2];
 #if MCUJS_HAS_SD
 static FATFS s_sd_fatfs;
 static bool s_sd_mounted;
+static storage_state_t s_sd_state = STORAGE_DEVICE_OWNED;
+#if MCUJS_USB_SD_MSC
+static fs_result_t s_sd_fault = FS_OK;
+#endif
 #endif
 
 static bool is_sd_path(const char *path) {
@@ -171,10 +180,17 @@ static fs_result_t volume_result(bool sd, FRESULT fr) {
 static fs_result_t path_ready(const char *path) {
     if (!is_sd_path(path)) return ensure_initialized();
 #if MCUJS_HAS_SD
-    if (s_sd_mounted) return FS_OK;
+    if (s_sd_state == STORAGE_HOST_OWNED || s_sd_state == STORAGE_CLAIMING_HOST ||
+        s_sd_state == STORAGE_RELEASING_HOST) return FS_ERROR_BUSY;
+    if (s_sd_state == STORAGE_FAULT) return FS_ERROR_IO;
+    if (s_sd_mounted) {
+        if (disk_ioctl(1, CTRL_SYNC, NULL) == RES_OK) return FS_OK;
+        s_sd_mounted = false;
+        return FS_ERROR_IO;
+    }
     /* Stale open handles must be closed before mounting another card. */
     if (has_sd_files()) return FS_ERROR_IO;
-    (void)f_mount(NULL, "1:", 0);
+    if (f_mount(NULL, "1:", 0) != FR_OK) return FS_ERROR_IO;
     FRESULT fr=f_mount(&s_sd_fatfs, "1:", 1);
     s_sd_mounted = fr == FR_OK;
     /* Never format removable media, regardless of why mount failed. */
@@ -199,7 +215,8 @@ static fs_result_t file_ready(const fs_file_t *file) {
     int slot=file_slot(file);
     if (slot >= 0 && s_fil_sd[slot]) {
 #if MCUJS_HAS_SD
-        return s_sd_mounted ? FS_OK : FS_ERROR_IO;
+        if (!s_sd_mounted) return FS_ERROR_IO;
+        return path_ready("/sd");
 #else
         return FS_ERROR_NOT_FOUND;
 #endif
@@ -457,7 +474,7 @@ fs_result_t fs_begin_host_access(void) {
     if (ready != FS_OK) {
         return ready;
     }
-    if (!s_initialized || has_open_files()) {
+    if (!s_initialized || has_open_files() || s_directories[0]) {
         return FS_ERROR_BUSY;
     }
 
@@ -541,6 +558,164 @@ fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
     return FS_OK;
 }
 
+#if MCUJS_USB_SD_MSC
+#if !MCUJS_HAS_SD
+#error "SD MSC requires an SD backend"
+#endif
+static fs_result_t sd_disk_result(DRESULT result) {
+    switch (result) {
+        case RES_OK: return FS_OK;
+        case RES_WRPRT: return FS_ERROR_READ_ONLY;
+        case RES_NOTRDY: return FS_ERROR_NO_MEDIA;
+        case RES_PARERR: return FS_ERROR_INVALID;
+        default: return FS_ERROR_IO;
+    }
+}
+
+/* A failed host transaction fences this lease. Never initialize a replacement
+ * card underneath the host's cached FAT, or retry a partial write automatically. */
+static fs_result_t sd_host_result(DRESULT result) {
+    fs_result_t status = sd_disk_result(result);
+    if (status == FS_ERROR_IO || status == FS_ERROR_NO_MEDIA) s_sd_fault = status;
+    return status;
+}
+#endif
+
+bool fs_volume_host_owned(uint8_t volume) {
+    if (volume == 0) return fs_host_owned();
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) return s_sd_state == STORAGE_HOST_OWNED;
+#endif
+    return false;
+}
+
+fs_result_t fs_volume_begin_host_access(uint8_t volume) {
+    if (volume == 0) return fs_begin_host_access();
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        if (has_sd_files() || s_directories[1]) return FS_ERROR_BUSY;
+        fs_result_t ready = path_ready("/sd");
+        if (ready != FS_OK) return ready;
+        ready = sd_disk_result(disk_ioctl(1, CTRL_SYNC, NULL));
+        if (ready != FS_OK) { s_sd_mounted = false; return ready; }
+        s_sd_state = STORAGE_CLAIMING_HOST;
+        if (f_mount(NULL, "1:", 0) != FR_OK) {
+            s_sd_state = STORAGE_FAULT;
+            return FS_ERROR_IO;
+        }
+        s_sd_mounted = false;
+        s_sd_fault = FS_OK;
+        s_sd_state = STORAGE_HOST_OWNED;
+        return FS_OK;
+    }
+#endif
+    return FS_ERROR_UNSUPPORTED;
+}
+
+fs_result_t fs_volume_end_host_access(uint8_t volume) {
+    if (volume == 0) return fs_end_host_access();
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        if (!fs_volume_host_owned(volume)) return FS_ERROR_BUSY;
+        /* The adapter confirms sync before accepting eject. */
+        if (s_sd_fault != FS_OK) return s_sd_fault;
+        s_sd_state = STORAGE_RELEASING_HOST;
+        FRESULT fr = f_mount(&s_sd_fatfs, "1:", 1);
+        s_sd_mounted = fr == FR_OK;
+        s_sd_state = fr == FR_OK ? STORAGE_DEVICE_OWNED : STORAGE_FAULT;
+        return fresult_to_fs(fr); /* Never format, even after a host write. */
+    }
+#endif
+    return FS_ERROR_UNSUPPORTED;
+}
+
+fs_result_t fs_volume_msc_status(uint8_t volume) {
+    if (!fs_volume_host_owned(volume)) return FS_ERROR_BUSY;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        if (s_sd_fault != FS_OK) return s_sd_fault;
+        return sd_host_result(disk_ioctl(1, CTRL_SYNC, NULL));
+    }
+#endif
+    return volume == 0 ? FS_OK : FS_ERROR_UNSUPPORTED;
+}
+
+fs_result_t fs_volume_msc_sync(uint8_t volume) {
+    if (volume == 0) return fs_msc_sync();
+    return fs_volume_msc_status(volume);
+}
+
+fs_result_t fs_volume_capacity(uint8_t volume, uint32_t *sectors) {
+    if (!sectors) return FS_ERROR_INVALID;
+    *sectors = 0;
+    fs_result_t status = fs_volume_msc_status(volume);
+    if (status != FS_OK) return status;
+    if (volume == 0) { *sectors = fs_get_total_sectors(); return FS_OK; }
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        LBA_t count = 0;
+        status = sd_host_result(disk_ioctl(1, GET_SECTOR_COUNT, &count));
+        if (status != FS_OK) return status;
+        if (!count) return FS_ERROR_UNSUPPORTED;
+#if FF_LBA64
+        if (count > UINT32_MAX) return FS_ERROR_UNSUPPORTED;
+#endif
+        *sectors = (uint32_t)count;
+        return FS_OK;
+    }
+#endif
+    return FS_ERROR_UNSUPPORTED;
+}
+
+bool fs_volume_writable(uint8_t volume) {
+    if (fs_volume_msc_status(volume) != FS_OK) return false;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) return !(disk_status(1) & STA_PROTECT);
+#endif
+    return volume == 0;
+}
+
+/* TinyUSB supplies a sector plus a byte offset. Keep RMW private to one call;
+ * overflow-safe bounds and no persistent scratch/cache across media changes. */
+static fs_result_t volume_transfer(uint8_t volume, uint32_t sector, uint32_t offset,
+                                    void *buffer, uint32_t size, bool write) {
+    if (!buffer || offset >= FS_SECTOR_SIZE || size > FS_SECTOR_SIZE - offset)
+        return FS_ERROR_INVALID;
+    uint32_t count;
+    fs_result_t result = fs_volume_capacity(volume, &count);
+    if (result != FS_OK) return result;
+    if (sector >= count) return FS_ERROR_INVALID;
+    if (volume == 0) return write ? fs_write_sector(sector, offset, buffer, size)
+                                  : fs_read_sector(sector, offset, buffer, size);
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        if (write && (disk_status(1) & STA_PROTECT)) return FS_ERROR_READ_ONLY;
+        if (!size) return FS_OK;
+        BYTE scratch[FS_SECTOR_SIZE];
+        if (!write || offset || size != FS_SECTOR_SIZE) {
+            result = sd_host_result(disk_read(1, scratch, sector, 1));
+            if (result != FS_OK) return result; /* No write on failed RMW read. */
+        }
+        if (!write) { memcpy(buffer, scratch + offset, size); return FS_OK; }
+        if (!offset && size == FS_SECTOR_SIZE)
+            return sd_host_result(disk_write(1, buffer, sector, 1));
+        memcpy(scratch + offset, buffer, size);
+        return sd_host_result(disk_write(1, scratch, sector, 1));
+    }
+#endif
+    return FS_ERROR_UNSUPPORTED;
+}
+
+fs_result_t fs_volume_read_sector(uint8_t volume, uint32_t sector, uint32_t offset,
+                                  void *buffer, uint32_t size) {
+    return volume_transfer(volume, sector, offset, buffer, size, false);
+}
+
+fs_result_t fs_volume_write_sector(uint8_t volume, uint32_t sector, uint32_t offset,
+                                   const void *buffer, uint32_t size) {
+    return volume_transfer(volume, sector, offset, (void *)buffer, size, true);
+}
+
 /*
  * Open a file
  */
@@ -612,8 +787,10 @@ fs_result_t fs_close(fs_file_t *file) {
     /* Find and free the slot */
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (&s_fil_pool[i] == fp) {
-            FRESULT fr = f_close(fp);
             bool sd=s_fil_sd[i];
+            /* Never flush an old FIL into replacement media after an I/O fault. */
+            fs_result_t ready = sd ? file_ready(file) : FS_OK;
+            FRESULT fr = ready == FS_OK ? f_close(fp) : FR_DISK_ERR;
             s_fil_used[i] = false;
             file->is_open = false;
             file->internal = NULL;
@@ -829,6 +1006,7 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
         return volume_result(sd, fr);
     }
     
+    s_directories[sd ? 1 : 0]++;
     while (1) {
         fr = f_readdir(&dir, &finfo);
         if (fr != FR_OK || finfo.fname[0] == 0) {
@@ -853,5 +1031,6 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
     }
     
     FRESULT closed=f_closedir(&dir);
+    s_directories[sd ? 1 : 0]--;
     return volume_result(sd, fr != FR_OK ? fr : closed);
 }

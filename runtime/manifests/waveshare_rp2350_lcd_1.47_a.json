@@ -165,7 +165,7 @@
         "root": "/sd",
         "implementation": "fat",
         "writable": true,
-        "hostTransfer": false,
+        "hostTransfer": true,
         "removable": true,
         "formats": [
           "fat16",

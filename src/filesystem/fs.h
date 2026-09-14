@@ -116,6 +116,20 @@ fs_result_t fs_read_sector(uint32_t sector, uint32_t offset,
 fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
                             const void *buffer, uint32_t size);
 
+/* RP2 MSC volumes: 0 = app, 1 = SD only when MCUJS_USB_SD_MSC is enabled.
+ * Main-loop serialized; never initialize/remount media during a host lease. */
+fs_result_t fs_volume_begin_host_access(uint8_t volume);
+fs_result_t fs_volume_end_host_access(uint8_t volume);
+bool fs_volume_host_owned(uint8_t volume);
+fs_result_t fs_volume_msc_status(uint8_t volume);
+fs_result_t fs_volume_msc_sync(uint8_t volume);
+fs_result_t fs_volume_capacity(uint8_t volume, uint32_t *sectors);
+bool fs_volume_writable(uint8_t volume);
+fs_result_t fs_volume_read_sector(uint8_t volume, uint32_t sector, uint32_t offset,
+                                  void *buffer, uint32_t size);
+fs_result_t fs_volume_write_sector(uint8_t volume, uint32_t sector, uint32_t offset,
+                                   const void *buffer, uint32_t size);
+
 /*
  * File operations
  */

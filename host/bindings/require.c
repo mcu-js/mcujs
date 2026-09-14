@@ -115,7 +115,7 @@ static jerry_value_t throw_filesystem_busy(void) {
     };
     return mcujs_throw_operational_error(
         MCUJS_ERROR_BUSY,
-        "filesystem is owned by the USB host; eject MCUJS first",
+        "filesystem is owned by the USB host; eject the affected volume first",
         &details);
 }
 

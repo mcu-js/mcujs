@@ -86,7 +86,7 @@ static jerry_value_t create_fs_error(fs_result_t result, const char *fallback) {
         };
         return mcujs_throw_operational_error(
             MCUJS_ERROR_BUSY,
-            "filesystem is owned by the USB host; eject MCUJS first",
+            "filesystem is owned by the USB host; eject the affected volume first",
             &details);
     }
     if (result == FS_ERROR_NO_SPACE) {

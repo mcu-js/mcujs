@@ -20,7 +20,7 @@ static uint8_t packet[6], queue[2048];
 static bool selected, absent, freeze_time, bad_echo, sdsc, crc_rejected;
 static bool acmd_stuck, bad_csd_crc;
 static bool bad_read_crc, missing_token, busy_forever, write_busy, missing_accept;
-static bool removed_status;
+static bool removed_status, replaced_card;
 static unsigned remove_at;
 static uint8_t read_token, acceptance, status_r2;
 static unsigned rejected_command;
@@ -86,6 +86,15 @@ static void reply_command(void) {
         assert(arg == 0); push(0); push(0xff); push(0xfe);
         for (unsigned i=0; i<sizeof(csd); ++i) push(csd[i]);
         push((uint8_t)(csd_crc >> 8)); push((uint8_t)(csd_crc ^ (bad_csd_crc ? 1 : 0))); break;
+    case 10: {
+        uint8_t cid[16] = {3, 4, 5, 6};
+        if (replaced_card) cid[8] = 99;
+        uint16_t crc = reference_crc16(cid, sizeof(cid));
+        push(0); push(0xfe);
+        for (unsigned i = 0; i < sizeof(cid); i++) push(cid[i]);
+        push((uint8_t)(crc >> 8)); push((uint8_t)crc);
+        break;
+    }
     case 17:
         assert(arg == 7 || arg == 8 || arg == 8388607);
         push(0); push(0xff);
@@ -177,7 +186,7 @@ static void reset_mock(void) {
     stall=0; receiving_write=false; write_pos=writes=0;
     memcpy(csd, known_csd, sizeof(csd));
     bad_read_crc=missing_token=busy_forever=write_busy=missing_accept=removed_status=false;
-    remove_at=0; read_token=0xfe; acceptance=5; status_r2=0;
+    remove_at=0; read_token=0xfe; acceptance=5; status_r2=0; replaced_card=false;
     rejected_command=255; csd_crc=0x2c75;
 }
 static void csd_changed(void) {
@@ -206,7 +215,7 @@ int main(void) {
     assert(mcujs_sd_initialize() == 0);
     assert(mcujs_sd_status() == 0);
     assert(baud == 5000000 && !selected);
-    const unsigned expected[] = {0,8,59,55,41,55,41,55,41,58,9};
+    const unsigned expected[] = {0,8,59,55,41,55,41,55,41,58,9,10};
     assert(ncommands == sizeof(expected)/sizeof(expected[0]));
     assert(memcmp(commands, expected, sizeof(expected)) == 0);
     BYTE data[1024];
@@ -250,7 +259,7 @@ int main(void) {
     reset_mock(); csd[5]=(csd[5]&0xf0)|10; csd_changed(); rejected();
     reset_mock(); csd[13]=0; csd_changed(); rejected();
     reset_mock(); csd[15]^=2; csd_crc=reference_crc16(csd,16); rejected();
-    const unsigned init_commands[]={0,8,59,55,41,58,9};
+    const unsigned init_commands[]={0,8,59,55,41,58,9,10};
     for (unsigned i=0; i<sizeof(init_commands)/sizeof(init_commands[0]); ++i) {
         reset_mock(); rejected_command=init_commands[i]; rejected();
     }
@@ -311,6 +320,11 @@ int main(void) {
     assert(mcujs_sd_ioctl(CTRL_SYNC,NULL) == RES_NOTRDY);
     assert(mcujs_sd_read(data,7,1) == RES_NOTRDY);
     init_ok(); assert(mcujs_sd_read(data,7,1) == RES_OK); ++cases;
+    init_ok(); replaced_card=true;
+    failed_io(mcujs_sd_read(data,7,1));
+    assert(writes == 0); /* Replacement cannot inherit a live block lease. */
+    init_ok(); replaced_card=true;
+    assert(mcujs_sd_write(data,7,1) == RES_ERROR && writes == 0); ++cases;
     printf("sd_spi: %u cases passed (LBA%u): init/CRC/read/write/geometry/protection/removal/bounded faults\n",
            cases, (unsigned)(sizeof(LBA_t)*8));
     return 0;

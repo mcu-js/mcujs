@@ -4,12 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const registry = require('../runtime/board-registry');
-test('only 1.47 advertises SD and its bus/pins stay outside application routes', () => {
+test('configured SD policies preserve reserved RP2 bus/pins and read-only Sticky', () => {
   for (const [name, d] of Object.entries(registry.boardDescriptors)) {
-    assert.equal(Boolean(d.capabilities.fs.sd), name === 'waveshare_rp2350_lcd_1.47_a');
-    if (!d.capabilities.fs.sd) continue;
+    assert.equal(Boolean(d.capabilities.fs.sd), ['waveshare_rp2350_lcd_1.47_a', 'seeed_reterminal_sticky'].includes(name));
+    if (name !== 'waveshare_rp2350_lcd_1.47_a') continue;
     assert.equal(d.capabilities.fs.sd.root, '/sd');
-    assert.equal(d.capabilities.fs.sd.hostTransfer, false);
+    assert.equal(d.capabilities.fs.sd.hostTransfer, true);
     assert.deepEqual(d.capabilities.spi.buses, [0]);
     for (const cap of ['gpio', 'pwm', 'neopixel']) {
       for (const pin of [10, 11, 12, 15]) assert.ok(!d.capabilities[cap].pins.includes(pin));

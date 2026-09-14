@@ -12,7 +12,8 @@ opt-ins, not a second startup search.
 
 Configured boards:
 
-- **Waveshare RP2350 LCD 1.47 A**: writable `/sd` on a dedicated SPI bus.
+- **Waveshare RP2350 LCD 1.47 A**: writable `/sd` on a dedicated SPI bus,
+  with a separate USB mass-storage volume in the enabled development build.
 - **Seeed reTerminal Sticky**: read-only `/sd` on the shared display SPI bus.
   Writes, format, erase and USB host transfer are denied. Power/select of the
   inserted card is required for display traffic even when no file is opened.
@@ -25,8 +26,8 @@ var asset = JSON.parse(fs.readFileSync('/sd/mcujs-proof.json', 'utf8'));
 ```
 
 `board.capability('fs').sd` describes configured support: root `/sd`, FAT,
-removable, no USB host transfer, FAT16/FAT32 formats. `writable` is board
-policy, not live media state. It does **not** claim a card is present, healthy
+removable, FAT16/FAT32 formats, and `hostTransfer` support. `writable` and
+`hostTransfer` are board policies, not live media state. It does **not** claim a card is present, healthy
 or writable right now. The mount is attempted lazily when accessing `/sd`;
 absence or unsupported formatting does not block internal application startup.
 Other boards do not advertise this adapter.
@@ -36,10 +37,11 @@ Other boards do not advertise this adapter.
 - **No SD formatting API or automatic formatting.** exFAT and unsupported media
   fail rather than being converted. This first adapter supports block-addressed
   SD v2 cards (SDHC/SDXC) with FAT16/FAT32; SDSC is not supported.
-- USB MSC continues to expose **only internal flash**. `/sd` remains runtime-owned
-  even when the USB host owns `/app`. Never attach the same card to a second
-  writer. Copy assets using the existing runtime `fs` API, or power off the board
-  and use a computer card reader before reinserting it.
+- On the enabled 1.47-A build, USB MSC exposes app flash and SD as independent
+  volumes. A host-owned volume rejects device access with `EBUSY`; the other
+  volume can remain device-owned. Never attach the card to a second writer.
+  Boards without `fs.sd.hostTransfer` still use the runtime `fs` API or a card
+  reader (power off before removing or reinserting a card).
 - No mount-crossing traversal: `/sd/../app` fails, even when the resulting path
   would return to a valid mount. Cross-mount renames fail with `EXDEV`. `/sd`
   itself cannot be removed, renamed or opened as a file.
@@ -67,6 +69,66 @@ now provide explicit Uint8Array transfers. Streams, asynchronous I/O,
 capacity/status APIs and other board adapters remain follow-up work under
 [issue #7](https://github.com/mcu-js/mcujs/issues/7). Writes are not power-loss
 atomic; keep backups and do not unplug during a write.
+
+## Copying files over USB
+
+The runtime namespace is `/app` plus optional `/sd`. The computer sees separate
+volumes, not a synthetic disk containing `app/` and `sd/` folders:
+
+```text
+Computer                         MCU.js
+MCUJS/index.js               ->  /app/index.js
+<existing SD label>/photo.bmp ->  /sd/photo.bmp
+```
+
+`MCUJS_SD` would be a useful user-chosen card label, **not** a label firmware
+writes automatically. Actual mount locations and displayed names depend on the
+host OS. SD slot presence alone does not imply USB export: check
+`board.capability('fs').sd.hostTransfer === true`.
+
+1. Connect the enabled board with a supported FAT16/FAT32 card already inserted.
+   After startup files are read, firmware requests host ownership of each
+   volume. An open runtime file/directory delays that volume's handoff until it
+   closes; an absent or unsupported SD card does not stop app-volume export.
+2. Copy a uniquely named file into the appropriate drive's root with the normal
+   file manager. Do not overwrite existing files unintentionally.
+3. Use the host's **safe eject** action and wait for completion before reading
+   that volume from JavaScript. An unmount command that sends no SCSI eject is
+   not enough. Eject may affect one volume or the entire USB device depending
+   on the OS/tool; independent host-UI eject is **not yet qualified**.
+4. Read the copied file at `/sd/name` or `/app/name`. `board.storageReady()` still
+   describes internal `/app`, not SD health. Built-in modules and non-filesystem
+   work can continue while a volume is host-owned; code requiring that volume
+   receives an actionable `ResourceBusyError` (`EBUSY`).
+
+The adapter drains/synchronizes before acknowledging eject, stops new host I/O
+immediately, then remounts only that filesystem in the main loop. Host removal
+locks are honored. LOAD followed by EJECT cannot leave an obsolete claim queued.
+Reconnect requests export again; eject any volumes needed by the running app.
+
+USB reset, suspend or generic deconfiguration is **not evidence of safe eject**.
+Those signals retain the host-ownership fence; there is no reclaim timer.
+On ambiguous unplug, reconnect and safely eject. Failed SD host I/O fences that
+lease; reconnect alone does not clear it or reinitialize another card under
+cached host metadata. Stop host access before a deliberate device restart, and
+inspect/repair media externally when necessary. A failed remount never triggers
+formatting. Physical detach detection, live card swapping and power-loss-atomic
+writes are not promised. Card identity checks reduce stale-media access but are
+not a hot-swap qualification or an authentication mechanism.
+
+### Verification boundary
+
+Native tests compose **two independent FatFs R0.16 instances**, actual MCU.js
+filesystem code and actual RP2 MSC callbacks over memory-backed block media.
+They verify host copy -> sync/eject -> exact device read, the reverse direction,
+per-volume ownership, labels/sentinels, and absent/unsupported/failed media with
+no SD formatting. Additional callback and SPI fixtures cover bounds, write
+protection, invalid LUNs, removal locks and card-identity changes.
+
+These are not a physical USB host or card test. Linux, macOS and Windows
+file-manager mount/eject behavior, throughput and exact installed firmware
+remain **NOT_RUN** until measured on hardware. The earlier asset evidence below
+predates USB SD export and must not be reused to claim it passed.
 
 ## Evidence required for the asset demonstration
 

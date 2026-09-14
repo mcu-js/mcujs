@@ -4,6 +4,7 @@
 #include "board_config.h"
 #include "board_power.h"
 #include "boot.h"
+#include "fatal_recovery.h"
 #include "repl.h"
 #include "usb_cdc.h"
 #include "usb_msc.h"
@@ -38,6 +39,7 @@ static bool run_smoke(const char *name, const char *source, const char *expected
 }
 
 void app_main(void) {
+    mcujs_fatal_recovery_init();
     if (!mcujs_board_power_init()) { ESP_LOGE(TAG, "Board power initialization failed"); return; }
     mcujs_usb_recovery_start();
     mcujs_boot_init();

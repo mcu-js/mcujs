@@ -13,6 +13,8 @@ python3 - "${TMP}" <<'PY'
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
+(p/'esp_attr.h').write_text('#pragma once\n#define RTC_NOINIT_ATTR\n')
+(p/'esp_system.h').write_text('#pragma once\n#define ESP_RST_SW 4\nint esp_reset_reason(void);\nvoid esp_restart(void);\n')
 (p/'esp_log.h').write_text('''#include <stdio.h>
 #define ESP_LOGE(tag, ...) do { (void)(tag); fprintf(stderr, __VA_ARGS__); fputc('\\n', stderr); } while (0)
 #define ESP_LOGI(tag, ...) do { (void)(tag); fprintf(stdout, __VA_ARGS__); fputc('\\n', stdout); } while (0)
@@ -36,7 +38,7 @@ build_test() {
         >"${TMP}/build-${kib}.log" 2>&1 || { python3 -c 'from pathlib import Path; import sys; print("\n".join(Path(sys.argv[1]).read_text().splitlines()[-40:]))' "${TMP}/build-${kib}.log"; return 1; }
     cc -std=gnu17 -Wall -Wextra -Werror \
         -DMCUJS_JS_HEAP_KIB="${kib}" -DMCUJS_JS_HEAP_EXTERNAL="${external}" -DESP_PLATFORM \
-        -I"${TMP}" -I"${ROOT}/tests" -I"${ROOT}/tests/canvas_epaper_stubs" \
+        -I"${TMP}" -I"${ROOT}/host" -I"${ROOT}/tests" -I"${ROOT}/tests/canvas_epaper_stubs" \
         -I"${JERRY_ROOT}/jerry-core/include" \
         "${ROOT}/tests/esp32_js_heap_test.c" "${ROOT}/platform/esp32/main/jerry_port.c" \
         "${TMP}/jerry-${kib}/lib/libjerry-core.a" -lm -o "${TMP}/test-${kib}"
@@ -46,17 +48,17 @@ build_test 256 1
 "${TMP}/test-256"
 build_test 128 0
 python3 - "${TMP}/test-128" <<'PY'
-import subprocess,sys,signal
-p = subprocess.run([sys.argv[1]], capture_output=True, text=True)
-assert p.returncode == -signal.SIGABRT, (p.returncode, p.stdout, p.stderr)
-assert 'fatal error: 10' in p.stderr, p.stderr
+import subprocess,sys
+p = subprocess.run([sys.argv[1]], capture_output=True, text=True, timeout=15)
+assert p.returncode == 86, (p.returncode, p.stdout, p.stderr)
+assert 'FATAL_RESET_HANDOFF_OOM' in p.stdout, p.stdout
 print('PASS control: the identical live object graph exhausts the original 128KiB heap')
 PY
 
 # Missing PSRAM must be a compilation error, not a silent internal fallback.
 printf '' > "${TMP}/sdkconfig.h"
 if cc -std=gnu17 -fsyntax-only -DESP_PLATFORM -DMCUJS_JS_HEAP_KIB=256 -DMCUJS_JS_HEAP_EXTERNAL=1 \
-    -I"${TMP}" -I"${ROOT}/tests/canvas_epaper_stubs" -I"${JERRY_ROOT}/jerry-core/include" \
+    -I"${TMP}" -I"${ROOT}/host" -I"${ROOT}/tests/canvas_epaper_stubs" -I"${JERRY_ROOT}/jerry-core/include" \
     "${ROOT}/platform/esp32/main/jerry_port.c" >"${TMP}/invalid.log" 2>&1; then
     printf 'ERROR: accepted external heap without initialized PSRAM\n' >&2
     exit 1

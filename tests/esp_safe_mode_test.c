@@ -13,6 +13,7 @@ esp_err_t gpio_config(const gpio_config_t *config) { (void)config; return ESP_OK
 #include <string.h>
 
 static int64_t now;
+int mcujs_fatal_recovery_code(void) { return -1; }
 static int fail_write, fail_commit, writes;
 static int failures;
 int64_t esp_timer_get_time(void) { return now; }

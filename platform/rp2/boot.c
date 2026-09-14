@@ -4,6 +4,7 @@
  */
 
 #include "boot.h"
+#include "fatal_recovery.h"
 #include "fs.h"
 #include "engine.h"
 #include "usb_cdc.h"
@@ -124,6 +125,10 @@ bool boot_run_file(const char* filename) {
  * Attempt to boot from index.js
  */
 bool boot_run_index_js(void) {
+    if (mcujs_fatal_recovery_code() >= 0) {
+        boot_print("Fatal engine recovery - skipping /app/index.js\r\n");
+        return false;
+    }
     /* Check for safe mode (BOOTSEL held during boot) */
     if (boot_check_safe_mode()) {
         boot_print("*** SAFE MODE ***\r\n");

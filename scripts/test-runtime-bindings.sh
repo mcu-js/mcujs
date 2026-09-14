@@ -156,6 +156,9 @@ for board in "${BINDING_BOARDS[@]}"; do
             flags+=(-DMCUJS_PLATFORM_RP2=1 -I"${ROOT}/tests/native_stubs/rp2" -I"${ROOT}/board/${board}") ;;
     esac
     modules="$(node -e 'console.log(require(process.argv[1]).boardDescriptors[process.argv[2]].modules.join(" "))' "${ROOT}/runtime/board-registry.js" "${board}")"
+    if node -e 'process.exit(require(process.argv[1]).boardDescriptors[process.argv[2]].capabilities.fs.sd ? 0 : 1)' "${ROOT}/runtime/board-registry.js" "${board}"; then
+        flags+=(-DMCUJS_HAS_SD=1)
+    fi
     compile_binding_test "${binary}" "${backend}" "${modules}" "${flags[@]}"
     nm -g "${binary}" > "${binary}.nm"
     for factory in gpio i2c neopixel pwm keyboard mouse graphics screen; do

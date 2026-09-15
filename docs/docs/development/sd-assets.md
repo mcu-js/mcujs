@@ -125,10 +125,26 @@ per-volume ownership, labels/sentinels, and absent/unsupported/failed media with
 no SD formatting. Additional callback and SPI fixtures cover bounds, write
 protection, invalid LUNs, removal locks and card-identity changes.
 
-These are not a physical USB host or card test. Linux, macOS and Windows
-file-manager mount/eject behavior, throughput and exact installed firmware
-remain **NOT_RUN** until measured on hardware. The earlier asset evidence below
-predates USB SD export and must not be reused to claim it passed.
+Those fixtures are not physical USB/card tests. Separately, physical 1.47-A
+firmware `85fe3587802ac15143d604b7c89d804b9a0823a2` passed Linux command-line
+USB mount/copy/sync/eject and native read/write acceptance:
+
+- Both app and SD volumes, independent ownership and expected busy errors.
+- Exact binary contents: 1 MiB host-to-SD/native read and 4 KiB native-to-host
+  write/readback; text and binary persistence after board reset and safe eject.
+- Original filenames/content hashes preserved, test files removed, and a clean
+  final FAT check. Existing card filesystem defects were repaired separately
+  using backed-up, offline-verified metadata changes; firmware never reformats
+  or automatically repairs the card.
+
+SD USB capacity is the validated FAT volume, exported with logical sector zero
+at its boot sector. It is not raw whole-card access. Every partition location
+native FatFs could scan is checked before mount, including after host eject.
+
+File-manager UI behavior on Linux/macOS/Windows, macOS/Windows host acceptance,
+throughput benchmarking, live hot-swap and interrupted-power behavior remain
+**NOT_RUN**. This bounded Linux test is not all-platform or release-candidate
+qualification. Earlier asset evidence below predates USB SD export.
 
 ## Evidence required for the asset demonstration
 

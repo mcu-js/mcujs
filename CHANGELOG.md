@@ -12,9 +12,15 @@ All notable changes to mcujs will be documented in this file.
   and removal locks, refuse unsafe handoffs, and preserve no-SD/ESP read-only
   policies. Check SD identity during I/O; never reinitialize replacement media
   under a live host lease or automatically format it.
-- Add real FatFs host/device file-copy round trips and fault/preservation tests.
-  Hardware drag-and-drop, USB timing and Linux/macOS/Windows eject behavior
-  remain unqualified. This does not alter the frozen RC or authorize reflashing.
+- Bound SD USB export to a validated FAT volume rather than the whole card;
+  validate every partition native FatFs could scan before mounting and revalidate
+  on eject. Invalid geometry fails closed without rewriting card metadata.
+- Add real FatFs host/device copy, malformed-partition and preservation tests.
+  Linux command-line USB/native round trips, independent-volume ownership and
+  reset persistence passed on physical 1.47-A firmware `85fe358`, including a
+  1 MiB host copy and 4 KiB native binary write. File-manager UI, macOS/Windows,
+  hot-swap and power-loss qualification remain open. This does not alter the
+  frozen RC or authorize reflashing.
 
 ## [0.2.0-rc.1] — candidate preparation (unpublished)
 

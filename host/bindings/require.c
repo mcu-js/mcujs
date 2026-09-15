@@ -115,7 +115,7 @@ static jerry_value_t throw_filesystem_busy(void) {
     };
     return mcujs_throw_operational_error(
         MCUJS_ERROR_BUSY,
-        "filesystem is owned by the USB host; eject MCUJS first",
+        "filesystem is owned by the USB host; eject the affected volume first",
         &details);
 }
 
@@ -168,25 +168,25 @@ static jerry_value_t create_require_function(const char *from_path) {
 /*
  * Read a module file, using a static buffer for small files to avoid malloc().
  */
-static js_result_t read_module_file(const char *filename,
+static fs_result_t read_module_file(const char *filename,
                                     char **content,
                                     size_t *content_len,
                                     bool *used_static) {
     if (filename == NULL || content == NULL || content_len == NULL || used_static == NULL) {
-        return JS_ERROR_FILE_READ;
+        return FS_ERROR_IO;
     }
     
     fs_file_t file;
     fs_result_t result = fs_open(&file, filename, FS_MODE_READ);
     if (result != FS_OK) {
-        return JS_ERROR_FILE_NOT_FOUND;
+        return result;
     }
     
     size_t file_size = 0;
     result = fs_size(&file, &file_size);
     if (result != FS_OK) {
         fs_close(&file);
-        return JS_ERROR_FILE_READ;
+        return result;
     }
     
     if (file_size <= MAX_STATIC_MODULE_SIZE) {
@@ -194,19 +194,19 @@ static js_result_t read_module_file(const char *filename,
         result = fs_read(&file, s_module_wrapper_buf, file_size, &bytes_read);
         fs_close(&file);
         if (result != FS_OK || bytes_read != file_size) {
-            return JS_ERROR_FILE_READ;
+            return result == FS_OK ? FS_ERROR_IO : result;
         }
         s_module_wrapper_buf[file_size] = '\0';
         *content = s_module_wrapper_buf;
         *content_len = file_size;
         *used_static = true;
-        return JS_OK;
+        return FS_OK;
     }
     
     *content = (char *)malloc(file_size + 1);
     if (*content == NULL) {
         fs_close(&file);
-        return JS_ERROR_MEMORY;
+        return FS_ERROR;
     }
     
     size_t bytes_read = 0;
@@ -216,13 +216,13 @@ static js_result_t read_module_file(const char *filename,
     if (result != FS_OK || bytes_read != file_size) {
         free(*content);
         *content = NULL;
-        return JS_ERROR_FILE_READ;
+        return result == FS_OK ? FS_ERROR_IO : result;
     }
     
     (*content)[file_size] = '\0';
     *content_len = file_size;
     *used_static = false;
-    return JS_OK;
+    return FS_OK;
 }
 
 /*
@@ -281,23 +281,23 @@ static bool join_path(char *output, size_t output_len,
  * Handles: ./relative, ../parent, /absolute, bare (searches /lib/)
  * Tries .js extension first, then .json if not found
  */
-static bool resolve_module_path(const char *specifier, const char *from_path, 
+static fs_result_t resolve_module_path(const char *specifier, const char *from_path,
                                  char *resolved, size_t resolved_len) {
     if (specifier == NULL || resolved == NULL || resolved_len == 0) {
-        return false;
+        return FS_ERROR_INVALID;
     }
     
     char base_dir[MAX_MODULE_PATH] = FS_APP_ROOT;
     if (specifier[0] == '.' && from_path != NULL && from_path[0] != '\0') {
-        if (!join_path(base_dir,sizeof(base_dir),"",from_path)) return false;
+        if (!join_path(base_dir,sizeof(base_dir),"",from_path)) return FS_ERROR_INVALID;
         char *slash=strrchr(base_dir,'/');
-        if (!slash) return false;
+        if (!slash) return FS_ERROR_INVALID;
         *slash='\0';
     } else if (specifier[0] != '/' && specifier[0] != '.') {
-        if (!join_path(base_dir,sizeof(base_dir),FS_APP_ROOT,"/lib")) return false;
+        if (!join_path(base_dir,sizeof(base_dir),FS_APP_ROOT,"/lib")) return FS_ERROR_INVALID;
     }
     if (fs_normalize_path(specifier,base_dir,resolved,resolved_len)!=FS_OK ||
-        !strcmp(resolved,"/") || !strcmp(resolved,FS_APP_ROOT)) return false;
+        !strcmp(resolved,"/") || !strcmp(resolved,FS_APP_ROOT)) return FS_ERROR_INVALID;
 
     /* Add extension if missing - try .js first, then .json */
     size_t len = strlen(resolved);
@@ -309,30 +309,37 @@ static bool resolve_module_path(const char *specifier, const char *from_path,
         if (len + 3 < resolved_len) {
             strcat(resolved, ".js");
             /* Check if .js file exists, if not try .json */
-            if (fs_exists(resolved) != FS_OK) {
+            fs_result_t status = fs_exists(resolved);
+            if (status == FS_ERROR_BUSY) return status;
+            if (status != FS_OK) {
                 /* Remove .js and try .json */
                 resolved[len] = '\0';
                 if (len + 5 < resolved_len) {
                     strcat(resolved, ".json");
                     /* If .json also doesn't exist, revert to .js for error message */
-                    if (fs_exists(resolved) != FS_OK) {
+                    status = fs_exists(resolved);
+                    if (status == FS_ERROR_BUSY) return status;
+                    if (status != FS_OK) {
                         resolved[len] = '\0';
                         strcat(resolved, ".js");
                     }
                 }
             }
         } else {
-            return false;
+            return FS_ERROR_INVALID;
         }
     }
     
-    return true;
+    return FS_OK;
 }
 
 /*
  * Load and execute a module, returning its exports
  */
 static jerry_value_t load_module(const char *resolved_path, bool use_cache) {
+    /* Ownership belongs to the target volume, not always /app. Preserve the
+     * existing rule that file-backed require is busy even when cached. */
+    if (fs_exists(resolved_path) == FS_ERROR_BUSY) return throw_filesystem_busy();
     /* Entry execution reruns its body; require() retains canonical caching. */
     cached_module_t *cached = use_cache ? find_cached_module(resolved_path) : NULL;
     if (cached != NULL) {
@@ -344,8 +351,9 @@ static jerry_value_t load_module(const char *resolved_path, bool use_cache) {
     size_t content_len = 0;
     bool content_is_static = false;
     
-    js_result_t result = read_module_file(resolved_path, &content, &content_len, &content_is_static);
-    if (result != JS_OK) {
+    fs_result_t result = read_module_file(resolved_path, &content, &content_len, &content_is_static);
+    if (result == FS_ERROR_BUSY) return throw_filesystem_busy();
+    if (result != FS_OK) {
         /* Try to find a similar module name to suggest */
         char error_msg[192];
         const char *basename = strrchr(resolved_path, '/');
@@ -770,16 +778,14 @@ static jerry_value_t require_handler(const jerry_call_info_t *call_info,
         jerry_value_free(builtin);
     }
 
-    if (fs_access_status() == FS_ERROR_BUSY) {
-        return throw_filesystem_busy();
-    }
-    
-    /* Resolve the path */
+    /* Resolve the path before checking its owning volume. */
     require_context_t *context = jerry_object_get_native_ptr(
         call_info->function, &s_require_context_info);
     const char *from_path = context == NULL ? "" : context->from_path;
     char resolved[MAX_MODULE_PATH];
-    if (!resolve_module_path(specifier, from_path, resolved, sizeof(resolved))) {
+    fs_result_t status = resolve_module_path(specifier, from_path, resolved, sizeof(resolved));
+    if (status == FS_ERROR_BUSY) return throw_filesystem_busy();
+    if (status != FS_OK) {
         return jerry_throw_sz(JERRY_ERROR_COMMON, "Failed to resolve module path");
     }
     
@@ -790,7 +796,6 @@ static jerry_value_t require_handler(const jerry_call_info_t *call_info,
 /* Boot and .run execute a CommonJS entry without caching the entry itself.
  * Its own require closure keeps module-relative imports valid in callbacks. */
 jerry_value_t js_require_exec_file(const char *filename) {
-    if (fs_access_status()==FS_ERROR_BUSY) return throw_filesystem_busy();
     char resolved[MAX_MODULE_PATH];
     if (fs_normalize_path(filename,FS_APP_ROOT,resolved,sizeof(resolved))!=FS_OK ||
         !strcmp(resolved,"/") || !strcmp(resolved,FS_APP_ROOT))

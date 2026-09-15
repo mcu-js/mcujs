@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include "usb_cdc.h"
 
 #if MCUJS_SD_SPI_BUS != 1
@@ -31,6 +32,7 @@
 
 static DSTATUS status = STA_NOINIT;
 static LBA_t sector_count;
+static uint8_t mounted_cid[16];
 /* Every wire operation has BOTH a wall-clock deadline and a byte budget.
  * Every MMIO polling stage also has a deadline and a poll budget. In
  * particular, do not replace this with SDK spi_*_blocking (no timeout).
@@ -152,6 +154,15 @@ static bool read_data(uint8_t *buffer, unsigned length) {
     return crc16(buffer, length) == (uint16_t)((high << 8) | low);
 }
 
+/* Cached FatFs handles and host block leases must never retarget a new card.
+ * No CD pin: compare the CRC-checked identity before every transaction. A
+ * removal/fault fences the driver until the filesystem explicitly remounts. */
+static bool same_card(void) {
+    uint8_t r1, cid[16];
+    return command(10, 0, &r1) && r1 == 0 && read_data(cid, sizeof(cid)) &&
+           release() && memcmp(cid, mounted_cid, sizeof(cid)) == 0;
+}
+
 static DRESULT validate(const void *buffer, LBA_t sector, UINT count) {
     if (!buffer || !count || (uint64_t)count * SD_SECTOR_SIZE > SIZE_MAX) return RES_PARERR;
     if (status & STA_NOINIT) return RES_NOTRDY;
@@ -166,7 +177,7 @@ DRESULT mcujs_sd_read(BYTE *buffer, LBA_t sector, UINT count) {
     for (UINT i = 0; i < count; ++i) {
         begin(SD_IO_US);
         uint8_t r1;
-        if (!command(17, (uint32_t)(sector + i), &r1) || r1 != 0 ||
+        if (!same_card() || !command(17, (uint32_t)(sector + i), &r1) || r1 != 0 ||
             !read_data(buffer, SD_SECTOR_SIZE) || !release()) return fail();
         buffer += SD_SECTOR_SIZE;
     }
@@ -193,6 +204,7 @@ DRESULT mcujs_sd_ioctl(BYTE cmd, void *buffer) {
     switch (cmd) {
     case CTRL_SYNC:
         begin(SD_IO_US);
+        if (!same_card()) return fail();
         return card_status();
     case GET_SECTOR_COUNT: *(LBA_t *)buffer = sector_count; break;
     case GET_SECTOR_SIZE: *(WORD *)buffer = SD_SECTOR_SIZE; break;
@@ -208,7 +220,7 @@ DRESULT mcujs_sd_write(const BYTE *buffer, LBA_t sector, UINT count) {
     for (UINT i = 0; i < count; ++i) {
         begin(SD_IO_US);
         uint8_t r1;
-        if (!command(24, (uint32_t)(sector + i), &r1) || r1 != 0 ||
+        if (!same_card() || !command(24, (uint32_t)(sector + i), &r1) || r1 != 0 ||
             !receive(NULL) || !transfer(0xfe, NULL)) return fail();
         uint16_t crc = crc16(buffer, SD_SECTOR_SIZE);
         for (unsigned j = 0; j < SD_SECTOR_SIZE; ++j)
@@ -267,6 +279,8 @@ DSTATUS mcujs_sd_initialize(void) {
     uint64_t sectors = ((uint64_t)size + 1) * 1024;
     /* GET_SECTOR_COUNT must be representable, not silently wrap at 2 TiB. */
     if (sectors > (LBA_t)-1) goto error;
+    if (!command(10, 0, &r1) || r1 != 0 ||
+        !read_data(mounted_cid, sizeof(mounted_cid))) goto error;
     sector_count = (LBA_t)sectors;
     if (!release()) goto error;
     spi_set_baudrate(spi1, 5000000);

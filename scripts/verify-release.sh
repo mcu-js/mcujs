@@ -281,6 +281,8 @@ check_api_schema
 check_runtime_registry
 check_release_artifacts
 check_platform_boundaries
+bash "${ROOT_DIR}/scripts/test-storage-fatfs.sh"
+pass 'real FatFs USB-volume copy and preservation checks passed'
 check_docs_build
 
 printf '\nRelease source checks passed.\n'

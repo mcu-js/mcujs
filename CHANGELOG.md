@@ -2,6 +2,26 @@
 
 All notable changes to mcujs will be documented in this file.
 
+## [Unreleased] — development
+
+- Expose `/app` and `/sd` as separate USB mass-storage volumes on the configured
+  Waveshare RP2350 LCD 1.47-A. The app drive root still maps directly to `/app`;
+  the card keeps its existing label, format and contents. `fs.sd.hostTransfer`
+  describes support independently of card presence or current ownership.
+- Fence each volume independently during host access; honor per-volume eject
+  and removal locks, refuse unsafe handoffs, and preserve no-SD/ESP read-only
+  policies. Check SD identity during I/O; never reinitialize replacement media
+  under a live host lease or automatically format it.
+- Bound SD USB export to a validated FAT volume rather than the whole card;
+  validate every partition native FatFs could scan before mounting and revalidate
+  on eject. Invalid geometry fails closed without rewriting card metadata.
+- Add real FatFs host/device copy, malformed-partition and preservation tests.
+  Linux command-line USB/native round trips, independent-volume ownership and
+  reset persistence passed on physical 1.47-A firmware `85fe358`, including a
+  1 MiB host copy and 4 KiB native binary write. File-manager UI, macOS/Windows,
+  hot-swap and power-loss qualification remain open. This does not alter the
+  frozen RC or authorize reflashing.
+
 ## [0.2.0-rc.1] — candidate preparation (unpublished)
 
 This is the portable-contract foundation candidate, **not a hardware-qualified

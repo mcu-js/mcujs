@@ -101,13 +101,17 @@ explains application preservation and changes to old absolute paths.
 - `require('board').capability('fs')` is the static contract: it describes
   whether this firmware has a filesystem and supports host transfer.
 - `board.storageReady()` is dynamic. It is `true` only while the device owns a
-  mounted, usable filesystem; check that the method exists before calling it.
+  mounted, usable internal `/app` filesystem; it does not report SD health.
+  Check that the method exists before calling it.
+- On supported firmware, `fs.sd.hostTransfer` advertises a separate SD USB
+  volume. Drive roots map directly to `/app` and `/sd`; no extra `app/` folder
+  is required. See [SD copy/eject guidance](./development/sd-assets.md#copying-files-over-usb).
 - USB mass storage and device-side JavaScript never access the volume at the
   same time. While the USB host owns it, `fs` operations and file-backed
   `require()` throw `ResourceBusyError` with `code === 'EBUSY'`,
   `resource === 'filesystem'`, and `owner === 'usb-host'`. Built-in modules such
   as `require('board')` remain available.
-- Properly eject the MCU.js volume on the host before using device-side files.
+- Properly eject the affected volume on the host before using its device-side files.
   Once ownership returns, `board.storageReady()` becomes `true` and host writes
   are visible through the fresh mount.
 - Host OS directory caches can delay visibility of device-written files. If a

@@ -79,6 +79,21 @@ fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
     s_write_calls++;
     return FS_OK;
 }
+#if !defined(MCUJS_TEST_ESP32)
+fs_result_t fs_volume_begin_host_access(uint8_t v) { assert(v == 0); return fs_begin_host_access(); }
+fs_result_t fs_volume_end_host_access(uint8_t v) { assert(v == 0); return fs_end_host_access(); }
+bool fs_volume_host_owned(uint8_t v) { assert(v == 0); return fs_host_owned(); }
+fs_result_t fs_volume_msc_status(uint8_t v) { assert(v == 0); return s_host_owned ? FS_OK : FS_ERROR_BUSY; }
+fs_result_t fs_volume_msc_sync(uint8_t v) { assert(v == 0); return fs_msc_sync(); }
+fs_result_t fs_volume_capacity(uint8_t v, uint32_t *n) { assert(v == 0); *n = 64; return FS_OK; }
+bool fs_volume_writable(uint8_t v) { assert(v == 0); return s_host_owned; }
+fs_result_t fs_volume_read_sector(uint8_t v, uint32_t s, uint32_t o, void *b, uint32_t n) {
+    assert(v == 0); return fs_read_sector(s, o, b, n);
+}
+fs_result_t fs_volume_write_sector(uint8_t v, uint32_t s, uint32_t o, const void *b, uint32_t n) {
+    assert(v == 0); return fs_write_sector(s, o, b, n);
+}
+#endif
 void tud_msc_set_sense(uint8_t lun, uint8_t sense_key, uint8_t add_sense_code,
                        uint8_t add_sense_qualifier) {
     (void)lun;
@@ -107,6 +122,11 @@ static void test_backend_handoff_and_callbacks(void) {
     assert(s_begin_calls == 1);
     assert(tud_msc_test_unit_ready_cb(0));
     assert(tud_msc_is_writable_cb(0));
+#if !defined(MCUJS_TEST_ESP32)
+    /* An unknown LUN must never alias writable app flash. */
+    assert(!tud_msc_test_unit_ready_cb(2));
+    assert(!tud_msc_is_writable_cb(2));
+#endif
 
     uint32_t blocks = 0;
     uint16_t block_size = 0;
@@ -151,6 +171,11 @@ static void test_backend_handoff_and_callbacks(void) {
 
     backend_event(MCUJS_MSC_EVENT_DETACH);
     backend_task();
+#if !defined(MCUJS_TEST_ESP32)
+    assert(s_host_owned); /* Generic USB unmount is not confirmed eject. */
+    assert(tud_msc_start_stop_cb(0, 0, false, true));
+    backend_task();
+#endif
     assert(!s_host_owned);
     assert(s_end_calls == 2);
 }

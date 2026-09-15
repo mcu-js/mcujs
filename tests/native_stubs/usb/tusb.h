@@ -5,6 +5,9 @@
 #include <stdint.h>
 
 #define CFG_TUD_MSC 1
+#ifndef CFG_TUD_MSC_EP_BUFSIZE
+#define CFG_TUD_MSC_EP_BUFSIZE 512
+#endif
 #define SCSI_SENSE_NOT_READY 0x02
 #define SCSI_SENSE_MEDIUM_ERROR 0x03
 #define SCSI_SENSE_ILLEGAL_REQUEST 0x05

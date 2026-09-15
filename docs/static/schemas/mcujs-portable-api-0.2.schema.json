@@ -1434,7 +1434,7 @@
               "type": "boolean"
             },
             "hostTransfer": {
-              "const": false
+              "type": "boolean"
             },
             "removable": {
               "const": true

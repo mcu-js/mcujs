@@ -34,6 +34,16 @@ cc -std=gnu17 -Wall -Wextra -Werror -DMCUJS_HAS_SD=1 \
 "${TMP_ROOT}/fs-sd-test" sd
 "${TMP_ROOT}/fs-sd-test" sd-write
 
+cc -std=gnu17 -Wall -Wextra -Werror -DMCUJS_HAS_SD=1 -DMCUJS_USB_SD_MSC=1 -DMCUJS_TEST_DUAL_MSC=1 \
+    -I"${ROOT}/tests/native_stubs/storage" -I"${ROOT}/tests/native_stubs/usb" \
+    -I"${ROOT}/src/filesystem" -I"${ROOT}/src/usb" \
+    "${ROOT}/tests/fs_ownership_test.c" "${ROOT}/src/filesystem/fs.c" \
+    "${ROOT}/src/usb/msc_ownership.c" "${ROOT}/platform/rp2/usb/usb_msc.c" \
+    -o "${TMP_ROOT}/dual-msc-test"
+"${TMP_ROOT}/dual-msc-test" sd-malformed
+"${TMP_ROOT}/dual-msc-test" sd-bounds
+"${TMP_ROOT}/dual-msc-test" dual
+
 cc -std=gnu17 -Wall -Wextra -Werror \
     -I"${ROOT}/tests/native_stubs/usb" \
     -I"${ROOT}/src/filesystem" \

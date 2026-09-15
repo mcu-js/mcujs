@@ -66,7 +66,15 @@ jerry_value_t js_create_microphone_native_module(void) { return stub_module(); }
 #endif
 
 static fs_result_t s_fs_operation_result = FS_ERROR_NOT_FOUND;
+static bool s_app_host_owned, s_sd_host_owned;
+static bool path_host_owned(const char *path) {
+    bool sd = !strncmp(path, "/sd", 3) && (!path[3] || path[3] == '/');
+    return sd ? s_sd_host_owned : s_app_host_owned;
+}
 static const struct { const char *path, *source; } app_files[] = {
+    {"/sd/owned.js", "module.exports={ok:true};"},
+    {"/sd/owned.json", "{\"ok\":true}"},
+    {"/sd/deferred.js", "exports.later=function(){return require('./owned.json');};"},
     {"/app/settings.json", "{\"color\":\"white\"}"},
     {"/app/lib/helper.js", "module.exports={ok:true};"},
     {"/app/nested/main.js", "exports.filename=__filename;exports.dirname=__dirname;exports.later=function(){return require('../settings.json').color;};"},
@@ -88,6 +96,7 @@ static bool s_short_write;
 static unsigned s_seek_fail_after;
 
 fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
+    if (path_host_owned(path)) return FS_ERROR_BUSY;
     if (s_fs_operation_result != FS_OK) return s_fs_operation_result;
     FILE *stream;
     if (!strcmp(path, "/app/binary.bin") || !strcmp(path, "/sd/binary.bin")) {
@@ -155,6 +164,7 @@ fs_result_t fs_size(fs_file_t *file, size_t *size) {
 }
 
 fs_result_t fs_exists(const char *path) {
+    if (path_host_owned(path)) return FS_ERROR_BUSY;
     if (s_fs_operation_result==FS_OK) return app_source(path)?FS_OK:FS_ERROR_NOT_FOUND;
     return s_fs_operation_result;
 }
@@ -190,7 +200,7 @@ fs_result_t fs_sync(void) {
 void fs_notify_host(void) {}
 
 fs_result_t fs_access_status(void) {
-    return s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_OK;
+    return s_app_host_owned || s_fs_operation_result == FS_ERROR_BUSY ? FS_ERROR_BUSY : FS_OK;
 }
 
 bool fs_storage_ready(void) {
@@ -396,6 +406,7 @@ static const char s_busy_test_source[] =
     "    assert(error.code === 'EBUSY', label + ' code');\n"
     "    assert(error.resource === 'filesystem', label + ' resource');\n"
     "    assert(error.owner === 'usb-host', label + ' owner');\n"
+    "    assert(error.message.indexOf('affected volume') !== -1, label + ' eject guidance');\n"
     "  }\n"
     "  var filesystem = require('fs');\n"
     "  expectBusy(function () { filesystem.readFileSync('/busy.js'); }, 'readFileSync');\n"
@@ -508,6 +519,34 @@ int main(void) {
     assert(!jerry_value_is_exception(entry));jerry_value_free(entry);
     assert(eval_source("if(appRuns!==2||appEntry.later()!=='white'||appEntry.filename!=='/app/nested/main.js')throw Error('entry rerun and callback import');"));
     js_require_clear_cache();
+#if MCUJS_HAS_SD
+    assert(eval_source("globalThis.sdDeferred = require('/sd/deferred.js');"));
+    s_sd_host_owned = true;
+    assert(eval_source(
+        "globalThis.checkVolumeBusy=function(call){var e;try{call();}catch(x){e=x;}"
+        "if(!e||e.name!=='ResourceBusyError'||e.code!=='EBUSY'||e.resource!=='filesystem'||e.owner!=='usb-host'||e.message.indexOf('affected volume')<0)throw Error('expected volume busy: '+e);};"
+        "['/sd/owned.js','/sd/owned.json','/sd/owned','/sd/deferred.js'].forEach(function(p){checkVolumeBusy(function(){require(p);});});"
+        "checkVolumeBusy(function(){sdDeferred.later();});"
+        "if(!require('/app/lib/helper.js').ok)throw Error('SD blocks app');"));
+    entry=js_require_exec_file("/sd/owned.js");
+    assert(jerry_value_is_exception(entry));
+    jerry_value_t entry_error=jerry_exception_value(entry,true);
+    jerry_value_t realm=jerry_current_realm();
+    js_set_property(realm,"sdEntryError",entry_error);
+    jerry_value_free(realm);
+    jerry_value_free(entry_error);
+    assert(eval_source("checkVolumeBusy(function(){throw sdEntryError;});delete globalThis.sdEntryError;"));
+    s_sd_host_owned = false;
+    s_app_host_owned = true;
+    assert(eval_source("if(!require('/sd/owned.js').ok||!require('/sd/owned.json').ok||!sdDeferred.later().ok)throw Error('app blocks SD');checkVolumeBusy(function(){require('/app/lib/helper.js');});"));
+    entry=js_require_exec_file("/sd/owned.js");
+    assert(!jerry_value_is_exception(entry));jerry_value_free(entry);
+    s_app_host_owned = false;
+    assert(eval_source("if(!require('/sd/owned').ok)throw Error('ejected SD reload');delete globalThis.sdDeferred;delete globalThis.checkVolumeBusy;"));
+    js_require_clear_cache();
+    assert(s_open_files == 0);
+    puts("independent app/SD require, entry, extension probing, cached and deferred imports: PASS");
+#endif
     const struct { fs_result_t result; const char *code, *message; } media_errors[] = {
         {FS_ERROR_NO_MEDIA,"ENOMEDIUM","not ready"},
         {FS_ERROR_UNSUPPORTED,"ENOTSUP","FAT16/FAT32"},

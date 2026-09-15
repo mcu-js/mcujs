@@ -49,6 +49,8 @@ static bool s_sd_mounted;
 static storage_state_t s_sd_state = STORAGE_DEVICE_OWNED;
 #if MCUJS_USB_SD_MSC
 static fs_result_t s_sd_fault = FS_OK;
+/* Fixed for a host lease; native FatFs continues to address the whole card. */
+static uint32_t s_sd_usb_start, s_sd_usb_sectors;
 #endif
 #endif
 
@@ -579,6 +581,112 @@ static fs_result_t sd_host_result(DRESULT result) {
     if (status == FS_ERROR_IO || status == FS_ERROR_NO_MEDIA) s_sd_fault = status;
     return status;
 }
+
+static uint16_t sd_le16(const BYTE *p) {
+    return (uint16_t)p[0] | (uint16_t)p[1] << 8;
+}
+
+static uint32_t sd_le32(const BYTE *p) {
+    return (uint32_t)sd_le16(p) | (uint32_t)sd_le16(p + 2) << 16;
+}
+
+/* Match R0.16 check_fs recognition, including legacy FAT12/16 without a
+ * signature/type string. Recognition and geometry are separate: a header
+ * native FatFs recognizes must not be skipped in favour of another volume. */
+static bool sd_fat_header(const BYTE *b) {
+    if (b[0] != 0xeb && b[0] != 0xe9 && b[0] != 0xe8) return false;
+    if (sd_le16(b + 510) == 0xaa55 && !memcmp(b + 82, "FAT32   ", 8)) return true;
+    uint32_t cluster = b[13];
+    return sd_le16(b + 11) == FS_SECTOR_SIZE && cluster && !(cluster & (cluster - 1)) &&
+        sd_le16(b + 14) && (b[16] == 1 || b[16] == 2) && sd_le16(b + 17) &&
+        (sd_le16(b + 19) >= 128 || sd_le32(b + 32) >= 0x10000) && sd_le16(b + 22);
+}
+
+/* Validate the BPB before publishing any USB capacity. Do not infer the end
+ * from cluster count: FAT volumes may legitimately include trailing padding. */
+static bool sd_fat_sectors(const BYTE *b, uint32_t limit, uint32_t *sectors) {
+    if (!sd_fat_header(b)) return false;
+    uint32_t total = sd_le16(b + 19), fat = sd_le16(b + 22);
+    uint32_t reserved = sd_le16(b + 14), roots = sd_le16(b + 17);
+    uint32_t cluster = b[13], fats = b[16];
+    if (total && sd_le32(b + 32)) return false;
+    if (!total) total = sd_le32(b + 32);
+    if (!fat) fat = sd_le32(b + 36);
+    if (sd_le16(b + 11) != FS_SECTOR_SIZE || !cluster ||
+        (cluster & (cluster - 1)) || !reserved || (fats != 1 && fats != 2) ||
+        !fat || roots % 16 || total < 128 || total > limit) return false;
+    uint64_t overhead = reserved + (uint64_t)fats * fat + roots / 16;
+    if (overhead >= total) return false;
+    uint32_t clusters = (total - overhead) / cluster;
+    if (!clusters || clusters > 0x0ffffff5) return false;
+    /* Match FatFs R0.16's FAT subtype thresholds. */
+    uint32_t bits = clusters <= 0xff5 ? 12 : clusters <= 0xfff5 ? 16 : 32;
+    if (((uint64_t)clusters + 2) * bits > (uint64_t)fat * FS_SECTOR_SIZE * 8)
+        return false;
+    if (bits == 32) {
+        uint32_t root = sd_le32(b + 44);
+        uint16_t info = sd_le16(b + 48), backup = sd_le16(b + 50);
+        if (sd_le16(b + 510) != 0xaa55 || roots || sd_le16(b + 22) ||
+            sd_le16(b + 42) || root < 2 || root >= clusters + 2 ||
+            (info != 0xffff && info >= reserved) ||
+            (backup != 0xffff && backup >= reserved)) return false;
+    } else if (!roots || !sd_le16(b + 22)) {
+        return false;
+    }
+    *sectors = total;
+    return true;
+}
+
+/* Only MBR/VBR headers are needed. In particular, never probe CSD count - 1.
+ * Check partition extents BEFORE reading a VBR or asking FatFs to mount it. */
+static fs_result_t sd_usb_geometry(uint32_t *start, uint32_t *sectors) {
+    LBA_t count = 0;
+    fs_result_t result = sd_disk_result(disk_ioctl(1, GET_SECTOR_COUNT, &count));
+    if (result != FS_OK) return result;
+    if (count < 128) return FS_ERROR_UNSUPPORTED;
+#if FF_LBA64
+    if (count > UINT32_MAX) return FS_ERROR_UNSUPPORTED;
+#endif
+    BYTE boot[FS_SECTOR_SIZE];
+    result = sd_disk_result(disk_read(1, boot, 0, 1));
+    if (result != FS_OK) return result;
+    *start = 0;
+    if (sd_fat_header(boot))
+        return sd_fat_sectors(boot, (uint32_t)count, sectors) ? FS_OK : FS_ERROR_UNSUPPORTED;
+    if (sd_le16(boot + 510) != 0xaa55) return FS_ERROR_UNSUPPORTED;
+    BYTE table[64];
+    memcpy(table, boot + 446, sizeof(table));
+#if FF_LBA64
+    if (table[4] == 0xee) return FS_ERROR_UNSUPPORTED; /* No unchecked GPT scan. */
+#endif
+    /* FatFs scans by start LBA, regardless of type. Validate every possible
+     * location before selecting a VBR, not only entries before the first FAT. */
+    for (unsigned i = 0; i < 4; i++) {
+        const BYTE *entry = table + i * 16;
+        uint32_t first = sd_le32(entry + 8), length = sd_le32(entry + 12);
+        if (!first && !entry[4] && !length) continue;
+        if (!first || first >= count || length < 128 || length > count - first)
+            return FS_ERROR_UNSUPPORTED;
+    }
+    for (unsigned i = 0; i < 4; i++) {
+        const BYTE *entry = table + i * 16;
+        uint32_t first = sd_le32(entry + 8), length = sd_le32(entry + 12);
+        if (!first) continue; /* Extent was validated above. */
+        result = sd_disk_result(disk_read(1, boot, first, 1));
+        if (result != FS_OK) return result;
+        if (sd_fat_header(boot)) {
+            if (!sd_fat_sectors(boot, length, sectors)) return FS_ERROR_UNSUPPORTED;
+            *start = first;
+            return FS_OK;
+        }
+        /* A malformed FAT partition must not turn into a raw-card export or
+         * silently select a different FAT volume. Skip only non-FAT entries. */
+        if (entry[4] == 0x01 || entry[4] == 0x04 || entry[4] == 0x06 ||
+            entry[4] == 0x0b || entry[4] == 0x0c || entry[4] == 0x0e)
+            return FS_ERROR_UNSUPPORTED;
+    }
+    return FS_ERROR_UNSUPPORTED;
+}
 #endif
 
 bool fs_volume_host_owned(uint8_t volume) {
@@ -594,8 +702,22 @@ fs_result_t fs_volume_begin_host_access(uint8_t volume) {
 #if MCUJS_USB_SD_MSC
     if (volume == 1) {
         if (has_sd_files() || s_directories[1]) return FS_ERROR_BUSY;
+        if (s_sd_state != STORAGE_DEVICE_OWNED)
+            return s_sd_state == STORAGE_FAULT ? FS_ERROR_IO : FS_ERROR_BUSY;
+        if (disk_status(1) & STA_NOINIT) {
+            s_sd_mounted = false;
+            if (disk_initialize(1) & STA_NOINIT) return FS_ERROR_NO_MEDIA;
+        }
+        uint32_t start, sectors;
+        fs_result_t geometry = sd_usb_geometry(&start, &sectors);
+        if (geometry != FS_OK) {
+            if (geometry == FS_ERROR_IO || geometry == FS_ERROR_NO_MEDIA) s_sd_mounted = false;
+            return geometry;
+        }
         fs_result_t ready = path_ready("/sd");
         if (ready != FS_OK) return ready;
+        /* Fail closed if native auto-detection selected a different volume. */
+        if (s_sd_fatfs.volbase != start) return FS_ERROR_UNSUPPORTED;
         ready = sd_disk_result(disk_ioctl(1, CTRL_SYNC, NULL));
         if (ready != FS_OK) { s_sd_mounted = false; return ready; }
         s_sd_state = STORAGE_CLAIMING_HOST;
@@ -605,6 +727,8 @@ fs_result_t fs_volume_begin_host_access(uint8_t volume) {
         }
         s_sd_mounted = false;
         s_sd_fault = FS_OK;
+        s_sd_usb_start = start;
+        s_sd_usb_sectors = sectors;
         s_sd_state = STORAGE_HOST_OWNED;
         return FS_OK;
     }
@@ -620,6 +744,15 @@ fs_result_t fs_volume_end_host_access(uint8_t volume) {
         /* The adapter confirms sync before accepting eject. */
         if (s_sd_fault != FS_OK) return s_sd_fault;
         s_sd_state = STORAGE_RELEASING_HOST;
+        /* Host may have edited its boot sector. Revalidate before native
+         * autodetection, and never expand beyond the volume just released. */
+        uint32_t start, sectors;
+        fs_result_t geometry = sd_usb_geometry(&start, &sectors);
+        if (geometry != FS_OK || start != s_sd_usb_start || sectors > s_sd_usb_sectors) {
+            s_sd_mounted = false;
+            s_sd_state = STORAGE_FAULT;
+            return geometry != FS_OK ? geometry : FS_ERROR_UNSUPPORTED;
+        }
         FRESULT fr = f_mount(&s_sd_fatfs, "1:", 1);
         s_sd_mounted = fr == FR_OK;
         s_sd_state = fr == FR_OK ? STORAGE_DEVICE_OWNED : STORAGE_FAULT;
@@ -653,14 +786,7 @@ fs_result_t fs_volume_capacity(uint8_t volume, uint32_t *sectors) {
     if (volume == 0) { *sectors = fs_get_total_sectors(); return FS_OK; }
 #if MCUJS_USB_SD_MSC
     if (volume == 1) {
-        LBA_t count = 0;
-        status = sd_host_result(disk_ioctl(1, GET_SECTOR_COUNT, &count));
-        if (status != FS_OK) return status;
-        if (!count) return FS_ERROR_UNSUPPORTED;
-#if FF_LBA64
-        if (count > UINT32_MAX) return FS_ERROR_UNSUPPORTED;
-#endif
-        *sectors = (uint32_t)count;
+        *sectors = s_sd_usb_sectors;
         return FS_OK;
     }
 #endif
@@ -691,6 +817,8 @@ static fs_result_t volume_transfer(uint8_t volume, uint32_t sector, uint32_t off
     if (volume == 1) {
         if (write && (disk_status(1) & STA_PROTECT)) return FS_ERROR_READ_ONLY;
         if (!size) return FS_OK;
+        /* Validated start + count fits the card and uint32_t; sector < count. */
+        sector += s_sd_usb_start;
         BYTE scratch[FS_SECTOR_SIZE];
         if (!write || offset || size != FS_SECTOR_SIZE) {
             result = sd_host_result(disk_read(1, scratch, sector, 1));

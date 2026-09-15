@@ -10,6 +10,7 @@ typedef enum { RES_OK, RES_ERROR, RES_WRPRT, RES_NOTRDY, RES_PARERR } DRESULT;
 #define CTRL_SYNC 0
 #define GET_SECTOR_COUNT 1
 DSTATUS disk_status(BYTE drive);
+DSTATUS disk_initialize(BYTE drive);
 DRESULT disk_ioctl(BYTE drive, BYTE cmd, void *buffer);
 DRESULT disk_read(BYTE drive, BYTE *buffer, LBA_t sector, UINT count);
 DRESULT disk_write(BYTE drive, const BYTE *buffer, LBA_t sector, UINT count);

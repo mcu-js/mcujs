@@ -33,6 +33,7 @@ typedef enum {
 
 typedef struct {
     DWORD csize;
+    DWORD volbase;
 } FATFS;
 
 typedef struct {

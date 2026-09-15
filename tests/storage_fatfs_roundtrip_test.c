@@ -16,6 +16,10 @@ static BYTE disks[2][SECTORS * 512u];
 static FATFS host_fs[2];
 static bool absent, fail_sync, fail_write, fixtures = true;
 static unsigned host_reads[2], host_writes[2];
+static uint32_t sd_volume_start;
+static bool malformed_tail;
+static unsigned tail_reads;
+static BYTE tail_mbr[512], tail_vbr[512];
 static const char sentinel[] = "pre-existing file: preserve these bytes\r\n";
 static const char app_source[] = "module.exports = 'copied at USB root, not app/app';\n";
 static BYTE asset[8193];
@@ -54,12 +58,22 @@ DSTATUS disk_status(BYTE d) { return d > 1 || (d == 1 && absent) ? STA_NOINIT : 
 DSTATUS disk_initialize(BYTE d) { return disk_status(d); }
 DRESULT disk_read(BYTE d, BYTE *b, LBA_t s, UINT n) {
     if (disk_status(d)) return RES_NOTRDY;
+    if (d == 1 && malformed_tail) {
+        assert(n == 1);
+        if (s == 0) memcpy(b, tail_mbr, 512);
+        else if (s == 8192) memcpy(b, tail_vbr, 512);
+        else { if (s == 62535679) tail_reads++; return RES_ERROR; }
+        return RES_OK;
+    }
+    /* Advertised raw card tail is deliberately inaccessible, like the issue. */
+    if (d == 1 && !fixtures) assert(s < SECTORS && n <= SECTORS - s);
     if (!b || !n || s >= SECTORS || n > SECTORS - s) return RES_PARERR;
     memcpy(b, disks[d] + s * 512u, n * 512u);
     return RES_OK;
 }
 DRESULT disk_write(BYTE d, const BYTE *b, LBA_t s, UINT n) {
     if (disk_status(d)) return RES_NOTRDY;
+    if (d == 1 && !fixtures) assert(s < SECTORS && n <= SECTORS - s);
     if (!b || !n || s >= SECTORS || n > SECTORS - s) return RES_PARERR;
     if (d == 1 && fail_write) return RES_ERROR;
     memcpy(disks[d] + s * 512u, b, n * 512u);
@@ -69,7 +83,7 @@ DRESULT disk_ioctl(BYTE d, BYTE c, void *b) {
     if (disk_status(d)) return RES_NOTRDY;
     switch (c) {
         case CTRL_SYNC: return d == 1 && fail_sync ? RES_ERROR : RES_OK;
-        case GET_SECTOR_COUNT: *(LBA_t *)b = SECTORS; return RES_OK;
+        case GET_SECTOR_COUNT: *(LBA_t *)b = d == 1 && malformed_tail ? 62535680 : SECTORS + (d == 1 && !fixtures ? 2 : 0); return RES_OK;
         case GET_SECTOR_SIZE: *(WORD *)b = 512; return RES_OK;
         case GET_BLOCK_SIZE: *(DWORD *)b = 1; return RES_OK;
         default: return RES_PARERR;
@@ -118,15 +132,17 @@ DRESULT host_disk_ioctl(BYTE d, BYTE c, void *b) {
     return RES_OK;
 }
 
-static void setup(void) {
+static void setup(bool partitioned) {
     BYTE work[512];
     MKFS_PARM options = {.fmt = FM_FAT | FM_SFD, .n_fat = 2, .n_root = 512};
     for (unsigned d = 0; d < 2; d++) {
         FATFS fs; FIL f; UINT n;
         char drive[] = "0:", path[] = "0:/KEEP.TXT";
         drive[0] += d; path[0] += d;
+        options.fmt = FM_FAT | (d == 1 && partitioned ? 0 : FM_SFD);
         assert(f_mkfs(drive, &options, work, sizeof(work)) == FR_OK);
         assert(f_mount(&fs, drive, 1) == FR_OK);
+        if (d == 1) sd_volume_start = fs.volbase;
         assert(f_setlabel(d ? "1:KEEP_SD" : "0:MCUJS") == FR_OK);
         assert(f_open(&f, path, FA_WRITE | FA_CREATE_NEW) == FR_OK);
         assert(f_write(&f, sentinel, sizeof(sentinel), &n) == FR_OK && n == sizeof(sentinel));
@@ -172,6 +188,15 @@ static void eject(unsigned d) {
 }
 static void roundtrip(void) {
     assert(usb_msc_expose());
+    uint32_t count = 0; uint16_t size = 0; BYTE boot[512];
+    tud_msc_capacity_cb(1, &count, &size);
+    assert(count == SECTORS - sd_volume_start && size == 512);
+    assert(tud_msc_read10_cb(1, 0, 0, boot, 512) == 512);
+    assert(!memcmp(boot, disks[1] + sd_volume_start * 512u, 512));
+    assert(tud_msc_read10_cb(1, count-1, 0, boot, 512) == 512);
+    assert(tud_msc_write10_cb(1, count-1, 0, boot, 512) == 512);
+    assert(tud_msc_read10_cb(1, count, 0, boot, 512) == -1);
+    assert(tud_msc_write10_cb(1, count, 0, boot, 512) == -1);
     mount_host(0); mount_host(1);
     assert(fs_exists("/app/KEEP.TXT") == FS_ERROR_BUSY);
     assert(fs_exists("/sd/KEEP.TXT") == FS_ERROR_BUSY);
@@ -213,6 +238,8 @@ static void roundtrip(void) {
     assert(host_reads[0] && host_reads[1] && host_writes[0] && host_writes[1]);
     printf("real FatFs copy/eject/device-read + device-write/load/host-read: PASS (app R/W %u/%u; SD %u/%u)\n",
            host_reads[0], host_writes[0], host_reads[1], host_writes[1]);
+    printf("real FatFs SD bounded %s export: PASS (start %u, count %u, raw inaccessible tail excluded)\n",
+           sd_volume_start ? "MBR" : "superfloppy", sd_volume_start, count);
 }
 static void fault(const char *scenario) {
     if (!strcmp(scenario, "absent")) absent = true;
@@ -262,8 +289,31 @@ static void fault(const char *scenario) {
     free(before);
     printf("real FatFs %s: PASS (peer available, SD preserved, no format/relabel)\n", scenario);
 }
+static void put16(BYTE *b, unsigned v) { b[0] = v; b[1] = v >> 8; }
+static void put32(BYTE *b, uint32_t v) { put16(b, v); put16(b+2, v >> 16); }
+static void malformed_first_tail(void) {
+    /* Real R0.16 rejects this otherwise valid FAT32 VBR without its type ID.
+     * Native autodetection must never reach the invalid later MBR entry. */
+    malformed_tail = true;
+    tail_mbr[450] = 0x0b; put32(tail_mbr+454, 8192); put32(tail_mbr+458, 62527486);
+    tail_mbr[466] = 0x0b; put32(tail_mbr+470, 62535679); put32(tail_mbr+474, 128);
+    put16(tail_mbr+510, 0xaa55);
+    tail_vbr[0] = 0xeb; put16(tail_vbr+11, 512); tail_vbr[13] = 64;
+    put16(tail_vbr+14, 32); tail_vbr[16] = 2;
+    put32(tail_vbr+32, 62527486); put32(tail_vbr+36, 7631); put32(tail_vbr+44, 2);
+    put16(tail_vbr+48, 1); put16(tail_vbr+50, 6); put16(tail_vbr+510, 0xaa55);
+    fs_result_t result = fs_volume_begin_host_access(1);
+    assert(tail_reads == 0 && "native FAT discovery read the physical tail");
+    assert(result == FS_ERROR_UNSUPPORTED && !fs_volume_host_owned(1));
+    /* Even with a recognizable first VBR, validate ALL later extents first. */
+    memcpy(tail_vbr+82, "FAT32   ", 8);
+    assert(fs_volume_begin_host_access(1) == FS_ERROR_UNSUPPORTED);
+    assert(tail_reads == 0 && !fs_volume_host_owned(1));
+    puts("real FatFs malformed-first/invalid-later MBR: PASS (no physical-tail I/O)");
+}
 int main(int argc, char **argv) {
-    assert(argc == 2); setup();
-    if (!strcmp(argv[1], "roundtrip")) roundtrip(); else fault(argv[1]);
+    assert(argc == 2); setup(!strcmp(argv[1], "roundtrip-mbr"));
+    if (!strcmp(argv[1], "malformed-tail")) malformed_first_tail();
+    else if (!strncmp(argv[1], "roundtrip", 9)) roundtrip(); else fault(argv[1]);
     return 0;
 }

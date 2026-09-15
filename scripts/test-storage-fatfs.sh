@@ -40,6 +40,6 @@ objcopy --redefine-syms="$TMP/host-symbols" "$TMP/device-ff.o" "$TMP/host-ff.o"
     "$ROOT/src/filesystem/fs.c" "$ROOT/src/usb/msc_ownership.c" \
     "$ROOT/platform/rp2/usb/usb_msc.c" "$TMP/ffunicode.c" \
     "$TMP/device-ff.o" "$TMP/host-ff.o" -Wl,--wrap=f_mkfs,--wrap=f_setlabel -o "$TMP/roundtrip"
-for scenario in roundtrip absent unsupported sync-fault write-fault remount-fault; do
+for scenario in malformed-tail roundtrip roundtrip-mbr absent unsupported sync-fault write-fault remount-fault; do
     "$TMP/roundtrip" "$scenario"
 done

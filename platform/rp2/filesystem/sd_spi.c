@@ -47,7 +47,8 @@ static void begin(unsigned duration) {
 
 static bool wait_hw(unsigned stage, uint64_t until) {
     for (unsigned i = 0; i < SD_BYTE_POLLS; ++i) {
-        if (time_us_64() >= until || time_us_64() >= deadline) return false;
+        uint64_t now = time_us_64();
+        if (now >= until || now >= deadline) return false;
         if ((stage == 0 && spi_is_writable(spi1)) ||
             (stage == 1 && spi_is_readable(spi1)) ||
             (stage == 2 && !spi_is_busy(spi1))) return true;
@@ -56,9 +57,10 @@ static bool wait_hw(unsigned stage, uint64_t until) {
 }
 
 static bool transfer(uint8_t tx, uint8_t *rx) {
-    if (!remaining || time_us_64() >= deadline) return false;
+    uint64_t now = time_us_64();
+    if (!remaining || now >= deadline) return false;
     --remaining;
-    uint64_t until = time_us_64() + SD_BYTE_US;
+    uint64_t until = now + SD_BYTE_US;
     if (!wait_hw(0, until)) return false;
     spi_get_hw(spi1)->dr = tx;
     if (!wait_hw(1, until)) return false;

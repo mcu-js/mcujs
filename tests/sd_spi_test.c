@@ -10,7 +10,7 @@ static spi_inst_t instance = {1};
 spi_inst_t *spi1 = &instance;
 static spi_hw_t hw;
 static uint64_t now;
-static unsigned transfers, polls, baud, packet_size, qhead, qtail, ncommands;
+static unsigned transfers, polls, baud, packet_size, qhead, qtail, ncommands, clock_reads;
 static unsigned commands[22000];
 static bool receiving_write;
 static unsigned write_pos, writes;
@@ -150,7 +150,7 @@ static uint8_t exchange(uint8_t tx) {
     }
     return 0xff;
 }
-uint64_t time_us_64(void) { if (!freeze_time) ++now; return now; }
+uint64_t time_us_64(void) { ++clock_reads; if (!freeze_time) ++now; return now; }
 void sleep_ms(uint ms) { if (!freeze_time) now += ms * 1000; }
 void gpio_init(uint pin) { assert(pin == MCUJS_SD_CS_PIN); }
 void gpio_set_dir(uint pin, bool output) { assert(pin == MCUJS_SD_CS_PIN && output); }
@@ -182,6 +182,7 @@ bool spi_is_readable(spi_inst_t *spi) {
 bool spi_is_busy(spi_inst_t *spi) { assert(spi==spi1); poll(); return stall == 3; }
 static void reset_mock(void) {
     now=0; transfers=polls=baud=packet_size=qhead=qtail=ncommands=init_attempts=0;
+    clock_reads=0;
     selected=absent=freeze_time=bad_echo=sdsc=crc_rejected=acmd_stuck=bad_csd_crc=false;
     stall=0; receiving_write=false; write_pos=writes=0;
     memcpy(csd, known_csd, sizeof(csd));
@@ -223,7 +224,11 @@ int main(void) {
     WORD size=0;
     assert(mcujs_sd_ioctl(GET_SECTOR_COUNT, &sectors) == RES_OK && sectors == 8388608);
     assert(mcujs_sd_ioctl(GET_SECTOR_SIZE, &size) == RES_OK && size == 512);
+    unsigned clocks_before=clock_reads, transfers_before=transfers;
     assert(mcujs_sd_read(data, 7, 2) == RES_OK);
+    /* Always-ready MMIO: one shared sample per polling stage, not separate
+     * clock reads for its byte and transaction deadlines. Allow command overhead. */
+    assert(clock_reads-clocks_before <= 5*(transfers-transfers_before));
     for (unsigned i=0; i<512; ++i) assert(data[i] == 0xff && data[i+512] == 0);
     assert(!selected);
     assert(mcujs_sd_write(data, 7, 2) == RES_OK);

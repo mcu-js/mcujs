@@ -29,6 +29,9 @@
 #define SD_TRANSFER_LIMIT 300000u
 #define SD_READY_US 500000u
 #define SD_TOKEN_US 200000u
+#ifndef MCUJS_SD_SPI_BAUD_HZ
+#define MCUJS_SD_SPI_BAUD_HZ 5000000u
+#endif
 
 static DSTATUS status = STA_NOINIT;
 static LBA_t sector_count;
@@ -310,7 +313,7 @@ DSTATUS mcujs_sd_initialize(void) {
         !read_data(mounted_cid, sizeof(mounted_cid))) goto error;
     sector_count = (LBA_t)sectors;
     if (!release()) goto error;
-    spi_set_baudrate(spi1, 5000000);
+    spi_set_baudrate(spi1, MCUJS_SD_SPI_BAUD_HZ);
     status = (csd[14] & 0x30) ? STA_PROTECT : 0;
     return status;
 error:

@@ -182,8 +182,12 @@ void gpio_set_function(uint pin, uint function) {
     assert(pin == MCUJS_SD_SCK_PIN || pin == MCUJS_SD_MOSI_PIN || pin == MCUJS_SD_MISO_PIN);
 }
 void gpio_pull_up(uint pin) { assert(pin == MCUJS_SD_MISO_PIN); }
-uint spi_init(spi_inst_t *spi, uint value) { assert(spi == spi1); baud=value; return value; }
-uint spi_set_baudrate(spi_inst_t *spi, uint value) { assert(spi == spi1); baud=value; return value; }
+uint spi_init(spi_inst_t *spi, uint value) { assert(spi == spi1 && value==400000); baud=value; return value; }
+uint spi_set_baudrate(spi_inst_t *spi, uint value) {
+    assert(spi==spi1 && baud==400000 && value==MCUJS_SD_SPI_BAUD_HZ);
+    assert(!selected && ncommands && commands[ncommands-1]==10);
+    baud=value; return value;
+}
 void spi_deinit(spi_inst_t *spi) { assert(spi == spi1); rx_count=rx_head=0; pending_write=write_armed=false; }
 void spi_set_format(spi_inst_t *spi, uint bits, int cpol, int cpha, int order) {
     assert(spi==spi1 && bits==8 && cpol==0 && cpha==0 && order==SPI_MSB_FIRST);
@@ -265,7 +269,7 @@ int main(void) {
     reset_mock();
     assert(mcujs_sd_initialize() == 0);
     assert(mcujs_sd_status() == 0);
-    assert(baud == 5000000 && !selected);
+    assert(baud == MCUJS_SD_SPI_BAUD_HZ && !selected);
     const unsigned expected[] = {0,8,59,55,41,55,41,55,41,58,9,10};
     assert(ncommands == sizeof(expected)/sizeof(expected[0]));
     assert(memcmp(commands, expected, sizeof(expected)) == 0);

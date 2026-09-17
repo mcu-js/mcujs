@@ -66,6 +66,11 @@
  * Verified against Waveshare RP2350-LCD-1.47 Python/02-SD/boot.py. */
 #define MCUJS_HAS_SD            1
 #define MCUJS_SD_SPI_BUS        1
+/* Below the ~20 MHz SPI setting in Waveshare's supplied FatFs example.
+ * 5 MHz cannot finish macOS FSKit's full FAT scan within its mount deadline. */
+#ifndef MCUJS_SD_SPI_BAUD_HZ
+#define MCUJS_SD_SPI_BAUD_HZ     10000000u
+#endif
 #define MCUJS_SD_SCK_PIN        10
 #define MCUJS_SD_MOSI_PIN       11
 #define MCUJS_SD_MISO_PIN       12

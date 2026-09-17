@@ -28,6 +28,7 @@ static uint16_t csd_crc;
 static unsigned cases;
 static uint8_t rx_fifo[8];
 static unsigned rx_head, rx_count, max_rx_count, rx_delay, rx_polls, payload_stall;
+static unsigned payload_bytes, payload_tx_polls, payload_tx_delay, payload_tick;
 static bool write_armed, pending_write, payload_phase, patterned_read;
 static uint16_t reference_crc16(const uint8_t *data, unsigned n) {
     static const uint16_t table[16] = {0,0x1021,0x2042,0x3063,0x4084,0x50a5,0x60c6,0x70e7,
@@ -130,8 +131,10 @@ static uint8_t exchange(uint8_t tx) {
     if (!selected || absent) return 0xff;
     if (busy_forever) return 0;
     if (qhead < qtail) {
-        if (ncommands && commands[ncommands-1] == 17 && qtail-qhead == 514)
+        if (ncommands && commands[ncommands-1] == 17 && qtail-qhead >= 3 && qtail-qhead <= 514) {
             payload_phase = true;
+            ++payload_bytes;
+        }
         uint8_t rx = queue[qhead++];
         if (qhead == qtail) qhead = qtail = 0;
         return rx;
@@ -161,7 +164,11 @@ static uint8_t exchange(uint8_t tx) {
     }
     return 0xff;
 }
-uint64_t time_us_64(void) { ++clock_reads; if (!freeze_time) ++now; return now; }
+uint64_t time_us_64(void) {
+    ++clock_reads;
+    if (!freeze_time) now += payload_phase && payload_tick ? payload_tick : 1;
+    return now;
+}
 void sleep_ms(uint ms) { if (!freeze_time) now += ms * 1000; }
 void gpio_init(uint pin) { assert(pin == MCUJS_SD_CS_PIN); }
 void gpio_set_dir(uint pin, bool output) { assert(pin == MCUJS_SD_CS_PIN && output); }
@@ -203,23 +210,28 @@ static void poll(void) { ++polls; assert(polls < 3000000); }
 bool spi_is_writable(spi_inst_t *spi) {
     assert(spi==spi1); flush_hw_write(); poll();
     write_armed=stall!=1 && !(payload_stall==1 && in_payload());
+    if (in_payload()) {
+        ++payload_tx_polls;
+        if (payload_tx_delay && payload_tx_polls%payload_tx_delay==0) write_armed=false;
+    }
     return write_armed;
 }
 bool spi_is_readable(spi_inst_t *spi) {
     assert(spi==spi1); flush_hw_write(); poll();
-    if (stall==2 || (payload_stall==2 && in_payload()) || !rx_count) return false;
+    if (stall==2 || (payload_stall==2 && payload_phase) || !rx_count) return false;
     if (rx_delay && in_payload() && rx_count<8 && ++rx_polls%rx_delay) return false;
     hw.dr=rx_fifo[rx_head];rx_head=(rx_head+1)%8;--rx_count;
     return true;
 }
 bool spi_is_busy(spi_inst_t *spi) {
     assert(spi==spi1); flush_hw_write(); poll();
-    return stall==3 || (payload_stall==3 && in_payload());
+    return stall==3 || (payload_stall==3 && payload_phase);
 }
 static void reset_mock(void) {
     now=0; transfers=polls=baud=packet_size=qhead=qtail=ncommands=init_attempts=0;
     clock_reads=0;
     rx_head=rx_count=max_rx_count=rx_delay=rx_polls=payload_stall=0;
+    payload_bytes=payload_tx_polls=payload_tx_delay=payload_tick=0;
     write_armed=pending_write=payload_phase=patterned_read=false;
     selected=absent=freeze_time=bad_echo=sdsc=crc_rejected=acmd_stuck=bad_csd_crc=false;
     stall=0; receiving_write=false; write_pos=writes=0;
@@ -275,7 +287,7 @@ int main(void) {
     assert(mcujs_sd_ioctl(CTRL_SYNC, NULL) == RES_OK);
     ++cases;
     /* FIFO backpressure reaches all eight entries without losing byte order. */
-    init_ok(); rx_delay=16; patterned_read=true;
+    init_ok(); rx_delay=16; patterned_read=true; payload_tx_delay=3;
     assert(mcujs_sd_read(data, 7, 2)==RES_OK);
     assert(max_rx_count==8 && rx_count==0 && !pending_write);
     for (unsigned i=0;i<512;i++) assert(data[i]==(uint8_t)(i*73+7) && data[i+512]==(uint8_t)(i*73+8));
@@ -284,9 +296,16 @@ int main(void) {
         for (unsigned stage=1;stage<=3;stage++) {
             init_ok(); freeze_time=frozen; payload_stall=stage;
             failed_io(mcujs_sd_read(data,7,1));
+            assert(payload_tx_polls>0);
+            assert(payload_bytes==(stage==1 ? 0u : stage==2 ? 8u : 512u));
             assert(rx_count==0 && !pending_write); /* Fault deinitializes FIFO. */
         }
     }
+    /* Progress just inside the no-progress deadline must not extend the
+     * enclosing one-second transaction deadline. */
+    init_ok(); payload_tick=1990;
+    failed_io(mcujs_sd_read(data,7,1));
+    assert(payload_bytes>400 && payload_bytes<512);
     init_ok();
     /* Invalid calls must not send a byte or invalidate a healthy card. */
     unsigned before=transfers;

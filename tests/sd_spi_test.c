@@ -26,6 +26,9 @@ static uint8_t read_token, acceptance, status_r2;
 static unsigned rejected_command;
 static uint16_t csd_crc;
 static unsigned cases;
+static uint8_t rx_fifo[8];
+static unsigned rx_head, rx_count, max_rx_count, rx_delay, rx_polls, payload_stall;
+static bool write_armed, pending_write, payload_phase, patterned_read;
 static uint16_t reference_crc16(const uint8_t *data, unsigned n) {
     static const uint16_t table[16] = {0,0x1021,0x2042,0x3063,0x4084,0x50a5,0x60c6,0x70e7,
         0x8108,0x9129,0xa14a,0xb16b,0xc18c,0xd1ad,0xe1ce,0xf1ef};
@@ -101,6 +104,12 @@ static void reply_command(void) {
         if (missing_token) break;
         push(read_token);
         if (read_token != 0xfe) break;
+        if (patterned_read) {
+            uint8_t bytes[512];
+            for (unsigned i=0;i<512;i++) { bytes[i]=(uint8_t)(i*73+arg); push(bytes[i]); }
+            uint16_t crc=reference_crc16(bytes,512);push(crc>>8);push(crc&255);
+            break;
+        }
         for (unsigned i=0; i<512; ++i) push(arg == 8 ? 0 : 0xff);
         push(arg == 8 ? 0 : 0x7f); push((arg == 8 ? 0 : 0xa1) ^ (bad_read_crc ? 1 : 0)); break;
     case 24:
@@ -121,6 +130,8 @@ static uint8_t exchange(uint8_t tx) {
     if (!selected || absent) return 0xff;
     if (busy_forever) return 0;
     if (qhead < qtail) {
+        if (ncommands && commands[ncommands-1] == 17 && qtail-qhead == 514)
+            payload_phase = true;
         uint8_t rx = queue[qhead++];
         if (qhead == qtail) qhead = qtail = 0;
         return rx;
@@ -157,7 +168,7 @@ void gpio_set_dir(uint pin, bool output) { assert(pin == MCUJS_SD_CS_PIN && outp
 void gpio_put(uint pin, bool value) {
     assert(pin == MCUJS_SD_CS_PIN);
     selected = !value;
-    if (value) { packet_size = qhead = qtail = 0; }
+    if (value) { packet_size = qhead = qtail = 0; payload_phase = false; }
 }
 void gpio_set_function(uint pin, uint function) {
     assert(function == GPIO_FUNC_SPI);
@@ -166,23 +177,50 @@ void gpio_set_function(uint pin, uint function) {
 void gpio_pull_up(uint pin) { assert(pin == MCUJS_SD_MISO_PIN); }
 uint spi_init(spi_inst_t *spi, uint value) { assert(spi == spi1); baud=value; return value; }
 uint spi_set_baudrate(spi_inst_t *spi, uint value) { assert(spi == spi1); baud=value; return value; }
-void spi_deinit(spi_inst_t *spi) { assert(spi == spi1); }
+void spi_deinit(spi_inst_t *spi) { assert(spi == spi1); rx_count=rx_head=0; pending_write=write_armed=false; }
 void spi_set_format(spi_inst_t *spi, uint bits, int cpol, int cpha, int order) {
     assert(spi==spi1 && bits==8 && cpol==0 && cpha==0 && order==SPI_MSB_FIRST);
 }
-spi_hw_t *spi_get_hw(spi_inst_t *spi) { assert(spi==spi1); return &hw; }
+spi_hw_t *spi_get_hw(spi_inst_t *spi) {
+    assert(spi==spi1);
+    if (write_armed) { assert(!pending_write); pending_write=true; write_armed=false; }
+    return &hw;
+}
+/* Capture the production register store at its next MMIO poll. Delay exposing
+ * RX to exercise multiple outstanding bytes, not just immediate byte exchange. */
+static void flush_hw_write(void) {
+    if (!pending_write) return;
+    pending_write=false;
+    uint8_t value=exchange((uint8_t)hw.dr);
+    if (rx_count == 8) { assert(!selected); return; } /* Fault cleanup only. */
+    rx_fifo[(rx_head+rx_count)%8]=value;
+    if (++rx_count > max_rx_count) max_rx_count=rx_count;
+}
+static bool in_payload(void) {
+    return payload_phase || (ncommands && commands[ncommands-1]==17 && qtail-qhead==514);
+}
 static void poll(void) { ++polls; assert(polls < 3000000); }
-bool spi_is_writable(spi_inst_t *spi) { assert(spi==spi1); poll(); return stall != 1; }
+bool spi_is_writable(spi_inst_t *spi) {
+    assert(spi==spi1); flush_hw_write(); poll();
+    write_armed=stall!=1 && !(payload_stall==1 && in_payload());
+    return write_armed;
+}
 bool spi_is_readable(spi_inst_t *spi) {
-    assert(spi==spi1); poll();
-    if (stall == 2) return false;
-    hw.dr = exchange((uint8_t)hw.dr);
+    assert(spi==spi1); flush_hw_write(); poll();
+    if (stall==2 || (payload_stall==2 && in_payload()) || !rx_count) return false;
+    if (rx_delay && in_payload() && rx_count<8 && ++rx_polls%rx_delay) return false;
+    hw.dr=rx_fifo[rx_head];rx_head=(rx_head+1)%8;--rx_count;
     return true;
 }
-bool spi_is_busy(spi_inst_t *spi) { assert(spi==spi1); poll(); return stall == 3; }
+bool spi_is_busy(spi_inst_t *spi) {
+    assert(spi==spi1); flush_hw_write(); poll();
+    return stall==3 || (payload_stall==3 && in_payload());
+}
 static void reset_mock(void) {
     now=0; transfers=polls=baud=packet_size=qhead=qtail=ncommands=init_attempts=0;
     clock_reads=0;
+    rx_head=rx_count=max_rx_count=rx_delay=rx_polls=payload_stall=0;
+    write_armed=pending_write=payload_phase=patterned_read=false;
     selected=absent=freeze_time=bad_echo=sdsc=crc_rejected=acmd_stuck=bad_csd_crc=false;
     stall=0; receiving_write=false; write_pos=writes=0;
     memcpy(csd, known_csd, sizeof(csd));
@@ -236,6 +274,20 @@ int main(void) {
     assert(commands[ncommands-1] == 13);
     assert(mcujs_sd_ioctl(CTRL_SYNC, NULL) == RES_OK);
     ++cases;
+    /* FIFO backpressure reaches all eight entries without losing byte order. */
+    init_ok(); rx_delay=16; patterned_read=true;
+    assert(mcujs_sd_read(data, 7, 2)==RES_OK);
+    assert(max_rx_count==8 && rx_count==0 && !pending_write);
+    for (unsigned i=0;i<512;i++) assert(data[i]==(uint8_t)(i*73+7) && data[i+512]==(uint8_t)(i*73+8));
+    ++cases;
+    for (unsigned frozen=0;frozen<2;frozen++) {
+        for (unsigned stage=1;stage<=3;stage++) {
+            init_ok(); freeze_time=frozen; payload_stall=stage;
+            failed_io(mcujs_sd_read(data,7,1));
+            assert(rx_count==0 && !pending_write); /* Fault deinitializes FIFO. */
+        }
+    }
+    init_ok();
     /* Invalid calls must not send a byte or invalidate a healthy card. */
     unsigned before=transfers;
     assert(mcujs_sd_read(NULL, 7, 1) == RES_PARERR);

@@ -43,6 +43,8 @@ cc -std=gnu17 -Wall -Wextra -Werror -DMCUJS_HAS_SD=1 -DMCUJS_USB_SD_MSC=1 -DMCUJ
 "${TMP_ROOT}/dual-msc-test" sd-malformed
 "${TMP_ROOT}/dual-msc-test" sd-bounds
 "${TMP_ROOT}/dual-msc-test" dual
+"${TMP_ROOT}/dual-msc-test" sd-read-checks
+"${TMP_ROOT}/dual-msc-test" sd-sync-checks
 
 cc -std=gnu17 -Wall -Wextra -Werror \
     -I"${ROOT}/tests/native_stubs/usb" \

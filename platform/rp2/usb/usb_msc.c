@@ -148,6 +148,11 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16
 }
 bool tud_msc_test_unit_ready_cb(uint8_t lun) {
     if (!ready(lun)) return false;
+#if MCUJS_USB_SD_MSC
+    /* No card-detect pin: TUR is an active CID/status probe, unlike the
+     * cached readiness gates on each data callback. */
+    if (lun == 1 && !sync_volume(lun)) return false;
+#endif
     unsigned state = s_volumes[lun].media_state;
     if (!state) return true;
     s_volumes[lun].media_state = state == 3 ? 0 : state + 1;
@@ -163,7 +168,7 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t *block_count, uint16_t *block_siz
 bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start, bool load_eject) {
     (void)power_condition;
     if (!valid_lun(lun) || !s_started) return false;
-    if (!load_eject) return start ? ready(lun) : sync_volume(lun);
+    if (!load_eject) return start && lun == 0 ? ready(lun) : sync_volume(lun);
     volume_t *volume = &s_volumes[lun];
     if (start) {
         if (atomic_load(&volume->ownership.owner_request) == MCUJS_MSC_OWNER_REQUEST_DEVICE)

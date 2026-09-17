@@ -336,6 +336,49 @@ static void test_dual_msc(void) {
     assert(s_format_calls == 0);
     puts("dual RP2 MSC / filesystem ownership: PASS");
 }
+/* One driver read already checks CID and CRC. Readiness/capacity queries
+ * must not add CTRL_SYNC transactions to every 512-byte data callback. */
+static void test_sd_io_checks(bool sync_fault) {
+    sd_fixture(true);
+    assert(fs_init() == FS_OK);
+    usb_msc_init();
+    assert(usb_msc_expose());
+    uint8_t data[512], command[16] = {0x35};
+    uint32_t count;
+    unsigned syncs = sd_syncs, reads = sd_reads;
+    assert(tud_msc_read10_cb(1, 1, 0, data, sizeof(data)) == 512);
+    assert(sd_reads == reads + 1 && sd_syncs == syncs);
+    assert(fs_volume_capacity(1, &count) == FS_OK && count == sd_length);
+    assert(tud_msc_is_writable_cb(1));
+    assert(sd_syncs == syncs);
+    assert(tud_msc_test_unit_ready_cb(1));
+    assert(sd_syncs == ++syncs);
+    assert(tud_msc_scsi_cb(1, command, NULL, 0) == 0);
+    assert(sd_syncs == ++syncs);
+    assert(tud_msc_start_stop_cb(1, 0, false, false));
+    assert(sd_syncs == ++syncs);
+    assert(tud_msc_start_stop_cb(1, 0, true, false));
+    assert(sd_syncs == ++syncs);
+    if (sync_fault) {
+        sd_sync_result = RES_ERROR;
+        assert(!tud_msc_test_unit_ready_cb(1));
+        assert(sd_syncs == ++syncs);
+        sd_sync_result = RES_OK;
+    } else {
+        sd_read_result = RES_NOTRDY;
+        assert(tud_msc_read10_cb(1, 1, 0, data, sizeof(data)) == -1);
+        sd_read_result = RES_OK;
+    }
+    /* Failure remains fenced even if the next transaction would succeed. */
+    reads = sd_reads;
+    assert(tud_msc_read10_cb(1, 1, 0, data, sizeof(data)) == -1);
+    assert(!tud_msc_test_unit_ready_cb(1));
+    assert(!tud_msc_start_stop_cb(1, 0, false, true));
+    assert(sd_reads == reads && sd_syncs == syncs);
+    assert(tud_msc_test_unit_ready_cb(0));
+    assert(fs_volume_host_owned(1) && s_format_calls == 0 && sd_writes == 0);
+    puts("SD data-path sync budget, explicit probes, fault fence and peer isolation: PASS");
+}
 static void test_sd_bounds(void) {
     assert(fs_init() == FS_OK);
     for (unsigned layout = 0; layout < 9; layout++) {
@@ -714,6 +757,8 @@ static void test_sd_write_failures(void) {
 int main(int argc, char **argv) {
     assert(argc == 2);
 #ifdef MCUJS_TEST_DUAL_MSC
+    if (!strcmp(argv[1], "sd-read-checks")) { test_sd_io_checks(false); return 0; }
+    if (!strcmp(argv[1], "sd-sync-checks")) { test_sd_io_checks(true); return 0; }
     if (!strcmp(argv[1], "sd-malformed")) { test_sd_malformed(); return 0; }
     if (!strcmp(argv[1], "sd-bounds")) { test_sd_bounds(); return 0; }
     if (!strcmp(argv[1], "dual")) { test_dual_msc(); return 0; }

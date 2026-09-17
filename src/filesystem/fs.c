@@ -767,7 +767,10 @@ fs_result_t fs_volume_msc_status(uint8_t volume) {
 #if MCUJS_USB_SD_MSC
     if (volume == 1) {
         if (s_sd_fault != FS_OK) return s_sd_fault;
-        return sd_host_result(disk_ioctl(1, CTRL_SYNC, NULL));
+        /* Cheap lease state only. Each driver read/write validates CID and
+         * CRC; probing here duplicates wire transactions for every USB chunk.
+         * Explicit readiness probes and sync/eject use msc_sync below. */
+        return (disk_status(1) & STA_NOINIT) ? sd_host_result(RES_NOTRDY) : FS_OK;
     }
 #endif
     return volume == 0 ? FS_OK : FS_ERROR_UNSUPPORTED;
@@ -775,7 +778,12 @@ fs_result_t fs_volume_msc_status(uint8_t volume) {
 
 fs_result_t fs_volume_msc_sync(uint8_t volume) {
     if (volume == 0) return fs_msc_sync();
-    return fs_volume_msc_status(volume);
+    fs_result_t result = fs_volume_msc_status(volume);
+    if (result != FS_OK) return result;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) return sd_host_result(disk_ioctl(1, CTRL_SYNC, NULL));
+#endif
+    return FS_ERROR_UNSUPPORTED;
 }
 
 fs_result_t fs_volume_capacity(uint8_t volume, uint32_t *sectors) {

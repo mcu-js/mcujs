@@ -121,6 +121,7 @@ fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
 fs_result_t fs_volume_begin_host_access(uint8_t volume);
 fs_result_t fs_volume_end_host_access(uint8_t volume);
 bool fs_volume_host_owned(uint8_t volume);
+/* RP2 SD: cached lease/fault state; msc_sync also probes live card identity/status. */
 fs_result_t fs_volume_msc_status(uint8_t volume);
 fs_result_t fs_volume_msc_sync(uint8_t volume);
 fs_result_t fs_volume_capacity(uint8_t volume, uint32_t *sectors);

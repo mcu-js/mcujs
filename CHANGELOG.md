@@ -18,9 +18,18 @@ All notable changes to mcujs will be documented in this file.
 - Add real FatFs host/device copy, malformed-partition and preservation tests.
   Linux command-line USB/native round trips, independent-volume ownership and
   reset persistence passed on physical 1.47-A firmware `85fe358`, including a
-  1 MiB host copy and 4 KiB native binary write. File-manager UI, macOS/Windows,
+  1 MiB host copy and 4 KiB native binary write. File-manager UI, Windows,
   hot-swap and power-loss qualification remain open. This does not alter the
   frozen RC or authorize reflashing.
+- Fix macOS FSKit automount of large FAT32 SD volumes on the 1.47-A: remove
+  redundant data-path probes, use bounded SPI FIFO reads, and set this board's
+  post-initialization SD clock target to 10 MHz. Keep 400 kHz initialization,
+  CRC/card-identity checks, finite deadlines and other boards' 5 MHz default.
+  Physical firmware `bf7bb13` automatically mounted both volumes through FSKit,
+  with writable SD, preserved user-file hashes and zero device I/O errors;
+  safe eject/software reset repeated the mount in 16.261 seconds. No formatting
+  or card-layout change was part of this fix; cold-power and hot-swap tests
+  remain unqualified.
 
 ## [0.2.0-rc.1] — candidate preparation (unpublished)
 

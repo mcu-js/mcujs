@@ -29,6 +29,9 @@
 #define SD_TRANSFER_LIMIT 300000u
 #define SD_READY_US 500000u
 #define SD_TOKEN_US 200000u
+#ifndef MCUJS_SD_SPI_BAUD_HZ
+#define MCUJS_SD_SPI_BAUD_HZ 5000000u
+#endif
 
 static DSTATUS status = STA_NOINIT;
 static LBA_t sector_count;
@@ -47,7 +50,8 @@ static void begin(unsigned duration) {
 
 static bool wait_hw(unsigned stage, uint64_t until) {
     for (unsigned i = 0; i < SD_BYTE_POLLS; ++i) {
-        if (time_us_64() >= until || time_us_64() >= deadline) return false;
+        uint64_t now = time_us_64();
+        if (now >= until || now >= deadline) return false;
         if ((stage == 0 && spi_is_writable(spi1)) ||
             (stage == 1 && spi_is_readable(spi1)) ||
             (stage == 2 && !spi_is_busy(spi1))) return true;
@@ -56,9 +60,10 @@ static bool wait_hw(unsigned stage, uint64_t until) {
 }
 
 static bool transfer(uint8_t tx, uint8_t *rx) {
-    if (!remaining || time_us_64() >= deadline) return false;
+    uint64_t now = time_us_64();
+    if (!remaining || now >= deadline) return false;
     --remaining;
-    uint64_t until = time_us_64() + SD_BYTE_US;
+    uint64_t until = now + SD_BYTE_US;
     if (!wait_hw(0, until)) return false;
     spi_get_hw(spi1)->dr = tx;
     if (!wait_hw(1, until)) return false;
@@ -139,6 +144,32 @@ static bool command(uint8_t cmd, uint32_t arg, uint8_t *r1) {
     return false;
 }
 
+/* Pico SDK's eight-entry full-duplex FIFO pattern, with our transaction,
+ * no-progress and byte bounds. Keep at most eight unread bytes in flight.
+ * Unlike spi_read_blocking, this cannot wait forever on a stalled peripheral. */
+static bool receive_payload(uint8_t *buffer, unsigned length) {
+    unsigned sent = 0, received = 0, polls = 0;
+    uint64_t until = time_us_64() + SD_BYTE_US;
+    while (received < length) {
+        uint64_t now = time_us_64();
+        if (now >= deadline || now >= until || polls++ >= SD_BYTE_POLLS) return false;
+        bool progress = false;
+        if (sent < length && sent - received < 8 && spi_is_writable(spi1)) {
+            if (!remaining) return false;
+            --remaining;
+            spi_get_hw(spi1)->dr = 0xff;
+            ++sent;
+            progress = true;
+        }
+        if (received < sent && spi_is_readable(spi1)) {
+            buffer[received++] = (uint8_t)spi_get_hw(spi1)->dr;
+            progress = true;
+        }
+        if (progress) { polls = 0; until = now + SD_BYTE_US; }
+    }
+    return wait_hw(2, until);
+}
+
 static bool read_data(uint8_t *buffer, unsigned length) {
     uint64_t until = time_us_64() + SD_TOKEN_US;
     uint8_t token = 0xff;
@@ -147,8 +178,7 @@ static bool read_data(uint8_t *buffer, unsigned length) {
         if (token != 0xff) break;
     }
     if (token != 0xfe) return false; /* Includes card data-error tokens. */
-    for (unsigned i = 0; i < length; ++i)
-        if (!receive(&buffer[i])) return false;
+    if (!receive_payload(buffer, length)) return false;
     uint8_t high, low;
     if (!receive(&high) || !receive(&low)) return false;
     return crc16(buffer, length) == (uint16_t)((high << 8) | low);
@@ -283,7 +313,7 @@ DSTATUS mcujs_sd_initialize(void) {
         !read_data(mounted_cid, sizeof(mounted_cid))) goto error;
     sector_count = (LBA_t)sectors;
     if (!release()) goto error;
-    spi_set_baudrate(spi1, 5000000);
+    spi_set_baudrate(spi1, MCUJS_SD_SPI_BAUD_HZ);
     status = (csd[14] & 0x30) ? STA_PROTECT : 0;
     return status;
 error:

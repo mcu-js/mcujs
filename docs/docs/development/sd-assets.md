@@ -141,10 +141,28 @@ SD USB capacity is the validated FAT volume, exported with logical sector zero
 at its boot sector. It is not raw whole-card access. Every partition location
 native FatFs could scan is checked before mount, including after host eject.
 
-File-manager UI behavior on Linux/macOS/Windows, macOS/Windows host acceptance,
-throughput benchmarking, live hot-swap and interrupted-power behavior remain
-**NOT_RUN**. This bounded Linux test is not all-platform or release-candidate
-qualification. Earlier asset evidence below predates USB SD export.
+Physical 1.47-A firmware `bf7bb131ebf9bbf414552e0b58ec490feca037f1` also passed
+bounded macOS FSKit acceptance: both app and SD mounted automatically, SD was
+writable, and safe eject/software reset repeated the automatic mount in
+16.261 seconds. File inventories covered 21 app and 141 SD entries; user-file
+hashes were preserved, excluding expected Spotlight/fseventsd housekeeping
+changes. Firmware readback and exact app/EEPROM preservation were verified;
+both LUNs reported zero device read/write errors and retries.
+
+The previous firmware transferred the mount-time FAT scan steadily at about
+164 KiB/s without device errors, needing about 23 seconds for this card's FAT.
+FSKit initiated unload after 20 seconds, followed by the read error. Bounded
+FIFO reads and a board-specific 10 MHz target (below the manufacturer's supplied
+SPI example) let the scan complete. Initialization stays at 400 kHz; other
+boards keep the 5 MHz default. This fix does not modify card metadata or format
+the card. A `F_NOCACHE` file read may still be FSKit-cached and is not, by itself,
+a physical USB throughput measurement.
+
+File-manager drag/drop UI, formal Windows host acceptance, live hot-swap and
+interrupted-power behavior remain **NOT_RUN**. The macOS repeat used software
+reset, not physical power removal. These bounded tests are not all-platform or
+release-candidate qualification. Earlier asset evidence below predates USB SD
+export.
 
 ## Evidence required for the asset demonstration
 

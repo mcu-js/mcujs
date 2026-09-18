@@ -15,11 +15,11 @@
 
 typedef struct {
     mcujs_msc_ownership_t ownership;
-    fs_result_t error;
-    bool ejected, prevent_removal, fault;
+    _Atomic fs_result_t error;
+    atomic_bool ejected, prevent_removal, fault;
 } volume_t;
 static volume_t s_volumes[VOLUME_COUNT];
-static bool s_started;
+static atomic_bool s_started;
 static uint8_t id(void *v) { return (uint8_t)((volume_t *)v - s_volumes); }
 static fs_result_t claim(void *v) {
     return ((volume_t *)v)->error = fs_volume_begin_host_access(id(v));
@@ -34,7 +34,13 @@ static mcujs_msc_ownership_hooks_t hooks(uint8_t lun) {
 void mcujs_usb_msc_init(void) {
     s_started = false;
     memset(s_volumes, 0, sizeof(s_volumes));
-    for (unsigned i = 0; i < VOLUME_COUNT; i++) mcujs_msc_ownership_init(&s_volumes[i].ownership);
+    for (unsigned i = 0; i < VOLUME_COUNT; i++) {
+        mcujs_msc_ownership_init(&s_volumes[i].ownership);
+        atomic_init(&s_volumes[i].error, FS_OK);
+        atomic_init(&s_volumes[i].ejected, false);
+        atomic_init(&s_volumes[i].prevent_removal, false);
+        atomic_init(&s_volumes[i].fault, false);
+    }
 }
 void mcujs_usb_msc_task(void) {
     if (!s_started) return;
@@ -90,14 +96,16 @@ static bool result(uint8_t lun, fs_result_t r, bool write) {
     }
     return false;
 }
+static void fence(uint8_t lun, fs_result_t r) {
+    volume_t *v = &s_volumes[lun];
+    v->error = r;
+    v->fault = true;
+    atomic_store(&v->ownership.media_ready, false);
+    atomic_store(&v->ownership.owner_request, MCUJS_MSC_OWNER_REQUEST_NONE);
+}
 static bool storage_result(uint8_t lun, fs_result_t r, bool write) {
-    if (r != FS_OK && r != FS_ERROR_BUSY && r != FS_ERROR_INVALID && r != FS_ERROR_READ_ONLY) {
-        volume_t *v = &s_volumes[lun];
-        v->error = r;
-        v->fault = true;
-        atomic_store(&v->ownership.media_ready, false);
-        atomic_store(&v->ownership.owner_request, MCUJS_MSC_OWNER_REQUEST_NONE);
-    }
+    if (r != FS_OK && r != FS_ERROR_BUSY && r != FS_ERROR_INVALID && r != FS_ERROR_READ_ONLY)
+        fence(lun, r);
     return result(lun, r, write);
 }
 static bool ready(uint8_t lun) {
@@ -115,6 +123,7 @@ static bool begin_io(uint8_t lun) {
 static bool sync_volume(uint8_t lun) {
     if (!begin_io(lun)) return false;
     fs_result_t r = fs_volume_msc_sync(lun);
+    if (r != FS_OK) fence(lun, r);
     mcujs_msc_ownership_end_io(&s_volumes[lun].ownership);
     return storage_result(lun, r, true);
 }
@@ -182,10 +191,14 @@ static int32_t transfer(uint8_t lun, uint32_t lba, uint32_t offset, void *buffer
         uint32_t chunk = block - offset;
         if (chunk > left) chunk = left;
         r = write ? fs_volume_write_sector(lun, lba, offset, p, chunk) : fs_volume_read_sector(lun, lba, offset, p, chunk);
+        if (write && r != FS_OK) fence(lun, r);
         p += chunk; left -= chunk; lba++; offset = 0;
     }
     /* Fail this WRITE10, not a later void completion, if durability fails. */
-    if (r == FS_OK && write) r = fs_volume_msc_sync(lun);
+    if (r == FS_OK && write) {
+        r = fs_volume_msc_sync(lun);
+        if (r != FS_OK) fence(lun, r);
+    }
     mcujs_msc_ownership_end_io(&s_volumes[lun].ownership);
     return storage_result(lun, r, write) ? (int32_t)size : -1;
 }

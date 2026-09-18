@@ -114,5 +114,10 @@ int main(void) {
     reset(); assert(mcujs_usb_msc_expose()); sync_error[1] = FS_ERROR_IO;
     assert(tud_msc_scsi_cb(1, cmd, NULL, 0) == -1);
     assert(!tud_msc_is_writable_cb(1) && tud_msc_test_unit_ready_cb(0));
+    reset(); assert(mcujs_usb_msc_expose()); sync_error[1] = FS_ERROR_BUSY;
+    assert(tud_msc_write10_cb(1, 0, 0, input, 1) == -1);
+    sync_error[1] = FS_OK;
+    assert(!tud_msc_test_unit_ready_cb(1) && tud_msc_test_unit_ready_cb(0));
+    mcujs_usb_msc_task(); assert(host[1]);
     puts("ESP32 dual MSC physical callback ABI harness: PASS");
 }

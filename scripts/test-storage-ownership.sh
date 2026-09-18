@@ -59,7 +59,8 @@ cc -std=gnu17 -Wall -Wextra -Werror \
 "${TMP_ROOT}/rp2-msc-backend-test"
 
 cc -std=gnu17 -Wall -Wextra -Werror \
-    -DMCUJS_TEST_ESP32=1 \
+    -DMCUJS_TEST_ESP32=1 -DMCUJS_BOARD_SEEED_XIAO_ESP32S3=1 \
+    -I"${ROOT}/src/generated" \
     -I"${ROOT}/tests/native_stubs/usb" \
     -I"${ROOT}/src/filesystem" \
     -I"${ROOT}/platform/esp32/main" \
@@ -71,7 +72,8 @@ cc -std=gnu17 -Wall -Wextra -Werror \
 
 "${TMP_ROOT}/esp32-msc-backend-test"
 
-cc -std=gnu17 -Wall -Wextra -Werror -DMCUJS_USB_SD_MSC=1 \
+cc -std=gnu17 -Wall -Wextra -Werror -DMCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2=1 \
+    -I"${ROOT}/src/generated" \
     -I"${ROOT}/tests/native_stubs/usb" -I"${ROOT}/src/filesystem" \
     -I"${ROOT}/platform/esp32/main" -I"${ROOT}/src/usb" \
     "${ROOT}/tests/esp32_dual_msc_test.c" "${ROOT}/src/usb/msc_ownership.c" \

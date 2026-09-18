@@ -2,7 +2,7 @@
 title: Removable SD assets
 ---
 
-# Optional `/sd` assets — first hardware slice
+# Optional `/sd` assets — board-defined transports
 
 On boards that advertise `fs.sd`, `/sd` is a separate removable FAT volume.
 `/app` remains internal flash; relative `fs` paths and automatic startup still
@@ -42,7 +42,12 @@ Other boards do not advertise this adapter.
 Wiring and firmware policy in `runtime/board-registry.js` generate the SD C
 header, build source-selection flag, capabilities and manifests together. These
 declarations require the matching platform adapters; they are not hardware
-qualification or evidence for an unintegrated build.
+qualification or evidence for an unintegrated build. A disabled physical slot
+requires a nonempty `policy.sd.disabledReason`; disabled policies do not compile
+the SD filesystem backend. Sticky experimental display builds still require its
+read-only SD adapter to own/power the shared SPI bus, and reject disabling it.
+Enabled transport clocks are validated against backend limits (at least 100 kHz;
+GPIO SPI at most 10 MHz).
 
 ## Preservation and ownership
 
@@ -62,7 +67,8 @@ qualification or evidence for an unintegrated build.
   routes. This is **not** shared-SPI display/card arbitration on other boards.
 - Failed card I/O invalidates the mount. Close outstanding files before retrying;
   stale open handles are not silently redirected to a newly inserted card.
-  The slot has no configured card-detect switch: idle removal is not an event.
+  RP slots and ePaper V2 have no card-detect GPIO. Sticky has a hardware detect
+  signal, but that does not establish a public hot-swap lifecycle.
   Power off before swapping cards; live hot-swap is not qualified.
 - Errors distinguish `ENOMEDIUM` (unavailable/not ready), `ENOTSUP` (unsupported
   filesystem), `EROFS` (write-protected), `EIO` (failed transport/filesystem),
@@ -117,6 +123,11 @@ The adapter drains/synchronizes before acknowledging eject, stops new host I/O
 immediately, then remounts only that filesystem in the main loop. Host removal
 locks are honored. LOAD followed by EJECT cannot leave an obsolete claim queued.
 Reconnect requests export again; eject any volumes needed by the running app.
+
+The ESP backend preserves explicit, confirmed internal detach/eject events.
+Its generic TinyUSB unmount callback is ambiguous and retains the host fence;
+it is not a physical-detach detector. Use safe eject, including on no-SD ESP
+profiles, rather than relying on cable removal to grant runtime file access.
 
 USB reset, suspend or generic deconfiguration is **not evidence of safe eject**.
 Those signals retain the host-ownership fence; there is no reclaim timer.

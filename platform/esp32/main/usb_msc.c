@@ -64,8 +64,8 @@ void mcujs_usb_msc_task(void) {
 }
 void mcujs_usb_msc_event(mcujs_msc_event_t event) {
     if (!s_started) return;
-    /* TinyUSB unmount also means deconfiguration/reset, not confirmed eject. */
-    if (event == MCUJS_MSC_EVENT_DETACH || event == MCUJS_MSC_EVENT_EJECT) return;
+    /* DETACH/EJECT here are explicit confirmed events. Ambiguous USB
+     * deconfiguration is translated to RESET at the callback boundary below. */
     for (uint8_t i = 0; i < VOLUME_COUNT; i++) {
         volume_t *v = &s_volumes[i];
         if (v->fault) continue;
@@ -81,7 +81,8 @@ bool mcujs_usb_msc_expose(void) {
     return mcujs_msc_ownership_media_ready(&s_volumes[0].ownership);
 }
 void tud_mount_cb(void) { mcujs_usb_msc_event(MCUJS_MSC_EVENT_LOAD); }
-void tud_umount_cb(void) { mcujs_usb_msc_event(MCUJS_MSC_EVENT_DETACH); }
+/* TinyUSB unmount can be deconfiguration/reset, not confirmed physical detach. */
+void tud_umount_cb(void) { mcujs_usb_msc_event(MCUJS_MSC_EVENT_RESET); }
 void tud_suspend_cb(bool remote) { (void)remote; mcujs_usb_msc_event(MCUJS_MSC_EVENT_SUSPEND); }
 void tud_resume_cb(void) { mcujs_usb_msc_event(MCUJS_MSC_EVENT_RESUME); }
 

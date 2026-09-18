@@ -50,6 +50,31 @@ test('generated SD config compiles all board policies and selects RP sources', (
   }
 });
 
+
+test('disabled ESP policy excludes its backend and records a reason', () => {
+  const temp = mkdtempSync(join(tmpdir(), 'mcujs-sd-disabled-'));
+  try {
+    require('node:fs').mkdirSync(join(temp, 'tools'));
+    writeFileSync(join(temp, 'tools/build.py'), '# never executed by requirement discovery\n');
+    const cmake = readFileSync(resolve(__dirname, '../platform/esp32/main/CMakeLists.txt'), 'utf8');
+    const prefix = cmake.slice(0, cmake.indexOf('if(MCUJS_EXPERIMENTAL_CANVAS)'));
+    for (const id of ['seeed_reterminal_sticky', 'waveshare_esp32s3_epaper_1.54_v2']) {
+      for (const enabled of [false, true]) {
+        const descriptor = structuredClone(boardDescriptors[id]);
+        if (!enabled) {
+          descriptor.policy.sd = {transport: 'none', readOnly: true, usbMsc: false, baudHz: 0};
+          delete descriptor.capabilities.fs.sd;
+          assert.throws(() => validateSdConfiguration(descriptor), /reason/);
+          descriptor.policy.sd.disabledReason = 'Explicit development profile without SD filesystem';
+        }
+        const defs = sdDefinitionsFor(descriptor);
+        writeFileSync(join(temp, 'select.cmake'), `set(ENV{JERRYSCRIPT_PATH} "${temp}")\nset(MCUJS_BOARD "${id}")\nset(MCUJS_HAS_SD ${defs.MCUJS_HAS_SD ? 'ON' : 'OFF'})\n${prefix}\nlist(FIND MCUJS_SOURCES sd_card.c selected)\nif(${enabled ? 'selected LESS 0' : 'NOT selected EQUAL -1'})\nmessage(FATAL_ERROR "SD backend disagrees with selected policy")\nendif()\n`);
+        execFileSync('cmake', ['-P', join(temp, 'select.cmake')], {stdio: 'pipe'});
+      }
+    }
+  } finally { rmSync(temp, {recursive: true, force: true}); }
+});
+
 test('selected transport/policy derives SD capabilities without live state', () => {
   const enabled = ['waveshare_rp2040_pizero', 'waveshare_rp2350_lcd_1.47_a',
     'waveshare_rp2350_touch_lcd_2.8', 'waveshare_esp32s3_epaper_1.54_v2', 'seeed_reterminal_sticky'];
@@ -82,6 +107,9 @@ test('configuration rejects unsupported mappings, missing wiring, export and liv
   reject('seeed_reterminal_sticky', d => { d.policy.sd.usbMsc = true; }, /USB MSC/);
   reject('waveshare_rp2040_pizero', d => { d.policy.sd.transport = 'magic'; }, /transport/);
   reject('waveshare_rp2040_pizero', d => { d.policy.sd.baudHz = 0; }, /baud/);
+  for (const baudHz of [1, 99999, 25000001]) {
+    reject('waveshare_rp2040_pizero', d => { d.policy.sd.baudHz = baudHz; }, /baud/);
+  }
   reject('pico', d => { d.policy.sd.usbMsc = true; }, /disabled/);
   reject('waveshare_rp2040_pizero', d => { d.capabilities.fs.sd.ready = true; }, /capability/);
   reject('waveshare_rp2040_pizero', d => { d.capabilities.fs.sd.writable = false; }, /capability/);

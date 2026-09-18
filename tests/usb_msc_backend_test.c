@@ -3,6 +3,9 @@
 #include "tusb.h"
 
 #include <assert.h>
+#if defined(MCUJS_TEST_ESP32)
+void tud_umount_cb(void);
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -169,11 +172,19 @@ static void test_backend_handoff_and_callbacks(void) {
     assert(s_host_owned);
     assert(s_begin_calls == 2);
 
+#if defined(MCUJS_TEST_ESP32)
+    tud_umount_cb(); /* Ambiguous deconfiguration must not release the volume. */
+    backend_task();
+    assert(s_host_owned);
+    backend_event(MCUJS_MSC_EVENT_DETACH); /* Explicit confirmed detach. */
+    backend_task();
+#else
     backend_event(MCUJS_MSC_EVENT_DETACH);
     backend_task();
-    assert(s_host_owned); /* Generic USB unmount is not confirmed eject. */
+    assert(s_host_owned);
     assert(tud_msc_start_stop_cb(0, 0, false, true));
     backend_task();
+#endif
     assert(!s_host_owned);
     assert(s_end_calls == 2);
 }

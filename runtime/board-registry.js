@@ -112,7 +112,7 @@ function validateSdConfiguration(descriptor) {
   const fail = message => { throw new Error(`${board.name}: SD ${message}`); };
   if (typeof sd?.present !== "boolean") fail("hardware presence must be explicit");
   if (!policy || !["none", "spi", "spi-gpio", "sdmmc"].includes(policy.transport)) fail("unsupported transport");
-  if (Object.keys(policy).some(key => !["transport", "readOnly", "usbMsc", "baudHz"].includes(key)) ||
+  if (Object.keys(policy).some(key => !["transport", "readOnly", "usbMsc", "baudHz", "disabledReason"].includes(key)) ||
       typeof policy.readOnly !== "boolean" || typeof policy.usbMsc !== "boolean") fail("invalid policy");
   const enabled = policy.transport !== "none";
   const rp = ["RP2040", "RP2350"].includes(board.chip);
@@ -139,8 +139,9 @@ function validateSdConfiguration(descriptor) {
     const pins = sdReservedPins(sd);
     if (new Set(pins).size !== pins.length) fail("duplicate wiring pins");
   }
-  if (!Number.isInteger(policy.baudHz) || (enabled ? policy.baudHz < 1 || policy.baudHz > 25000000 : policy.baudHz !== 0)) fail("invalid baud policy");
+  if (!Number.isInteger(policy.baudHz) || (enabled ? policy.baudHz < 100000 || policy.baudHz > 25000000 : policy.baudHz !== 0)) fail("invalid baud policy");
   if (!enabled && (!policy.readOnly || policy.usbMsc)) fail("disabled slot cannot write or export");
+  if (!enabled && sd.present && (typeof policy.disabledReason !== "string" || !policy.disabledReason.trim())) fail("disabled physical slot requires a reason");
   if (enabled && (!features.fs || !capabilities.fs)) fail("filesystem backend is disabled");
   if (policy.usbMsc && !capabilities.usb?.classes.includes("msc")) fail("USB MSC export is unavailable");
   if (policy.transport === "spi" || policy.transport === "spi-gpio") {

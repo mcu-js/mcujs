@@ -1,7 +1,7 @@
 #ifndef MCUJS_ESP32S3_BOARD_CONFIG_H
 #define MCUJS_ESP32S3_BOARD_CONFIG_H
 
-#include "sd_config.h"
+#include "../../../src/generated/sd_config.h"
 
 #ifdef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
 #define MCUJS_BOARD_NAME "seeed_reterminal_sticky"

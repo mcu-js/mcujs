@@ -22,3 +22,5 @@ add_compile_definitions(
 )
 
 message(STATUS "Configuring for Waveshare RP2040-PiZero (RP2040, 16MB Flash, DVI enabled)")
+
+include(${CMAKE_CURRENT_LIST_DIR}/../../src/generated/sd_config.cmake)

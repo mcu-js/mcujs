@@ -44,8 +44,9 @@ Create one copy of the record below for **each**, including unavailable boards:
 - `waveshare_rp2350_lcd_1.47_a` — RP2350; distinguish optional SD from `/app`.
 - `waveshare_rp2350_touch_lcd_1.69` — RP2350; verify configured input separately.
 - `waveshare_rp2350_touch_lcd_2.8` — RP2350; no declared external GPIO/LED/button;
-  panel hardware is listed, Canvas is experimental opt-in, touch/SD/sensors are
-  not supported by the initial port. Do not widen its default image to get a pass.
+  panel hardware is listed, Canvas is experimental opt-in; SD uses GPIO SPI
+  with a 10 MHz policy ceiling requiring hardware timing measurement. Touch and
+  sensors remain unsupported. Do not widen its default image to get a pass.
 - `adafruit_feather_rp2040` — RP2040; LED and onboard NeoPixel are distinct.
 - `seeed_xiao_esp32s3` — ESP32-S3; onboard LED is outside the PWM allowlist;
   compatible TinyUF2 application update, not RP ROM transport.
@@ -244,6 +245,11 @@ With an approved unused scratch filename and verified original-file inventory:
    `/sd` is not a fallback for an unavailable `/app`.
 
 #### Q5-SD — configured, read-only and absent adapters
+
+Qualify PiZero SPI0, LCD 1.47-A SPI1, LCD 2.8 GPIO SPI and ePaper V2
+1-bit SDMMC independently as writable/USB-export profiles. Sticky remains
+read-only with no SD USB export. Generated declarations and native tests do
+not establish electrical timing, card throughput, hot-swap or SDK integration.
 
 Record each operation, precondition, expected code/message, actual result and
 evidence separately. Run the no-SD cases on RP and ESP profiles too; feature

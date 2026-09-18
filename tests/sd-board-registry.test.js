@@ -1,6 +1,37 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {boardDescriptors, manifestFor, validateSdConfiguration, sdDefinitionsFor} = require('../runtime/board-registry');
+const {generateSdConfigHeader, generateSdConfigCmake} = require('../scripts/generate-runtime-registry');
+const {execFileSync} = require('node:child_process');
+
+test('generated SD config compiles all board policies and selects RP sources', () => {
+  const header = generateSdConfigHeader();
+  const expected = {
+    waveshare_rp2040_pizero: [1, 0, 18, 19, 20, 21, 5000000, 0, 1],
+    'waveshare_rp2350_lcd_1.47_a': [1, 1, 10, 11, 12, 15, 10000000, 0, 1],
+    'waveshare_rp2350_touch_lcd_2.8': [1, -1, 19, 20, 21, 24, 10000000, 0, 1],
+    'waveshare_esp32s3_epaper_1.54_v2': [1, -1, -1, -1, -1, -1, 4000000, 0, 1],
+    seeed_reterminal_sticky: [1, 2, 13, 14, 12, 8, 4000000, 1, 0],
+  };
+  const keys = ['MCUJS_HAS_SD', 'MCUJS_SD_SPI_BUS', 'MCUJS_SD_SCK_PIN', 'MCUJS_SD_MOSI_PIN',
+    'MCUJS_SD_MISO_PIN', 'MCUJS_SD_CS_PIN', 'MCUJS_SD_BAUD_HZ', 'MCUJS_SD_READONLY', 'MCUJS_USB_SD_MSC'];
+  for (const id of Object.keys(boardDescriptors)) {
+    const values = expected[id] ?? [0, -1, -1, -1, -1, -1, 0, 1, 0];
+    const macro = `MCUJS_BOARD_${id.toUpperCase().replaceAll('.', '_')}`;
+    const assertions = keys.map((key, i) => `_Static_assert(${key} == ${values[i]}, "${id} ${key}");`).join('\n');
+    execFileSync('cc', ['-std=c11', '-Werror', '-x', 'c', '-fsyntax-only', '-'], {
+      input: `#define ${macro} 1\n${header}\n${assertions}\n`,
+    });
+  }
+  assert.match(header, /#define MCUJS_SD_SDMMC_CLK_PIN 39/);
+  assert.match(header, /#define MCUJS_SD_SDMMC_CMD_PIN 41/);
+  assert.match(header, /#define MCUJS_SD_SDMMC_D0_PIN 40/);
+  assert.match(header, /#define MCUJS_SD_SHARED_CS_PIN 15/);
+  const cmake = generateSdConfigCmake();
+  for (const id of Object.keys(expected).filter(id => id.includes('_rp'))) {
+    assert.match(cmake, new RegExp(`MCUJS_BOARD_NAME STREQUAL "${id.replaceAll('.', '\\.')}"[\\s\\S]*?set\\(MCUJS_HAS_SD ON\\)`));
+  }
+});
 
 test('selected transport/policy derives SD capabilities without live state', () => {
   const enabled = ['waveshare_rp2040_pizero', 'waveshare_rp2350_lcd_1.47_a',

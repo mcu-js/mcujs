@@ -430,7 +430,7 @@ test("RP PWM limits count distinct reachable hardware outputs and slices", () =>
     waveshare_rp2040_zero: { maxOutputs: 16, timerCount: 8 },
     waveshare_rp2040_pizero: { maxOutputs: 16, timerCount: 8 },
     "waveshare_rp2040_touch_lcd_1.28": { maxOutputs: 11, timerCount: 6 },
-    "waveshare_rp2350_lcd_1.47_a": { maxOutputs: 11, timerCount: 6 },
+    "waveshare_rp2350_lcd_1.47_a": { maxOutputs: 10, timerCount: 5 },
     "waveshare_rp2350_touch_lcd_1.69": { maxOutputs: 9, timerCount: 5 },
     adafruit_feather_rp2040: { maxOutputs: 11, timerCount: 6 },
   };

@@ -4,6 +4,11 @@
  */
 #ifndef MCUJS_BOARD_CONFIG_H
 #define MCUJS_BOARD_CONFIG_H
+
+#ifndef MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_2_8
+#define MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_2_8 1
+#endif
+#include "../../src/generated/sd_config.h"
 #include "../flash_config.h"
 #define MCUJS_BOARD_NAME "waveshare_rp2350_touch_lcd_2.8"
 #define MCUJS_BOARD_CHIP "RP2350"

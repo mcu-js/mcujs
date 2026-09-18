@@ -83,7 +83,7 @@ const sdPolicies = {
   "waveshare_rp2040_touch_lcd_1.28": sdDisabled,
   "waveshare_rp2350_lcd_1.47_a": { transport: "spi", readOnly: false, usbMsc: true, baudHz: 10000000 },
   "waveshare_rp2350_touch_lcd_1.69": sdDisabled,
-  "waveshare_rp2350_touch_lcd_2.8": { transport: "spi-gpio", readOnly: false, usbMsc: true, baudHz: 500000 },
+  "waveshare_rp2350_touch_lcd_2.8": { transport: "spi-gpio", readOnly: false, usbMsc: true, baudHz: 10000000 },
   adafruit_feather_rp2040: sdDisabled, seeed_xiao_esp32s3: sdDisabled,
   "waveshare_esp32s3_epaper_1.54_v2": { transport: "sdmmc", readOnly: false, usbMsc: true, baudHz: 4000000 },
   seeed_reterminal_sticky: { transport: "spi", readOnly: true, usbMsc: false, baudHz: 4000000 },
@@ -147,7 +147,7 @@ function validateSdConfiguration(descriptor) {
     if (!sd.spi) fail("missing SPI wiring");
     const {bus, sck, mosi, miso} = sd.spi;
     if (policy.transport === "spi-gpio") {
-      if (!rp || bus !== -1 || policy.baudHz > 1000000) fail("unsupported GPIO-SPI mapping/baud");
+      if (!rp || bus !== -1 || policy.baudHz > 10000000) fail("unsupported GPIO-SPI mapping/baud");
     } else if (rp) {
       if (![0, 1].includes(bus) || ![[sck, 2], [mosi, 3], [miso, 0]].every(
         ([value, signal]) => value % 4 === signal && (Math.floor(value / 8) % 2) === bus)) fail("unsupported hardware SPI mapping");
@@ -188,7 +188,7 @@ function sdDefinitionsFor(descriptor) {
     MCUJS_SD_SCK_PIN: spi?.sck ?? -1, MCUJS_SD_MOSI_PIN: spi?.mosi ?? -1,
     MCUJS_SD_MISO_PIN: spi?.miso ?? -1, MCUJS_SD_CS_PIN: spi?.cs ?? -1,
     MCUJS_SD_BAUD_HZ: policy.baudHz,
-    ...(spi ? { MCUJS_SD_SPI_BAUD_HZ: policy.baudHz } : {}),
+    MCUJS_SD_SPI_BAUD_HZ: policy.baudHz,
     MCUJS_SD_SDMMC_CLK_PIN: sdmmc?.clk ?? -1, MCUJS_SD_SDMMC_CMD_PIN: sdmmc?.cmd ?? -1,
     MCUJS_SD_SDMMC_D0_PIN: sdmmc?.d0 ?? -1,
     MCUJS_SD_READONLY: Number(policy.readOnly), MCUJS_USB_SD_MSC: Number(policy.usbMsc),

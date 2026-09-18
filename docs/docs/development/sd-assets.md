@@ -14,6 +14,13 @@ Configured boards:
 
 - **Waveshare RP2350 LCD 1.47 A**: writable `/sd` on a dedicated SPI bus,
   with a separate USB mass-storage volume in the enabled development build.
+- **Waveshare RP2040 PiZero**: writable `/sd`, USB MSC, dedicated SPI0
+  SCK18/MOSI19/MISO20/CS21 at 5 MHz.
+- **Waveshare RP2350 Touch LCD 2.8**: writable `/sd`, USB MSC, GPIO SPI
+  SCK19/MOSI20/MISO21/CS24. The 10 MHz runtime ceiling is policy, not a
+  measured clock guarantee; hardware timing/throughput qualification is pending.
+- **Waveshare ESP32-S3 ePaper 1.54 V2**: writable `/sd`, USB MSC, 1-bit
+  SDMMC CLK39/CMD41/D0=40 at 4 MHz. There is no MCU-connected CS.
 - **Seeed reTerminal Sticky**: read-only `/sd` on the shared display SPI bus.
   Writes, format, erase and USB host transfer are denied. Power/select of the
   inserted card is required for display traffic even when no file is opened.
@@ -32,12 +39,17 @@ or writable right now. The mount is attempted lazily when accessing `/sd`;
 absence or unsupported formatting does not block internal application startup.
 Other boards do not advertise this adapter.
 
+Wiring and firmware policy in `runtime/board-registry.js` generate the SD C
+header, build source-selection flag, capabilities and manifests together. These
+declarations require the matching platform adapters; they are not hardware
+qualification or evidence for an unintegrated build.
+
 ## Preservation and ownership
 
 - **No SD formatting API or automatic formatting.** exFAT and unsupported media
   fail rather than being converted. This first adapter supports block-addressed
   SD v2 cards (SDHC/SDXC) with FAT16/FAT32; SDSC is not supported.
-- On the enabled 1.47-A build, USB MSC exposes app flash and SD as independent
+- On profiles with `fs.sd.hostTransfer`, USB MSC exposes app flash and SD as independent
   volumes. A host-owned volume rejects device access with `EBUSY`; the other
   volume can remain device-owned. Never attach the card to a second writer.
   Boards without `fs.sd.hostTransfer` still use the runtime `fs` API or a card
@@ -45,7 +57,7 @@ Other boards do not advertise this adapter.
 - No mount-crossing traversal: `/sd/../app` fails, even when the resulting path
   would return to a valid mount. Cross-mount renames fail with `EXDEV`. `/sd`
   itself cannot be removed, renamed or opened as a file.
-- This board's verified SD pins are SPI1 SCK10/MOSI11/MISO12/CS15; the display
+- The 1.47-A board's verified SD pins are SPI1 SCK10/MOSI11/MISO12/CS15; the display
   uses SPI0. Those SD pins and SPI1 are not exposed as application peripheral
   routes. This is **not** shared-SPI display/card arbitration on other boards.
 - Failed card I/O invalidates the mount. Close outstanding files before retrying;

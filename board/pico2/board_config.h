@@ -10,6 +10,11 @@
 #ifndef MCUJS_BOARD_CONFIG_H
 #define MCUJS_BOARD_CONFIG_H
 
+#ifndef MCUJS_BOARD_PICO2
+#define MCUJS_BOARD_PICO2 1
+#endif
+#include "../../src/generated/sd_config.h"
+
 #include "../flash_config.h"
 
 /* Board identification */

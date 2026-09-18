@@ -14,6 +14,11 @@
 #ifndef MCUJS_BOARD_CONFIG_H
 #define MCUJS_BOARD_CONFIG_H
 
+#ifndef MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_1_69
+#define MCUJS_BOARD_WAVESHARE_RP2350_TOUCH_LCD_1_69 1
+#endif
+#include "../../src/generated/sd_config.h"
+
 #include "../flash_config.h"
 
 /* Board identification */

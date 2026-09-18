@@ -19,6 +19,11 @@
 #ifndef MCUJS_BOARD_CONFIG_H
 #define MCUJS_BOARD_CONFIG_H
 
+#ifndef MCUJS_BOARD_WAVESHARE_RP2040_PIZERO
+#define MCUJS_BOARD_WAVESHARE_RP2040_PIZERO 1
+#endif
+#include "../../src/generated/sd_config.h"
+
 #include "../flash_config.h"
 
 /* Board identification */
@@ -120,24 +125,6 @@
 
 /* DVI feature flag */
 #define MCUJS_HAS_DVI           1
-
-/*
- * ============================================================================
- * MicroSD Card Configuration
- * 
- * NOTE: MicroSD support is planned for Phase 2.
- * The SD card uses SPI mode on dedicated pins.
- * ============================================================================
- */
-
-#define MCUJS_SD_SPI_BUS        1       /* SD card on SPI1 */
-#define MCUJS_SD_SCK_PIN        10
-#define MCUJS_SD_MOSI_PIN       11
-#define MCUJS_SD_MISO_PIN       12
-#define MCUJS_SD_CS_PIN         9       /* SD card chip select */
-
-/* SD feature flag (disabled until Phase 2 implementation) */
-#define MCUJS_HAS_SD            0
 
 /*
  * ============================================================================

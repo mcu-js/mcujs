@@ -91,7 +91,7 @@ mcujs_board_features() {
         waveshare_rp2040_touch_lcd_1.28) printf 'Round LCD, touch, IMU' ;;
         waveshare_rp2350_lcd_1.47_a) printf 'LCD, NeoPixel' ;;
         waveshare_rp2350_touch_lcd_1.69) printf 'LCD, touch, IMU, buzzer' ;;
-        waveshare_rp2350_touch_lcd_2.8) printf 'Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; bounded WAV speaker; touch/SD/sensors unsupported' ;;
+        waveshare_rp2350_touch_lcd_2.8) printf 'Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; bounded WAV speaker; configured writable SD/USB MSC (hardware qualification pending); touch/sensors unsupported' ;;
         adafruit_feather_rp2040) printf 'NeoPixel, STEMMA QT' ;;
         seeed_xiao_esp32s3) printf 'Native USB, onboard LED' ;;
         *) return 1 ;;

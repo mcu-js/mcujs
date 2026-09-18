@@ -6,7 +6,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/mcujs-sticky-sd.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 cc -std=gnu17 -Wall -Wextra -Werror ${SD_TEST_CFLAGS:-} \
-    -include "$ROOT/tests/sticky_sd_stubs/sd_config.h" -I"$ROOT/tests/sticky_sd_stubs" -I"$ROOT/tests/canvas_epaper_stubs" \
+    -DMCUJS_BOARD_SEEED_RETERMINAL_STICKY=1 \
+    -I"$ROOT/tests/sticky_sd_stubs" -I"$ROOT/tests/canvas_epaper_stubs" \
     -I"$ROOT/src/filesystem" -I"$ROOT/platform/esp32/main" \
     "$ROOT/tests/sticky_sd_test.c" "$ROOT/platform/esp32/main/sd_card.c" \
     -o "$TMP/sticky-sd"

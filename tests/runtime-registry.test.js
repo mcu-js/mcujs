@@ -210,6 +210,23 @@ test("release packaging covers every shipping capability descriptor", () => {
   assert.deepEqual(releaseBoardIds, shippingBoardIds);
 });
 
+test("all 13 filesystem profiles advertise the bounded binary API in default and Canvas manifests", () => {
+  const filesystemBoards = Object.entries(boardDescriptors).filter(([, descriptor]) => descriptor.features.fs);
+  assert.equal(filesystemBoards.length, 13);
+  const expectedBinary = {
+    buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096,
+    maxPosition: 2147483647, flags: ["r", "w"],
+  };
+  for (const [boardId, descriptor] of filesystemBoards) {
+    assert.deepEqual(descriptor.capabilities.fs.binary, expectedBinary, boardId);
+    for (const configuredDisplay of [false, true]) {
+      const manifest = manifestFor(boardId, { configuredDisplay });
+      assert.deepEqual(manifest.capabilities.fs.binary, expectedBinary, `${boardId} Canvas=${configuredDisplay}`);
+      assert.equal(validatePortableApiManifest(manifest).valid, true, boardId);
+    }
+  }
+});
+
 test("every descriptor produces a strict, semantically valid release manifest", () => {
   for (const boardId of shippingBoardIds) {
     const manifest = manifestFor(boardId);

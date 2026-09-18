@@ -5,6 +5,18 @@
     if (actual !== expected) throw Error(label + ': ' + actual + ' !== ' + expected);
   }
   function denied(fn, code) { var caught=false;try { fn(); } catch(e) {caught=true;eq(e.code,code,'error code');} if(!caught)throw Error('missing '+code); }
+  var board = require('board');
+  var expectedBinary = { buffer: 'Uint8Array', maxOpenFiles: 4,
+    maxTransferBytes: 4096, maxPosition: 2147483647, flags: ['r', 'w'] };
+  [board.capability('fs'), board.capabilities().fs].forEach(function (capability) {
+    if (!capability || !capability.binary) throw Error(board.name + ': missing fs.binary discovery');
+    Object.keys(expectedBinary).forEach(function (key) {
+      eq(JSON.stringify(capability.binary[key]), JSON.stringify(expectedBinary[key]), 'fs.binary.' + key);
+    });
+  });
+  ['openSync', 'readSync', 'writeSync', 'closeSync'].forEach(function (name) {
+    eq(typeof fs[name], 'function', 'production fs.' + name);
+  });
   var source = new Uint8Array([99, 0, 128, 255, 65, 99]);
   var fd = fs.openSync('/app/binary.bin', 'w');
   eq(fs.writeSync(fd, source.subarray(1, 5), 0, 4), 4, 'binary write count');

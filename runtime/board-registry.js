@@ -655,7 +655,7 @@ boardDescriptors["waveshare_esp32s3_epaper_1.54_v2"] = {
  board: {name:"waveshare_esp32s3_epaper_1.54_v2", chip:"ESP32-S3", firmwareVersion,
  exposedPins:[], pins:{}, devices:{display:{type:"epaper",controller:"Waveshare-1.54-V2",width:200,height:200}}},
  features:epaperFeatures, modules:modulesFor(epaperFeatures),
- capabilities:{boot:{safeMode:true}, fs:{appRoot:"/app",implementation:"fat",writable:true,hostTransfer:true},usb:usbCapability(espUsbClasses)}
+ capabilities:{boot:{safeMode:true}, fs:{appRoot:"/app",binary:{buffer:"Uint8Array",maxOpenFiles:4,maxTransferBytes:4096,maxPosition:2147483647,flags:["r","w"]},implementation:"fat",writable:true,hostTransfer:true},usb:usbCapability(espUsbClasses)}
 };
 boardDescriptors.seeed_reterminal_sticky = {
  board:{name:"seeed_reterminal_sticky",chip:"ESP32-S3",firmwareVersion,

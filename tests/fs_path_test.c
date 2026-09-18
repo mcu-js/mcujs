@@ -44,6 +44,9 @@ static DIR *test_opendir(const char *path) { test_unlink(path); errno = ENOENT; 
 #define MCUJS_FS_BASE_PATH "/mcujs"
 #define MCUJS_FS_PATH_MAX 192
 static atomic_uint s_open_files, s_sd_open_files;
+#if MCUJS_USB_SD_MSC
+#include "esp-path-state.inc"
+#endif
 #ifndef MCUJS_SD_READONLY
 #define MCUJS_SD_READONLY 1
 #endif
@@ -131,7 +134,7 @@ static void test_sd(void) {
     assert(calls == before);
     open_real = true;
     fs_file_t file = {0};
-    assert(fs_open(&file, "/sd/file.bin", FS_MODE_READ) == FS_OK);
+    assert(fs_open(&file, "/sd/file.bin", MCUJS_SD_READONLY ? FS_MODE_READ : FS_MODE_READ | FS_MODE_WRITE) == FS_OK);
     assert(atomic_load(&s_sd_open_files) == 1 && atomic_load(&s_open_files) == 0);
     unsigned char data[] = {0, 255, 128, 0, 42}, out[sizeof(data)] = {0};
     size_t n = 99;
@@ -146,6 +149,15 @@ static void test_sd(void) {
     (void)out;
     assert(fs_close(&file) == FS_OK && atomic_load(&s_sd_open_files) == 0);
     open_real = false;
+#if MCUJS_USB_SD_MSC
+    atomic_store(&s_sd_state, STORAGE_HOST_OWNED);
+    assert(fs_exists("/sd/file.bin") == FS_ERROR_BUSY);
+    assert(fs_exists("/app") == FS_OK);
+    atomic_store(&s_sd_state, STORAGE_FAULT);
+    assert(fs_exists("/sd") == FS_ERROR_IO);
+    assert(fs_exists("/app") == FS_OK);
+    atomic_store(&s_sd_state, STORAGE_DEVICE_OWNED);
+#endif
     sd_access_result = FS_ERROR_NO_MEDIA;
     assert(fs_exists("/sd") == FS_ERROR_NO_MEDIA);
     assert(fs_list_dir("/sd", root_entry, &entries) == FS_ERROR_NO_MEDIA);

@@ -8,10 +8,21 @@ trap 'rm -rf "$TMP"' EXIT
 # The Dockerfile is the dependency authority. An offline archive is allowed but
 # must match the same digest; nothing is vendored or trusted by pathname alone.
 python3 - "$ROOT" "$TMP" "${FATFS_ARCHIVE:-}" <<'PY'
-import hashlib, io, pathlib, re, sys, urllib.request, zipfile
+import hashlib, io, pathlib, re, sys, urllib.error, urllib.request, zipfile
 root, tmp = map(pathlib.Path, sys.argv[1:3])
 expected = re.search(r'^ENV FATFS_SHA256=([0-9a-f]{64})$', (root/'Dockerfile').read_text(), re.M).group(1)
-data = pathlib.Path(sys.argv[3]).read_bytes() if sys.argv[3] else urllib.request.urlopen('https://elm-chan.org/fsw/ff/arc/ff16.zip', timeout=60).read()
+if sys.argv[3]:
+    data = pathlib.Path(sys.argv[3]).read_bytes()
+else:
+    try:
+        with urllib.request.urlopen('https://elm-chan.org/fsw/ff/arc/ff16.zip', timeout=20) as response:
+            data = response.read()
+    except (urllib.error.URLError, TimeoutError):
+        # Some CI egress routes cannot reach the author's TLS endpoint. The
+        # same-author HTTP archive is authenticated by the pinned SHA below;
+        # never extract/compile bytes before checking it, on either transport.
+        with urllib.request.urlopen('http://elm-chan.org/fsw/ff/arc/ff16.zip', timeout=20) as response:
+            data = response.read()
 actual = hashlib.sha256(data).hexdigest()
 if actual != expected:
     raise SystemExit(f'FatFs checksum mismatch: {actual} != {expected}')

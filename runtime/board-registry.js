@@ -40,6 +40,165 @@ const featureModule = Object.freeze({
   dvi: "dvi",
 });
 
+// Physical inventory is independent of enabled firmware. See docs/development/sd-board-definitions.md
+// for revision-specific primary sources (including the two non-hardware-SPI mappings).
+const sdHardware = {
+  pico: { present: false },
+  pico2: { present: false },
+  pico2_w: { present: false },
+  waveshare_rp2040_zero: { present: false },
+  waveshare_rp2040_pizero: {
+    present: true, revision: "RP2040-PiZero", spi: { bus: 0, sck: 18, mosi: 19, miso: 20, cs: 21 },
+    powerPin: -1, powerActiveHigh: false, cardDetectPin: -1, unusedDataPins: [], sharedCsPin: -1,
+  },
+  "waveshare_rp2040_touch_lcd_1.28": { present: false },
+  "waveshare_rp2350_lcd_1.47_a": {
+    present: true, revision: "RP2350-LCD-1.47-A", spi: { bus: 1, sck: 10, mosi: 11, miso: 12, cs: 15 },
+    powerPin: -1, powerActiveHigh: false, cardDetectPin: -1, unusedDataPins: [13, 14], sharedCsPin: -1,
+  },
+  "waveshare_rp2350_touch_lcd_1.69": { present: false },
+  "waveshare_rp2350_touch_lcd_2.8": {
+    present: true, revision: "RP2350-Touch-LCD-2.8",
+    spi: { bus: -1, sck: 19, mosi: 20, miso: 21, cs: 24 },
+    powerPin: -1, powerActiveHigh: false, cardDetectPin: -1, unusedDataPins: [22, 23], sharedCsPin: -1,
+  },
+  adafruit_feather_rp2040: { present: false },
+  seeed_xiao_esp32s3: { present: false }, // Base XIAO, not the Sense expansion board.
+  "waveshare_esp32s3_epaper_1.54_v2": {
+    present: true, revision: "ESP32-S3-ePaper-1.54 V2", spi: null,
+    sdmmc: { clk: 39, cmd: 41, d0: 40 }, // D3/CS has no MCU connection. SPI is impossible.
+    powerPin: -1, powerActiveHigh: false, cardDetectPin: -1, unusedDataPins: [], sharedCsPin: -1,
+  },
+  seeed_reterminal_sticky: {
+    present: true, revision: "reTerminal Sticky Rev 01 (2026-06-05)",
+    spi: { bus: 2, sck: 13, mosi: 14, miso: 12, cs: 8 }, // 2 means ESP SPI2_HOST, not its enum value.
+    powerPin: 10, powerActiveHigh: true, cardDetectPin: 11, unusedDataPins: [], sharedCsPin: 15,
+  },
+};
+const sdDisabled = Object.freeze({ transport: "none", readOnly: true, usbMsc: false, baudHz: 0 });
+const sdPolicies = {
+  pico: sdDisabled, pico2: sdDisabled, pico2_w: sdDisabled,
+  waveshare_rp2040_zero: sdDisabled,
+  waveshare_rp2040_pizero: { transport: "spi", readOnly: false, usbMsc: true, baudHz: 5000000 },
+  "waveshare_rp2040_touch_lcd_1.28": sdDisabled,
+  "waveshare_rp2350_lcd_1.47_a": { transport: "spi", readOnly: false, usbMsc: true, baudHz: 10000000 },
+  "waveshare_rp2350_touch_lcd_1.69": sdDisabled,
+  "waveshare_rp2350_touch_lcd_2.8": { transport: "spi-gpio", readOnly: false, usbMsc: true, baudHz: 500000 },
+  adafruit_feather_rp2040: sdDisabled, seeed_xiao_esp32s3: sdDisabled,
+  "waveshare_esp32s3_epaper_1.54_v2": { transport: "sdmmc", readOnly: false, usbMsc: true, baudHz: 4000000 },
+  seeed_reterminal_sticky: { transport: "spi", readOnly: true, usbMsc: false, baudHz: 4000000 },
+};
+
+function sdCapabilityFor(policy) {
+  return policy.transport === "none" ? undefined : {
+    root: "/sd", implementation: "fat", writable: !policy.readOnly,
+    hostTransfer: policy.usbMsc, removable: true, formats: ["fat16", "fat32"],
+  };
+}
+
+function sdReservedPins(sd) {
+  if (!sd.present) return [];
+  return [sd.spi?.sck, sd.spi?.mosi, sd.spi?.miso, sd.spi?.cs,
+    sd.sdmmc?.clk, sd.sdmmc?.cmd, sd.sdmmc?.d0,
+    sd.powerPin, sd.cardDetectPin, sd.sharedCsPin, ...(sd.unusedDataPins ?? [])]
+    .filter(pin => Number.isInteger(pin) && pin >= 0);
+}
+
+// The generator and manifest publisher both fail closed, before writing artifacts.
+function validateSdConfiguration(descriptor) {
+  const {board, capabilities, features} = descriptor;
+  const sd = descriptor.hardware?.sd;
+  const policy = descriptor.policy?.sd;
+  const fail = message => { throw new Error(`${board.name}: SD ${message}`); };
+  if (typeof sd?.present !== "boolean") fail("hardware presence must be explicit");
+  if (!policy || !["none", "spi", "spi-gpio", "sdmmc"].includes(policy.transport)) fail("unsupported transport");
+  if (Object.keys(policy).some(key => !["transport", "readOnly", "usbMsc", "baudHz"].includes(key)) ||
+      typeof policy.readOnly !== "boolean" || typeof policy.usbMsc !== "boolean") fail("invalid policy");
+  const enabled = policy.transport !== "none";
+  const rp = ["RP2040", "RP2350"].includes(board.chip);
+  const esp = board.chip === "ESP32-S3";
+  const pin = (value, output = false) => Number.isInteger(value) && value >= 0 &&
+    (rp ? value <= 29 : esp && (value <= 21 || (value >= 38 && value <= 48))) &&
+    !(esp && output && value === 46);
+  if (enabled && !sd.present) fail("no onboard SD slot for selected transport");
+  if (sd.present) {
+    if (!sd.revision || typeof sd.powerActiveHigh !== "boolean" || !Array.isArray(sd.unusedDataPins)) fail("incomplete wiring inventory");
+    for (const name of ["powerPin", "cardDetectPin", "sharedCsPin"]) {
+      if (sd[name] !== -1 && !pin(sd[name], name !== "cardDetectPin")) fail(`invalid ${name} wiring`);
+    }
+    if (sd.spi) {
+      for (const name of ["sck", "mosi", "miso", "cs"]) {
+        if (!pin(sd.spi[name], name !== "miso")) fail(`missing/invalid SPI ${name} wiring`);
+      }
+    }
+    if (sd.sdmmc) {
+      for (const name of ["clk", "cmd", "d0"]) if (!pin(sd.sdmmc[name], true)) fail(`missing/invalid SDMMC ${name} wiring`);
+    }
+    if ((!sd.spi && !sd.sdmmc) || (sd.spi && sd.sdmmc)) fail("one physical wiring map is required");
+    if (sd.unusedDataPins.some(value => !pin(value))) fail("invalid unused-data wiring");
+    const pins = sdReservedPins(sd);
+    if (new Set(pins).size !== pins.length) fail("duplicate wiring pins");
+  }
+  if (!Number.isInteger(policy.baudHz) || (enabled ? policy.baudHz < 1 || policy.baudHz > 25000000 : policy.baudHz !== 0)) fail("invalid baud policy");
+  if (!enabled && (!policy.readOnly || policy.usbMsc)) fail("disabled slot cannot write or export");
+  if (enabled && (!features.fs || !capabilities.fs)) fail("filesystem backend is disabled");
+  if (policy.usbMsc && !capabilities.usb?.classes.includes("msc")) fail("USB MSC export is unavailable");
+  if (policy.transport === "spi" || policy.transport === "spi-gpio") {
+    if (!sd.spi) fail("missing SPI wiring");
+    const {bus, sck, mosi, miso} = sd.spi;
+    if (policy.transport === "spi-gpio") {
+      if (!rp || bus !== -1 || policy.baudHz > 1000000) fail("unsupported GPIO-SPI mapping/baud");
+    } else if (rp) {
+      if (![0, 1].includes(bus) || ![[sck, 2], [mosi, 3], [miso, 0]].every(
+        ([value, signal]) => value % 4 === signal && (Math.floor(value / 8) % 2) === bus)) fail("unsupported hardware SPI mapping");
+    } else if (!esp || bus !== 2) fail("unsupported hardware SPI mapping (ESP requires SPI2_HOST)");
+  }
+  if (policy.transport === "sdmmc" && (!esp || !sd.sdmmc || sd.spi)) fail("unsupported SDMMC wiring/transport");
+  const expected = sdCapabilityFor(policy);
+  if (JSON.stringify(capabilities.fs?.sd) !== JSON.stringify(expected)) fail("capability contradicts selected policy or includes live state");
+
+  // Reserve socket wiring even if policy disables SD. Public pin aliases are not
+  // an escape hatch around GPIO/PWM checks, nor is a second route on the same bus.
+  const reserved = new Set(sdReservedPins(sd));
+  const publicPins = [...board.exposedPins, ...Object.values(board.pins)];
+  for (const name of ["gpio", "pwm", "adc", "neopixel"]) {
+    publicPins.push(...(capabilities[name]?.pins ?? []), ...(capabilities[name]?.outputPins ?? []));
+  }
+  for (const name of ["spi", "i2c"]) {
+    for (const route of [...(capabilities[name]?.routes ?? []), capabilities[name]?.defaultRoute].filter(Boolean)) {
+      publicPins.push(...Object.entries(route).filter(([key]) => key !== "bus").map(([,value]) => value));
+      if (name === "spi" && sd.spi?.bus >= 0 && (rp ? route.bus : route.bus + 2) === sd.spi.bus) fail("reserved SPI controller exposed publicly");
+    }
+  }
+  if (publicPins.some(value => reserved.has(value))) fail("reserved socket pin exposed publicly");
+}
+
+function sdDefinitionsFor(descriptor) {
+  validateSdConfiguration(descriptor);
+  const sd = descriptor.hardware.sd;
+  const policy = descriptor.policy.sd;
+  const enabled = policy.transport !== "none";
+  const spi = enabled && policy.transport !== "sdmmc" ? sd.spi : undefined;
+  const sdmmc = policy.transport === "sdmmc" ? sd.sdmmc : undefined;
+  return {
+    MCUJS_HAS_SD: Number(enabled),
+    MCUJS_SD_SPI_GPIO: Number(policy.transport === "spi-gpio"),
+    MCUJS_SD_SDMMC: Number(policy.transport === "sdmmc"),
+    MCUJS_SD_SPI_BUS: spi?.bus ?? -1,
+    MCUJS_SD_SCK_PIN: spi?.sck ?? -1, MCUJS_SD_MOSI_PIN: spi?.mosi ?? -1,
+    MCUJS_SD_MISO_PIN: spi?.miso ?? -1, MCUJS_SD_CS_PIN: spi?.cs ?? -1,
+    MCUJS_SD_BAUD_HZ: policy.baudHz,
+    ...(spi ? { MCUJS_SD_SPI_BAUD_HZ: policy.baudHz } : {}),
+    MCUJS_SD_SDMMC_CLK_PIN: sdmmc?.clk ?? -1, MCUJS_SD_SDMMC_CMD_PIN: sdmmc?.cmd ?? -1,
+    MCUJS_SD_SDMMC_D0_PIN: sdmmc?.d0 ?? -1,
+    MCUJS_SD_READONLY: Number(policy.readOnly), MCUJS_USB_SD_MSC: Number(policy.usbMsc),
+    MCUJS_SD_POWER_PIN: enabled ? sd.powerPin : -1,
+    MCUJS_SD_POWER_ACTIVE_HIGH: Number(enabled && sd.powerActiveHigh),
+    MCUJS_SD_CARD_DETECT_PIN: enabled ? sd.cardDetectPin : -1,
+    MCUJS_SD_SHARED_CS_PIN: enabled ? sd.sharedCsPin : -1,
+  };
+}
+
 const rpUsbClasses = Object.freeze(["cdc", "msc", "keyboardHid", "mouseHid"]);
 const espUsbClasses = Object.freeze(["cdc", "msc"]);
 
@@ -283,8 +442,7 @@ function rpDescriptor({
   i2cDefaultBus = 0,
   spiRoutes,
   spiDefaultBus = 0,
-  sd = false,
-  sdHostTransfer = false,
+
   neopixelPins = gpioPins,
 }) {
   const capabilities = {
@@ -295,8 +453,7 @@ function rpDescriptor({
     usb: usbCapability(rpUsbClasses.filter((name) =>
       name === "keyboardHid" ? features.keyboard : name === "mouseHid" ? features.mouse : true)),
   };
-  if (sd) capabilities.fs.sd = { root: "/sd", implementation: "fat", writable: true,
-    hostTransfer: sdHostTransfer, removable: true, formats: ["fat16", "fat32"] };
+
   if (features.adc) capabilities.adc = adcCapability(adcPins, adcAliases, adcOptions);
   if (features.i2c) capabilities.i2c = i2cCapability(i2cRoutes, i2cDefaultBus);
   if (features.spi) capabilities.spi = spiCapability(spiRoutes, spiDefaultBus, { dma: true });
@@ -368,12 +525,12 @@ const boardDescriptors = {
     adcPins: [26, 27, 28, 29], adcAliases: { 26: "A0", 27: "A1", 28: "A2", 29: "A3" },
   }),
   waveshare_rp2040_pizero: rpDescriptor({
-    name: "waveshare_rp2040_pizero", chip: "RP2040", exposedPins: pinsBetween(0, 21),
+    name: "waveshare_rp2040_pizero", chip: "RP2040", exposedPins: pinsBetween(0, 17),
     features: rpFeatureMaps.waveshare_rp2040_pizero,
-    aliases: pinAliases(pinsBetween(0, 21), { SDA: 2, SCL: 3, SCK: 18, MOSI: 19, MISO: 16 }),
+    aliases: pinAliases(pinsBetween(0, 17), { SDA: 2, SCL: 3, SCK: 10, MOSI: 11, MISO: 12 }),
 
     i2cRoutes: [{ bus: 0, sda: 0, scl: 1 }, { bus: 1, sda: 2, scl: 3 }],
-    i2cDefaultBus: 1, spiRoutes: picoSpi,
+    i2cDefaultBus: 1, spiRoutes: [{ bus: 1, sck: 10, mosi: 11, miso: 12 }], spiDefaultBus: 1,
   }),
   "waveshare_rp2040_touch_lcd_1.28": rpDescriptor({
     name: "waveshare_rp2040_touch_lcd_1.28", chip: "RP2040",
@@ -394,10 +551,9 @@ const boardDescriptors = {
   "waveshare_rp2350_lcd_1.47_a": rpDescriptor({
     name: "waveshare_rp2350_lcd_1.47_a", chip: "RP2350",
     features: rpFeatureMaps["waveshare_rp2350_lcd_1.47_a"],
-    sd: true,
-    sdHostTransfer: true,
-    exposedPins: [...pinsBetween(0, 9), 14, 16, 17, 18, 19, 20, 21, 22],
-    aliases: pinAliases([...pinsBetween(0, 9), 14, 16, 17, 18, 19, 20, 21, 22], {
+
+    exposedPins: [...pinsBetween(0, 9), 16, 17, 18, 19, 20, 21, 22],
+    aliases: pinAliases([...pinsBetween(0, 9), 16, 17, 18, 19, 20, 21, 22], {
       SDA: 4, SCL: 5, SCK: 18, MOSI: 19, MISO: 0, NEOPIXEL: 22,
     }),
     devices: {
@@ -407,8 +563,8 @@ const boardDescriptors = {
 
     i2cRoutes: [{ bus: 0, sda: 4, scl: 5 }, { bus: 1, sda: 6, scl: 7 }],
     spiRoutes: [{ bus: 0, sck: 18, mosi: 19, miso: 0 }],
-    pwmPins: [...pinsBetween(0, 9), 14, 22],
-    neopixelPins: [...pinsBetween(0, 9), 14, 22],
+    pwmPins: [...pinsBetween(0, 9), 22],
+    neopixelPins: [...pinsBetween(0, 9), 22],
   }),
   "waveshare_rp2350_touch_lcd_1.69": rpDescriptor({
     name: "waveshare_rp2350_touch_lcd_1.69", chip: "RP2350",
@@ -505,10 +661,14 @@ boardDescriptors.seeed_reterminal_sticky = {
  exposedPins:[],pins:{},devices:{display:{type:"epaper",controller:"SSD1677",width:800,height:480}}},
  features:epaperFeatures,modules:modulesFor(epaperFeatures),
  capabilities:{boot:{safeMode:true},fs:{appRoot:"/app",implementation:"fat",writable:true,hostTransfer:false,
-  binary:{buffer:"Uint8Array",maxOpenFiles:4,maxTransferBytes:4096,maxPosition:2147483647,flags:["r","w"]},
-  sd:{root:"/sd",implementation:"fat",writable:false,hostTransfer:false,removable:true,formats:["fat16","fat32"]}},usb:usbCapability([])}
+  binary:{buffer:"Uint8Array",maxOpenFiles:4,maxTransferBytes:4096,maxPosition:2147483647,flags:["r","w"]}},usb:usbCapability([])}
 };
 for (const [boardId, descriptor] of Object.entries(boardDescriptors)) {
+  descriptor.hardware = { sd: structuredClone(sdHardware[boardId]) };
+  descriptor.policy = { sd: structuredClone(sdPolicies[boardId]) };
+  const sdPolicy = descriptor.policy.sd;
+  if (sdPolicy.transport !== "none") descriptor.capabilities.fs.sd = sdCapabilityFor(sdPolicy);
+  validateSdConfiguration(descriptor);
   const presentation = boardPresentation[boardId];
   if (!presentation) throw new Error(`Missing presentation metadata for MCU.js board: ${boardId}`);
   descriptor.presentation = Object.freeze({ ...presentation });
@@ -554,6 +714,7 @@ const configuredDeviceCapabilities = Object.freeze({
 function manifestFor(boardId, { configuredDisplay = false } = {}) {
   const descriptor = boardDescriptors[boardId];
   if (!descriptor) throw new Error(`Unknown MCU.js board: ${boardId}`);
+  validateSdConfiguration(descriptor);
   return structuredClone({
     formatVersion: 1,
     apiVersion: "0.2",
@@ -563,6 +724,8 @@ function manifestFor(boardId, { configuredDisplay = false } = {}) {
 }
 
 module.exports = {
+  validateSdConfiguration,
+  sdDefinitionsFor,
   configuredDeviceCapabilities,
   boardDescriptors: Object.freeze(boardDescriptors),
   featureNames,

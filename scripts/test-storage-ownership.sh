@@ -70,6 +70,13 @@ cc -std=gnu17 -Wall -Wextra -Werror \
     -o "${TMP_ROOT}/esp32-msc-backend-test"
 
 "${TMP_ROOT}/esp32-msc-backend-test"
+
+cc -std=gnu17 -Wall -Wextra -Werror -DMCUJS_USB_SD_MSC=1 \
+    -I"${ROOT}/tests/native_stubs/usb" -I"${ROOT}/src/filesystem" \
+    -I"${ROOT}/platform/esp32/main" -I"${ROOT}/src/usb" \
+    "${ROOT}/tests/esp32_dual_msc_test.c" "${ROOT}/src/usb/msc_ownership.c" \
+    "${ROOT}/platform/esp32/main/usb_msc.c" -o "${TMP_ROOT}/esp32-dual-msc-test"
+"${TMP_ROOT}/esp32-dual-msc-test"
 # Compile the actual ESP32 path-facing functions against native POSIX stubs.
 # SDK/partition/ownership lifecycle code is deliberately outside this seam.
 python3 - "${ROOT}" "${TMP_ROOT}" <<'PY'

@@ -44,6 +44,7 @@ int32_t tud_msc_read10_cb(uint8_t, uint32_t, uint32_t, void *, uint32_t);
 int32_t tud_msc_write10_cb(uint8_t, uint32_t, uint32_t, uint8_t *, uint32_t);
 int32_t tud_msc_scsi_cb(uint8_t, const uint8_t *, void *, uint16_t);
 void tud_msc_write10_complete_cb(uint8_t);
+int32_t tud_msc_request_sense_cb(uint8_t, void *, uint16_t);
 void tud_umount_cb(void);
 void tud_suspend_cb(bool);
 static void reset(void) {
@@ -101,6 +102,15 @@ int main(void) {
         assert(tud_msc_scsi_cb(v, cmd, NULL, 0) == -1);
         tud_msc_write10_complete_cb(v); assert(sense_lun == v && sense_asc == 0x25);
     }
+    uint8_t sense[18];
+    assert(tud_msc_request_sense_cb(255, sense, sizeof(sense)) == 18);
+    assert(sense[2] == 5 && sense[12] == 0x25);
+    (void)tud_msc_request_sense_cb(0, sense, sizeof(sense));
+    (void)tud_msc_request_sense_cb(1, sense, sizeof(sense));
+    assert(tud_msc_read10_cb(1, UINT32_MAX, 0, output, 1) == -1);
+    assert(tud_msc_request_sense_cb(0, sense, sizeof(sense)) == 18 && sense[2] == 0);
+    assert(tud_msc_request_sense_cb(1, sense, sizeof(sense)) == 18 && sense[12] == 0x21);
+    assert(tud_msc_request_sense_cb(1, sense, sizeof(sense)) == 18 && sense[2] == 0);
     tud_umount_cb(); tud_suspend_cb(false); mcujs_usb_msc_event(MCUJS_MSC_EVENT_RESET);
     mcujs_usb_msc_task(); assert(host[0] && host[1]);
     write_error[1] = FS_ERROR_IO;

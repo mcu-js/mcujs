@@ -17,9 +17,15 @@ typedef struct {
     mcujs_msc_ownership_t ownership;
     _Atomic fs_result_t error;
     atomic_bool ejected, prevent_removal, fault;
+    atomic_uint sense;
 } volume_t;
 static volume_t s_volumes[VOLUME_COUNT];
 static atomic_bool s_started;
+static void set_sense(uint8_t lun, uint8_t key, uint8_t asc, uint8_t qual) {
+    if (lun < VOLUME_COUNT)
+        atomic_store(&s_volumes[lun].sense, ((unsigned)key << 16) | ((unsigned)asc << 8) | qual);
+    tud_msc_set_sense(lun, key, asc, qual);
+}
 static uint8_t id(void *v) { return (uint8_t)((volume_t *)v - s_volumes); }
 static fs_result_t claim(void *v) {
     return ((volume_t *)v)->error = fs_volume_begin_host_access(id(v));
@@ -40,6 +46,7 @@ void mcujs_usb_msc_init(void) {
         atomic_init(&s_volumes[i].ejected, false);
         atomic_init(&s_volumes[i].prevent_removal, false);
         atomic_init(&s_volumes[i].fault, false);
+        atomic_init(&s_volumes[i].sense, 0);
     }
 }
 void mcujs_usb_msc_task(void) {
@@ -82,17 +89,17 @@ void tud_resume_cb(void) { mcujs_usb_msc_event(MCUJS_MSC_EVENT_RESUME); }
 uint8_t tud_msc_get_maxlun_cb(void) { return VOLUME_COUNT; }
 static bool valid(uint8_t lun) {
     if (lun < VOLUME_COUNT) return true;
-    tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x25, 0);
+    set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x25, 0);
     return false;
 }
 static bool result(uint8_t lun, fs_result_t r, bool write) {
     if (r == FS_OK) return true;
     switch (r) {
-        case FS_ERROR_BUSY: tud_msc_set_sense(lun, SCSI_SENSE_NOT_READY, 4, 1); break;
-        case FS_ERROR_NO_MEDIA: tud_msc_set_sense(lun, SCSI_SENSE_NOT_READY, 0x3a, 0); break;
-        case FS_ERROR_INVALID: tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x21, 0); break;
-        case FS_ERROR_READ_ONLY: tud_msc_set_sense(lun, 7, 0x27, 0); break;
-        default: tud_msc_set_sense(lun, SCSI_SENSE_MEDIUM_ERROR, write ? 0x0c : 0x11, write ? 2 : 0); break;
+        case FS_ERROR_BUSY: set_sense(lun, SCSI_SENSE_NOT_READY, 4, 1); break;
+        case FS_ERROR_NO_MEDIA: set_sense(lun, SCSI_SENSE_NOT_READY, 0x3a, 0); break;
+        case FS_ERROR_INVALID: set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x21, 0); break;
+        case FS_ERROR_READ_ONLY: set_sense(lun, 7, 0x27, 0); break;
+        default: set_sense(lun, SCSI_SENSE_MEDIUM_ERROR, write ? 0x0c : 0x11, write ? 2 : 0); break;
     }
     return false;
 }
@@ -153,7 +160,7 @@ bool tud_msc_is_writable_cb(uint8_t lun) { return ready(lun) && fs_volume_writab
 bool tud_msc_prevent_allow_medium_removal_cb(uint8_t lun, uint8_t prevent, uint8_t control) {
     (void)control;
     if (!valid(lun)) return false;
-    if (prevent > 1) { tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x24, 0); return false; }
+    if (prevent > 1) { set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x24, 0); return false; }
     s_volumes[lun].prevent_removal = prevent != 0;
     return true;
 }
@@ -170,7 +177,7 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power, bool start, bool eject) {
         v->error = FS_OK;
         mcujs_msc_ownership_event(&v->ownership, MCUJS_MSC_EVENT_LOAD);
     } else {
-        if (v->prevent_removal) { tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x53, 2); return false; }
+        if (v->prevent_removal) { set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x53, 2); return false; }
         if (v->ejected) return true;
         if (fs_volume_host_owned(lun) && !sync_volume(lun)) return false;
         v->ejected = true;
@@ -225,7 +232,20 @@ int32_t tud_msc_scsi_cb(uint8_t lun, const uint8_t cmd[16], void *buffer, uint16
             out[ten ? 3 : 2] = fs_volume_writable(lun) ? 0 : 0x80;
             return (int32_t)n;
         }
-        default: tud_msc_set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0); return -1;
+        default: set_sense(lun, SCSI_SENSE_ILLEGAL_REQUEST, 0x20, 0); return -1;
     }
 }
 void tud_msc_write10_complete_cb(uint8_t lun) { (void)valid(lun); }
+void tud_msc_read10_complete_cb(uint8_t lun) { (void)valid(lun); }
+void tud_msc_scsi_complete_cb(uint8_t lun, const uint8_t cmd[16]) { (void)cmd; (void)valid(lun); }
+int32_t tud_msc_request_sense_cb(uint8_t lun, void *buffer, uint16_t size) {
+    /* The pinned stack prefills a global sense; replace it with this LUN's. */
+    bool known = valid(lun);
+    if (!buffer || size < 18) return -1;
+    unsigned sense = known ? atomic_exchange(&s_volumes[lun].sense, 0) : 0x052500;
+    uint8_t *out = buffer;
+    memset(out, 0, 18);
+    out[0] = 0x70; out[2] = (sense >> 16) & 15; out[7] = 10;
+    out[12] = (sense >> 8) & 255; out[13] = sense & 255;
+    return 18;
+}

@@ -3,7 +3,7 @@
 #include "pico/stdlib.h"
 typedef struct { int index; } spi_inst_t;
 typedef struct { volatile uint32_t dr; } spi_hw_t;
-extern spi_inst_t *spi1;
+extern spi_inst_t *spi0, *spi1;
 #define SPI_CPOL_0 0
 #define SPI_CPHA_0 0
 #define SPI_MSB_FIRST 0

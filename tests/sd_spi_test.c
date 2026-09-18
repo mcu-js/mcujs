@@ -6,8 +6,13 @@
 #include <stdio.h>
 #include <string.h>
 
-static spi_inst_t instance = {1};
-spi_inst_t *spi1 = &instance;
+static spi_inst_t instances[] = {{0}, {1}};
+spi_inst_t *spi0 = &instances[0], *spi1 = &instances[1];
+#define expected_spi (MCUJS_SD_SPI_BUS < 0 ? NULL : MCUJS_SD_SPI_BUS == 0 ? spi0 : spi1)
+#define gpio_transport (MCUJS_SD_SPI_BUS < 0)
+static bool gpio_sck, gpio_mosi;
+static uint8_t gpio_tx, gpio_rx;
+static unsigned gpio_bits, gpio_delays, gpio_clock_hz = 150000000;
 static spi_hw_t hw;
 static uint64_t now;
 static unsigned transfers, polls, baud, packet_size, qhead, qtail, ncommands, clock_reads;
@@ -170,30 +175,69 @@ uint64_t time_us_64(void) {
     return now;
 }
 void sleep_ms(uint ms) { if (!freeze_time) now += ms * 1000; }
-void gpio_init(uint pin) { assert(pin == MCUJS_SD_CS_PIN); }
-void gpio_set_dir(uint pin, bool output) { assert(pin == MCUJS_SD_CS_PIN && output); }
+unsigned clock_get_hz(int clock) { assert(clock == 0); return gpio_clock_hz; }
+void busy_wait_at_least_cycles(uint32_t cycles) {
+    assert(gpio_transport);
+    if (!(mcujs_sd_status() & STA_NOINIT)) baud=MCUJS_SD_SPI_BAUD_HZ;
+    unsigned rate = baud ? MCUJS_SD_SPI_BAUD_HZ : 400000;
+    assert(cycles >= (gpio_clock_hz + 2*rate-1)/(2*rate));
+    ++gpio_delays;
+    if (!freeze_time) now += (uint64_t)cycles*1000000/gpio_clock_hz;
+}
+void gpio_init(uint pin) {
+    assert(pin == MCUJS_SD_CS_PIN || (gpio_transport &&
+        (pin == MCUJS_SD_SCK_PIN || pin == MCUJS_SD_MOSI_PIN || pin == MCUJS_SD_MISO_PIN)));
+}
+void gpio_set_dir(uint pin, bool output) {
+    assert((pin == MCUJS_SD_CS_PIN && output) || (gpio_transport &&
+        ((pin == MCUJS_SD_SCK_PIN && output) || (pin == MCUJS_SD_MOSI_PIN && output) ||
+         (pin == MCUJS_SD_MISO_PIN && !output))));
+}
+bool gpio_get(uint pin) {
+    assert(gpio_transport && pin == MCUJS_SD_MISO_PIN && gpio_sck);
+    assert(gpio_bits > 0 && gpio_bits <= 8);
+    return (gpio_rx >> (8-gpio_bits)) & 1;
+}
 void gpio_put(uint pin, bool value) {
+    if (gpio_transport && pin == MCUJS_SD_MOSI_PIN) {
+        assert(!gpio_sck); gpio_mosi=value; return;
+    }
+    if (gpio_transport && pin == MCUJS_SD_SCK_PIN) {
+        if (value) {
+            assert(!gpio_sck && gpio_bits < 8);
+            if (!gpio_bits) {
+                bool removed=absent || (remove_at && transfers+1>=remove_at);
+                gpio_rx = !selected || removed ? 0xff : busy_forever ? 0 :
+                    qhead<qtail ? queue[qhead] : write_busy && writes ? 0 : 0xff;
+                gpio_tx=0;
+            }
+            gpio_tx=(uint8_t)((gpio_tx<<1)|gpio_mosi); ++gpio_bits;
+        } else if (gpio_sck && gpio_bits==8) {
+            assert(exchange(gpio_tx)==gpio_rx); gpio_bits=0;
+        }
+        gpio_sck=value; return;
+    }
     assert(pin == MCUJS_SD_CS_PIN);
     selected = !value;
-    if (value) { packet_size = qhead = qtail = 0; payload_phase = false; }
+    if (value) { packet_size = qhead = qtail = 0; payload_phase = false; gpio_bits=0; }
 }
 void gpio_set_function(uint pin, uint function) {
     assert(function == GPIO_FUNC_SPI);
     assert(pin == MCUJS_SD_SCK_PIN || pin == MCUJS_SD_MOSI_PIN || pin == MCUJS_SD_MISO_PIN);
 }
 void gpio_pull_up(uint pin) { assert(pin == MCUJS_SD_MISO_PIN); }
-uint spi_init(spi_inst_t *spi, uint value) { assert(spi == spi1 && value==400000); baud=value; return value; }
+uint spi_init(spi_inst_t *spi, uint value) { assert(spi == expected_spi && value==400000); baud=value; return value; }
 uint spi_set_baudrate(spi_inst_t *spi, uint value) {
-    assert(spi==spi1 && baud==400000 && value==MCUJS_SD_SPI_BAUD_HZ);
+    assert(spi==expected_spi && baud==400000 && value==MCUJS_SD_SPI_BAUD_HZ);
     assert(!selected && ncommands && commands[ncommands-1]==10);
     baud=value; return value;
 }
-void spi_deinit(spi_inst_t *spi) { assert(spi == spi1); rx_count=rx_head=0; pending_write=write_armed=false; }
+void spi_deinit(spi_inst_t *spi) { assert(spi == expected_spi); rx_count=rx_head=0; pending_write=write_armed=false; }
 void spi_set_format(spi_inst_t *spi, uint bits, int cpol, int cpha, int order) {
-    assert(spi==spi1 && bits==8 && cpol==0 && cpha==0 && order==SPI_MSB_FIRST);
+    assert(spi==expected_spi && bits==8 && cpol==0 && cpha==0 && order==SPI_MSB_FIRST);
 }
 spi_hw_t *spi_get_hw(spi_inst_t *spi) {
-    assert(spi==spi1);
+    assert(spi==expected_spi);
     if (write_armed) { assert(!pending_write); pending_write=true; write_armed=false; }
     return &hw;
 }
@@ -212,7 +256,7 @@ static bool in_payload(void) {
 }
 static void poll(void) { ++polls; assert(polls < 3000000); }
 bool spi_is_writable(spi_inst_t *spi) {
-    assert(spi==spi1); flush_hw_write(); poll();
+    assert(spi==expected_spi); flush_hw_write(); poll();
     write_armed=stall!=1 && !(payload_stall==1 && in_payload());
     if (in_payload()) {
         ++payload_tx_polls;
@@ -221,17 +265,18 @@ bool spi_is_writable(spi_inst_t *spi) {
     return write_armed;
 }
 bool spi_is_readable(spi_inst_t *spi) {
-    assert(spi==spi1); flush_hw_write(); poll();
+    assert(spi==expected_spi); flush_hw_write(); poll();
     if (stall==2 || (payload_stall==2 && payload_phase) || !rx_count) return false;
     if (rx_delay && in_payload() && rx_count<8 && ++rx_polls%rx_delay) return false;
     hw.dr=rx_fifo[rx_head];rx_head=(rx_head+1)%8;--rx_count;
     return true;
 }
 bool spi_is_busy(spi_inst_t *spi) {
-    assert(spi==spi1); flush_hw_write(); poll();
+    assert(spi==expected_spi); flush_hw_write(); poll();
     return stall==3 || (payload_stall==3 && payload_phase);
 }
 static void reset_mock(void) {
+    gpio_sck=gpio_mosi=false; gpio_tx=gpio_rx=0; gpio_bits=gpio_delays=0;
     now=0; transfers=polls=baud=packet_size=qhead=qtail=ncommands=init_attempts=0;
     clock_reads=0;
     rx_head=rx_count=max_rx_count=rx_delay=rx_polls=payload_stall=0;
@@ -248,7 +293,7 @@ static void csd_changed(void) {
     csd[15]=reference_crc7(csd,15);
     csd_crc=reference_crc16(csd,16);
 }
-static void init_ok(void) { reset_mock(); assert(mcujs_sd_initialize() == 0); }
+static void init_ok(void) { reset_mock(); assert(mcujs_sd_initialize() == 0); baud=MCUJS_SD_SPI_BAUD_HZ; }
 static void rejected(void) {
     assert(mcujs_sd_initialize() & STA_NOINIT);
     assert(!selected && writes == 0 && transfers <= 300001);
@@ -269,6 +314,7 @@ int main(void) {
     reset_mock();
     assert(mcujs_sd_initialize() == 0);
     assert(mcujs_sd_status() == 0);
+    if (gpio_transport) { assert(gpio_delays >= 160 && !gpio_sck); baud=MCUJS_SD_SPI_BAUD_HZ; }
     assert(baud == MCUJS_SD_SPI_BAUD_HZ && !selected);
     const unsigned expected[] = {0,8,59,55,41,55,41,55,41,58,9,10};
     assert(ncommands == sizeof(expected)/sizeof(expected[0]));
@@ -282,7 +328,7 @@ int main(void) {
     assert(mcujs_sd_read(data, 7, 2) == RES_OK);
     /* Always-ready MMIO: one shared sample per polling stage, not separate
      * clock reads for its byte and transaction deadlines. Allow command overhead. */
-    assert(clock_reads-clocks_before <= 5*(transfers-transfers_before));
+    if (!gpio_transport) assert(clock_reads-clocks_before <= 5*(transfers-transfers_before));
     for (unsigned i=0; i<512; ++i) assert(data[i] == 0xff && data[i+512] == 0);
     assert(!selected);
     assert(mcujs_sd_write(data, 7, 2) == RES_OK);
@@ -291,6 +337,7 @@ int main(void) {
     assert(mcujs_sd_ioctl(CTRL_SYNC, NULL) == RES_OK);
     ++cases;
     /* FIFO backpressure reaches all eight entries without losing byte order. */
+    if (!gpio_transport) {
     init_ok(); rx_delay=16; patterned_read=true; payload_tx_delay=3;
     assert(mcujs_sd_read(data, 7, 2)==RES_OK);
     assert(max_rx_count==8 && rx_count==0 && !pending_write);
@@ -310,6 +357,7 @@ int main(void) {
     init_ok(); payload_tick=1990;
     failed_io(mcujs_sd_read(data,7,1));
     assert(payload_bytes>400 && payload_bytes<512);
+    }
     init_ok();
     /* Invalid calls must not send a byte or invalidate a healthy card. */
     unsigned before=transfers;
@@ -364,6 +412,7 @@ int main(void) {
         reset_mock(); freeze_time=frozen; acmd_stuck=true; rejected();
         assert(frozen || now < 2010000);
         for (int fault=1; fault<=3; ++fault) {
+            if (gpio_transport) continue; /* No MMIO/FIFO on GPIO SPI. */
             reset_mock(); stall=fault; freeze_time=frozen; rejected();
             assert(polls < 10000);
             init_ok(); stall=fault; freeze_time=frozen;

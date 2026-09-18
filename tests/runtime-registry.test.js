@@ -63,7 +63,7 @@ const expectedPresentation = {
   "waveshare_rp2040_touch_lcd_1.28": { label: "Waveshare RP2040 Touch LCD 1.28", flash: "4MB", notes: "Round LCD, touch, IMU" },
   "waveshare_rp2350_lcd_1.47_a": { label: "Waveshare RP2350-LCD-1.47-A", flash: "16MB", notes: "LCD, NeoPixel" },
   "waveshare_rp2350_touch_lcd_1.69": { label: "Waveshare RP2350-Touch-LCD-1.69", flash: "16MB", notes: "LCD, touch, IMU, buzzer" },
-  "waveshare_rp2350_touch_lcd_2.8": { label: "Waveshare RP2350-Touch-LCD-2.8", flash: "16MB", notes: "Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; bounded WAV speaker; touch/SD/sensors unsupported" },
+  "waveshare_rp2350_touch_lcd_2.8": { label: "Waveshare RP2350-Touch-LCD-2.8", flash: "16MB", notes: "Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; bounded WAV speaker; configured writable SD/USB MSC (hardware qualification pending); touch/sensors unsupported" },
   adafruit_feather_rp2040: { label: "Adafruit Feather RP2040", flash: "8MB", notes: "NeoPixel, STEMMA QT" },
   seeed_xiao_esp32s3: { label: "Seeed Studio XIAO ESP32-S3", flash: "8MB", notes: "Native USB, onboard LED" },
 };
@@ -158,6 +158,25 @@ test("all eleven board identities, presentation rows, and onboard inventories ar
     assert.deepEqual(descriptor.board.devices, expectedOnboardDevices[boardId], `${boardId}.devices`);
     assert.equal(descriptor.board.firmwareVersion, version, `${boardId}.firmwareVersion`);
   }
+});
+
+test("SD/audio presentation preserves configured support and qualification limits", () => {
+  for (const [boardId, audio] of [
+    ["waveshare_rp2350_touch_lcd_2.8", "speaker"],
+    ["waveshare_esp32s3_epaper_1.54_v2", "microphone"],
+  ]) {
+    const { capabilities, presentation } = boardDescriptors[boardId];
+    assert.equal(capabilities.fs.sd.writable, true);
+    assert.equal(capabilities.fs.sd.hostTransfer, true);
+    assert.equal(capabilities.devices[audio].maxOpenHandles, 1);
+    assert.match(presentation.notes, /configured writable SD\/USB MSC \(hardware qualification pending\)/);
+    assert.match(presentation.notes, /experimental Canvas opt-in/i);
+    assert.doesNotMatch(presentation.notes, /touch\/SD\/sensors unsupported|; peripherals unqualified/);
+  }
+  assert.match(boardDescriptors["waveshare_rp2350_touch_lcd_2.8"].presentation.notes,
+    /bounded WAV speaker;.*touch\/sensors unsupported/);
+  assert.equal(boardDescriptors["waveshare_esp32s3_epaper_1.54_v2"].presentation.notes,
+    "Experimental Canvas opt-in; ROM recovery only; bounded PCM microphone; configured writable SD/USB MSC (hardware qualification pending); other peripherals unqualified");
 });
 
 test("Docusaurus board tables are generated exactly from the shared registry", () => {

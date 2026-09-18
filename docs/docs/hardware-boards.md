@@ -23,7 +23,7 @@ package set in `MCUJS_RELEASE_BOARDS`; keep this table in sync with both lanes.
 | `waveshare_rp2040_touch_lcd_1.28` | Waveshare RP2040 Touch LCD 1.28 | RP2040 | 4MB | Round LCD, touch, IMU |
 | `waveshare_rp2350_lcd_1.47_a` | Waveshare RP2350-LCD-1.47-A | RP2350 | 16MB | LCD, NeoPixel |
 | `waveshare_rp2350_touch_lcd_1.69` | Waveshare RP2350-Touch-LCD-1.69 | RP2350 | 16MB | LCD, touch, IMU, buzzer |
-| `waveshare_rp2350_touch_lcd_2.8` | Waveshare RP2350-Touch-LCD-2.8 | RP2350 | 16MB | Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; bounded WAV speaker; touch/SD/sensors unsupported |
+| `waveshare_rp2350_touch_lcd_2.8` | Waveshare RP2350-Touch-LCD-2.8 | RP2350 | 16MB | Initial runtime/USB/filesystem port; LCD hardware only, experimental Canvas opt-in; bounded WAV speaker; configured writable SD/USB MSC (hardware qualification pending); touch/sensors unsupported |
 | `adafruit_feather_rp2040` | Adafruit Feather RP2040 | RP2040 | 8MB | NeoPixel, STEMMA QT |
 | `seeed_xiao_esp32s3` | Seeed Studio XIAO ESP32-S3 | ESP32-S3 | 8MB | Native USB, onboard LED |
 

@@ -4,15 +4,24 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const registry = require('../runtime/board-registry');
-test('configured SD policies preserve reserved RP2 bus/pins and read-only Sticky', () => {
+test('every equipped board declares its selected SD policy and protects socket pins', () => {
+  const equipped = new Set(['waveshare_rp2350_lcd_1.47_a', 'waveshare_rp2350_touch_lcd_2.8',
+    'waveshare_rp2040_pizero', 'waveshare_esp32s3_epaper_1.54_v2', 'seeed_reterminal_sticky']);
+  const rpPins = {
+    'waveshare_rp2350_lcd_1.47_a': [10, 11, 12, 15],
+    'waveshare_rp2350_touch_lcd_2.8': [19, 20, 21, 22, 23, 24],
+    waveshare_rp2040_pizero: [18, 19, 20, 21],
+  };
   for (const [name, d] of Object.entries(registry.boardDescriptors)) {
-    assert.equal(Boolean(d.capabilities.fs.sd), ['waveshare_rp2350_lcd_1.47_a', 'seeed_reterminal_sticky'].includes(name));
-    if (name !== 'waveshare_rp2350_lcd_1.47_a') continue;
+    assert.equal(Boolean(d.capabilities.fs.sd), equipped.has(name), name);
+    if (!equipped.has(name)) continue;
     assert.equal(d.capabilities.fs.sd.root, '/sd');
-    assert.equal(d.capabilities.fs.sd.hostTransfer, true);
-    assert.deepEqual(d.capabilities.spi.buses, [0]);
+    assert.equal(d.capabilities.fs.sd.hostTransfer, name !== 'seeed_reterminal_sticky');
+    assert.equal(d.capabilities.fs.sd.writable, name !== 'seeed_reterminal_sticky');
+    if (name === 'waveshare_rp2350_lcd_1.47_a') assert.deepEqual(d.capabilities.spi.buses, [0]);
+    if (name === 'waveshare_rp2040_pizero') assert.deepEqual(d.capabilities.spi.buses, [1]);
     for (const cap of ['gpio', 'pwm', 'neopixel']) {
-      for (const pin of [10, 11, 12, 15]) assert.ok(!d.capabilities[cap].pins.includes(pin));
+      for (const pin of rpPins[name] || []) assert.ok(!(d.capabilities[cap]?.pins || []).includes(pin), `${name}: ${cap} pin ${pin}`);
     }
   }
 });

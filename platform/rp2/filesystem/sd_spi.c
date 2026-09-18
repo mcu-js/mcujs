@@ -399,7 +399,7 @@ DSTATUS mcujs_sd_initialize(void) {
 #else
     set_gpio_baud(MCUJS_SD_SPI_BAUD_HZ);
 #endif
-    status = (csd[14] & 0x30) ? STA_PROTECT : 0;
+    status = (MCUJS_SD_READONLY || (csd[14] & 0x30)) ? STA_PROTECT : 0;
     return status;
 error:
     (void)fail();

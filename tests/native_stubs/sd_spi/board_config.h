@@ -1,5 +1,5 @@
 /* Explicit driver fixtures: independent of generated registry/board headers.
- * Wiring provenance and transport limits: tests/rp2-sd-wiring.md. */
+ * Wiring provenance: manufacturer schematics recorded in sd-assets.md. */
 #ifndef SD_TEST_BOARD_CONFIG_H
 #define SD_TEST_BOARD_CONFIG_H
 #ifndef MCUJS_HAS_SD

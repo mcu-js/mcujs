@@ -312,6 +312,17 @@ int main(void) {
     reset_mock(); absent=true;
     assert(mcujs_sd_initialize() & STA_NOINIT);
     reset_mock();
+    if (MCUJS_SD_READONLY) {
+        assert(mcujs_sd_initialize() == STA_PROTECT);
+        BYTE readonly_data[512];
+        assert(mcujs_sd_read(readonly_data, 7, 1) == RES_OK);
+        unsigned before_write = transfers;
+        assert(mcujs_sd_write(readonly_data, 7, 1) == RES_WRPRT);
+        assert(writes == 0 && transfers == before_write);
+        assert(mcujs_sd_ioctl(CTRL_SYNC, NULL) == RES_OK);
+        puts("sd_spi: configured read-only policy PASS (reads enabled, writes rejected before transfer)");
+        return 0;
+    }
     assert(mcujs_sd_initialize() == 0);
     assert(mcujs_sd_status() == 0);
     if (gpio_transport) { assert(gpio_delays >= 160 && !gpio_sck); baud=MCUJS_SD_SPI_BAUD_HZ; }

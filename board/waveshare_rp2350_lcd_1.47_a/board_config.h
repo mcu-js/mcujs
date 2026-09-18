@@ -11,6 +11,11 @@
 #ifndef MCUJS_BOARD_CONFIG_H
 #define MCUJS_BOARD_CONFIG_H
 
+#ifndef MCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A
+#define MCUJS_BOARD_WAVESHARE_RP2350_LCD_1_47_A 1
+#endif
+#include "../../src/generated/sd_config.h"
+
 #include "../flash_config.h"
 
 /* Board identification */
@@ -61,20 +66,6 @@
 #define MCUJS_LCD_DC_PIN        16
 #define MCUJS_LCD_RST_PIN       20
 #define MCUJS_LCD_BL_PIN        21
-
-/* SD Card pins. SPI1 is reserved for this mount, separate from display SPI0.
- * Verified against Waveshare RP2350-LCD-1.47 Python/02-SD/boot.py. */
-#define MCUJS_HAS_SD            1
-#define MCUJS_SD_SPI_BUS        1
-/* Below the ~20 MHz SPI setting in Waveshare's supplied FatFs example.
- * 5 MHz cannot finish macOS FSKit's full FAT scan within its mount deadline. */
-#ifndef MCUJS_SD_SPI_BAUD_HZ
-#define MCUJS_SD_SPI_BAUD_HZ     10000000u
-#endif
-#define MCUJS_SD_SCK_PIN        10
-#define MCUJS_SD_MOSI_PIN       11
-#define MCUJS_SD_MISO_PIN       12
-#define MCUJS_SD_CS_PIN         15
 
 /* Default UART pins */
 #define MCUJS_UART0_TX_PIN      0

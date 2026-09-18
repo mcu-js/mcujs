@@ -18,7 +18,8 @@ test("LCD 2.8 advertises core runtime, USB storage and bounded configured speake
     ["moduleLoader", "console", "timers", "board", "process", "require", "fs"]);
   assert.deepEqual(descriptor.modules, ["board", "fs", "process", "events", "devices", "mcujs:module", "node:module", "mcujs:speaker", "mcujs:speaker-native"]);
   assert.deepEqual(descriptor.capabilities, {
-    fs: { appRoot: "/app", binary: { buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096, maxPosition: 2147483647, flags: ["r", "w"] }, implementation: "fat", writable: true, hostTransfer: true },
+    boot: { enterUf2: true },
+    fs: { appRoot: "/app", binary: { buffer: "Uint8Array", maxOpenFiles: 4, maxTransferBytes: 4096, maxPosition: 2147483647, flags: ["r", "w"] }, implementation: "fat", writable: true, hostTransfer: true, sd: { root: "/sd", implementation: "fat", writable: true, hostTransfer: true, removable: true, formats: ["fat16", "fat32"] } },
     usb: { classes: ["cdc", "msc"] },
     devices: {speaker: {"interface": "wav", "maxOpenHandles": 1, "maxConcurrentPlays": 1, "encoding": "pcm-s16le", "channels": 1, "sampleRateHz": 16000, "defaultVolume": 0.25, "bufferFrames": 1024, "maxRiffChunks": 128, "shutdown": "native-silence"}},
   });

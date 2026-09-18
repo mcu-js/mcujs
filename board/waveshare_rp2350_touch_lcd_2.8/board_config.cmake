@@ -9,3 +9,5 @@ add_compile_definitions(
     PICO_FLASH_SIZE_BYTES=${MCUJS_FLASH_SIZE}
 )
 message(STATUS "Configuring for Waveshare RP2350-Touch-LCD-2.8 (RP2350)")
+
+include(${CMAKE_CURRENT_LIST_DIR}/../../src/generated/sd_config.cmake)

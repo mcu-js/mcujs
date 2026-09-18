@@ -18,6 +18,11 @@
 #ifndef MCUJS_BOARD_CONFIG_H
 #define MCUJS_BOARD_CONFIG_H
 
+#ifndef MCUJS_BOARD_ADAFRUIT_FEATHER_RP2040
+#define MCUJS_BOARD_ADAFRUIT_FEATHER_RP2040 1
+#endif
+#include "../../src/generated/sd_config.h"
+
 #include "../flash_config.h"
 
 /* Board identification */

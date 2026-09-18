@@ -1,7 +1,7 @@
 /*
- * Exclusive SPI1 SDHC/SDXC block device, SD v2 only, mode 0, 512-byte sectors.
+ * Board-selected SDHC/SDXC block device, SD v2 only, mode 0, 512-byte sectors.
  * No DMA/IRQ/core work, formatting, erase, TRIM, or automatic retry of writes.
- * The caller serializes access and reserves the bus/pins. No card-detect or
+ * The caller serializes access and reserves the selected bus/pins. No card-detect or
  * socket write-protect signal exists: status is cached; I/O detects removal.
  * CRC is mandatory (CMD59); command CRC7 and read/write data CRC16 are checked.
  */
@@ -17,8 +17,32 @@
 #include <string.h>
 #include "usb_cdc.h"
 
-#if MCUJS_SD_SPI_BUS != 1
-#error "The SD slice requires exclusive SPI1"
+#if MCUJS_SD_SPI_BUS == 0
+#define sd_spi spi0
+#elif MCUJS_SD_SPI_BUS == 1
+#define sd_spi spi1
+#elif MCUJS_SD_SPI_BUS == -1
+/* LCD 2.8 SD pins cannot route to PL022. No shared LCD controller or PIO/DMA
+ * allocation: only its dedicated socket GPIOs are touched. */
+#include "hardware/clocks.h"
+static uint32_t half_cycles;
+#else
+#error "SD requires SPI0, SPI1, or GPIO SPI (-1)"
+#endif
+#if MCUJS_SD_SPI_BUS >= 0 && \
+    (((MCUJS_SD_SCK_PIN & 3) != 2) || ((MCUJS_SD_MOSI_PIN & 3) != 3) || \
+     ((MCUJS_SD_MISO_PIN & 3) != 0) || \
+     (((MCUJS_SD_SCK_PIN >> 3) & 1) != MCUJS_SD_SPI_BUS) || \
+     (((MCUJS_SD_MOSI_PIN >> 3) & 1) != MCUJS_SD_SPI_BUS) || \
+     (((MCUJS_SD_MISO_PIN >> 3) & 1) != MCUJS_SD_SPI_BUS))
+#error "SD pins do not route to the selected hardware SPI controller"
+#endif
+/* Supported RP sockets have fixed power and no readable detect switch. */
+#if defined(MCUJS_SD_POWER_PIN) && MCUJS_SD_POWER_PIN >= 0
+#error "RP SD switched power is not implemented"
+#endif
+#if defined(MCUJS_SD_CARD_DETECT_PIN) && MCUJS_SD_CARD_DETECT_PIN >= 0
+#error "RP SD card-detect GPIO is not implemented"
 #endif
 
 #define SD_SECTOR_SIZE 512u
@@ -31,6 +55,12 @@
 #define SD_TOKEN_US 200000u
 #ifndef MCUJS_SD_SPI_BAUD_HZ
 #define MCUJS_SD_SPI_BAUD_HZ 5000000u
+#endif
+#if MCUJS_SD_SPI_BAUD_HZ < 100000 || MCUJS_SD_SPI_BAUD_HZ > 25000000
+#error "SD SPI clock must be between 100 kHz and 25 MHz (default-speed SD)"
+#endif
+#ifndef MCUJS_SD_READONLY
+#define MCUJS_SD_READONLY 0
 #endif
 
 static DSTATUS status = STA_NOINIT;
@@ -48,27 +78,55 @@ static void begin(unsigned duration) {
     remaining = SD_TRANSFER_LIMIT;
 }
 
+#if MCUJS_SD_SPI_BUS >= 0
 static bool wait_hw(unsigned stage, uint64_t until) {
     for (unsigned i = 0; i < SD_BYTE_POLLS; ++i) {
         uint64_t now = time_us_64();
         if (now >= until || now >= deadline) return false;
-        if ((stage == 0 && spi_is_writable(spi1)) ||
-            (stage == 1 && spi_is_readable(spi1)) ||
-            (stage == 2 && !spi_is_busy(spi1))) return true;
+        if ((stage == 0 && spi_is_writable(sd_spi)) ||
+            (stage == 1 && spi_is_readable(sd_spi)) ||
+            (stage == 2 && !spi_is_busy(sd_spi))) return true;
     }
     return false;
 }
+
+#else
+static void set_gpio_baud(unsigned baud) {
+    /* Ceiling division: even with zero GPIO/software overhead neither half
+     * cycle can exceed the requested clock. Real GPIO throughput is lower.
+     * Counted SDK delay, NOT a timer-poll loop: bounded even if time freezes. */
+    uint32_t hz = clock_get_hz(clk_sys);
+    half_cycles = (uint32_t)(((uint64_t)hz + 2u * baud - 1) / (2u * baud));
+}
+#endif
 
 static bool transfer(uint8_t tx, uint8_t *rx) {
     uint64_t now = time_us_64();
     if (!remaining || now >= deadline) return false;
     --remaining;
     uint64_t until = now + SD_BYTE_US;
+#if MCUJS_SD_SPI_BUS >= 0
     if (!wait_hw(0, until)) return false;
-    spi_get_hw(spi1)->dr = tx;
+    spi_get_hw(sd_spi)->dr = tx;
     if (!wait_hw(1, until)) return false;
-    uint8_t value = (uint8_t)spi_get_hw(spi1)->dr;
+    uint8_t value = (uint8_t)spi_get_hw(sd_spi)->dr;
     if (!wait_hw(2, until)) return false;
+#else
+    uint8_t value = 0;
+    /* Exactly eight mode-0 bits. No interrupts are masked. A delayed byte is
+     * rejected against BOTH original deadlines; it cannot extend either. */
+    for (unsigned bit = 0; bit < 8; ++bit) {
+        gpio_put(MCUJS_SD_MOSI_PIN, (tx & 0x80) != 0);
+        busy_wait_at_least_cycles(half_cycles);
+        gpio_put(MCUJS_SD_SCK_PIN, 1);
+        busy_wait_at_least_cycles(half_cycles);
+        value = (uint8_t)((value << 1) | gpio_get(MCUJS_SD_MISO_PIN));
+        gpio_put(MCUJS_SD_SCK_PIN, 0);
+        tx <<= 1;
+    }
+    now = time_us_64();
+    if (now >= until || now >= deadline) return false;
+#endif
     if (rx) *rx = value;
     return true;
 }
@@ -87,7 +145,12 @@ static DRESULT fail_at(unsigned line) {
     status = STA_NOINIT;
     sector_count = 0;
     (void)release();
-    spi_deinit(spi1); /* Clear stalled/in-flight FIFO state before a retry. */
+#if MCUJS_SD_SPI_BUS >= 0
+    spi_deinit(sd_spi); /* Clear stalled/in-flight FIFO state before a retry. */
+#else
+    gpio_put(MCUJS_SD_SCK_PIN, 0);
+    gpio_put(MCUJS_SD_MOSI_PIN, 1);
+#endif
     return RES_ERROR;
 }
 
@@ -148,26 +211,32 @@ static bool command(uint8_t cmd, uint32_t arg, uint8_t *r1) {
  * no-progress and byte bounds. Keep at most eight unread bytes in flight.
  * Unlike spi_read_blocking, this cannot wait forever on a stalled peripheral. */
 static bool receive_payload(uint8_t *buffer, unsigned length) {
+#if MCUJS_SD_SPI_BUS >= 0
     unsigned sent = 0, received = 0, polls = 0;
     uint64_t until = time_us_64() + SD_BYTE_US;
     while (received < length) {
         uint64_t now = time_us_64();
         if (now >= deadline || now >= until || polls++ >= SD_BYTE_POLLS) return false;
         bool progress = false;
-        if (sent < length && sent - received < 8 && spi_is_writable(spi1)) {
+        if (sent < length && sent - received < 8 && spi_is_writable(sd_spi)) {
             if (!remaining) return false;
             --remaining;
-            spi_get_hw(spi1)->dr = 0xff;
+            spi_get_hw(sd_spi)->dr = 0xff;
             ++sent;
             progress = true;
         }
-        if (received < sent && spi_is_readable(spi1)) {
-            buffer[received++] = (uint8_t)spi_get_hw(spi1)->dr;
+        if (received < sent && spi_is_readable(sd_spi)) {
+            buffer[received++] = (uint8_t)spi_get_hw(sd_spi)->dr;
             progress = true;
         }
         if (progress) { polls = 0; until = now + SD_BYTE_US; }
     }
     return wait_hw(2, until);
+#else
+    for (unsigned i = 0; i < length; ++i)
+        if (!receive(&buffer[i])) return false;
+    return true;
+#endif
 }
 
 static bool read_data(uint8_t *buffer, unsigned length) {
@@ -277,11 +346,23 @@ DSTATUS mcujs_sd_initialize(void) {
     gpio_init(MCUJS_SD_CS_PIN);
     gpio_put(MCUJS_SD_CS_PIN, 1); /* Set latch before enabling output. */
     gpio_set_dir(MCUJS_SD_CS_PIN, GPIO_OUT);
-    spi_init(spi1, 400000);
-    spi_set_format(spi1, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
+#if MCUJS_SD_SPI_BUS >= 0
+    spi_init(sd_spi, 400000);
+    spi_set_format(sd_spi, 8, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
     gpio_set_function(MCUJS_SD_SCK_PIN, GPIO_FUNC_SPI);
     gpio_set_function(MCUJS_SD_MOSI_PIN, GPIO_FUNC_SPI);
     gpio_set_function(MCUJS_SD_MISO_PIN, GPIO_FUNC_SPI);
+#else
+    gpio_init(MCUJS_SD_SCK_PIN);
+    gpio_put(MCUJS_SD_SCK_PIN, 0);
+    gpio_set_dir(MCUJS_SD_SCK_PIN, GPIO_OUT);
+    gpio_init(MCUJS_SD_MOSI_PIN);
+    gpio_put(MCUJS_SD_MOSI_PIN, 1);
+    gpio_set_dir(MCUJS_SD_MOSI_PIN, GPIO_OUT);
+    gpio_init(MCUJS_SD_MISO_PIN);
+    gpio_set_dir(MCUJS_SD_MISO_PIN, GPIO_IN);
+    set_gpio_baud(400000);
+#endif
     gpio_pull_up(MCUJS_SD_MISO_PIN);
     sleep_ms(2); /* SD power-up requires >=1 ms before the initial clocks. */
     begin(SD_INIT_US);
@@ -313,8 +394,12 @@ DSTATUS mcujs_sd_initialize(void) {
         !read_data(mounted_cid, sizeof(mounted_cid))) goto error;
     sector_count = (LBA_t)sectors;
     if (!release()) goto error;
-    spi_set_baudrate(spi1, MCUJS_SD_SPI_BAUD_HZ);
-    status = (csd[14] & 0x30) ? STA_PROTECT : 0;
+#if MCUJS_SD_SPI_BUS >= 0
+    spi_set_baudrate(sd_spi, MCUJS_SD_SPI_BAUD_HZ);
+#else
+    set_gpio_baud(MCUJS_SD_SPI_BAUD_HZ);
+#endif
+    status = (MCUJS_SD_READONLY || (csd[14] & 0x30)) ? STA_PROTECT : 0;
     return status;
 error:
     (void)fail();

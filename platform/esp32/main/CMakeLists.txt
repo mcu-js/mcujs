@@ -72,10 +72,15 @@ set(MCUJS_SD_REQUIRES)
 if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
  list(REMOVE_ITEM MCUJS_SOURCES usb_cdc.c usb_msc.c)
  list(APPEND MCUJS_SOURCES serial_uart.c)
- list(APPEND MCUJS_SOURCES sticky_sd.c)
- list(APPEND MCUJS_SD_REQUIRES sdmmc esp_driver_sdspi)
+endif()
+if(MCUJS_HAS_SD)
+ list(APPEND MCUJS_SOURCES sd_card.c)
+ list(APPEND MCUJS_SD_REQUIRES sdmmc esp_driver_sdspi esp_driver_sdmmc)
 endif()
 if(MCUJS_EXPERIMENTAL_CANVAS)
+ if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky" AND NOT MCUJS_HAS_SD)
+  message(FATAL_ERROR "Sticky display requires its SD shared-bus adapter; keep the read-only SD policy enabled")
+ endif()
  if(NOT MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2" AND NOT MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
   message(FATAL_ERROR "ESP Canvas only supports qualified experimental ePaper targets")
  endif()
@@ -128,6 +133,7 @@ idf_component_register(
         ${MCUJS_ROOT}/host/bindings
         ${MCUJS_ROOT}/board
         ${MCUJS_ROOT}/src
+        ${MCUJS_ROOT}/src/generated
         ${MCUJS_ROOT}/src/filesystem
         ${MCUJS_ROOT}/src/usb
         ${JERRY_ROOT}/jerry-core/include
@@ -137,9 +143,10 @@ idf_component_register(
         ${MCUJS_SD_REQUIRES}
 )
 
-if(MCUJS_BOARD STREQUAL "seeed_reterminal_sticky")
- target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_HAS_SD=1)
-endif()
+# fs.h contains inline path normalization, so feature policy must precede it
+# in every translation unit, including shared host bindings.
+target_compile_options(${COMPONENT_LIB} PRIVATE
+    -include "${MCUJS_ROOT}/src/generated/sd_config.h")
 
 if(MCUJS_EXPERIMENTAL_CANVAS AND CMAKE_CROSSCOMPILING)
  target_include_directories(${COMPONENT_LIB} PRIVATE "$ENV{CTX_PATH}" "${CMAKE_CURRENT_BINARY_DIR}")

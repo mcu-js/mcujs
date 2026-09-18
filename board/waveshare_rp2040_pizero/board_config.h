@@ -19,6 +19,11 @@
 #ifndef MCUJS_BOARD_CONFIG_H
 #define MCUJS_BOARD_CONFIG_H
 
+#ifndef MCUJS_BOARD_WAVESHARE_RP2040_PIZERO
+#define MCUJS_BOARD_WAVESHARE_RP2040_PIZERO 1
+#endif
+#include "../../src/generated/sd_config.h"
+
 #include "../flash_config.h"
 
 /* Board identification */
@@ -51,16 +56,8 @@
 #define MCUJS_I2C1_SDA_PIN      2
 #define MCUJS_I2C1_SCL_PIN      3
 
-/*
- * Default SPI pins (Pi Zero compatible header)
- * SPI0: Standard Pi SPI0 pins
- * SPI1: Directly used by SD card (directly controlled by board)
- */
-#define MCUJS_SPI0_SCK_PIN      18
-#define MCUJS_SPI0_MOSI_PIN     19
-#define MCUJS_SPI0_MISO_PIN     16
-#define MCUJS_SPI0_CS_PIN       17
-
+/* Public SPI1 header route. SPI0 is reserved for the onboard SD slot;
+ * its wiring is supplied exclusively by generated/sd_config.h. */
 #define MCUJS_SPI1_SCK_PIN      10
 #define MCUJS_SPI1_MOSI_PIN     11
 #define MCUJS_SPI1_MISO_PIN     12
@@ -120,24 +117,6 @@
 
 /* DVI feature flag */
 #define MCUJS_HAS_DVI           1
-
-/*
- * ============================================================================
- * MicroSD Card Configuration
- * 
- * NOTE: MicroSD support is planned for Phase 2.
- * The SD card uses SPI mode on dedicated pins.
- * ============================================================================
- */
-
-#define MCUJS_SD_SPI_BUS        1       /* SD card on SPI1 */
-#define MCUJS_SD_SCK_PIN        10
-#define MCUJS_SD_MOSI_PIN       11
-#define MCUJS_SD_MISO_PIN       12
-#define MCUJS_SD_CS_PIN         9       /* SD card chip select */
-
-/* SD feature flag (disabled until Phase 2 implementation) */
-#define MCUJS_HAS_SD            0
 
 /*
  * ============================================================================

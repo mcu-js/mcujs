@@ -18,3 +18,5 @@ add_compile_definitions(
 )
 
 message(STATUS "Configuring for Waveshare RP2040 Touch LCD 1.28 (RP2040)")
+
+include(${CMAKE_CURRENT_LIST_DIR}/../../src/generated/sd_config.cmake)

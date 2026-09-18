@@ -70,7 +70,7 @@ corresponding physical device is listed.
 | `pico2` | `A0=26`, `A1=27`, `A2=28`, `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=16`, `LED=25` | LED (GPIO 25, active-high) | `board.led()` |
 | `pico2_w` | `A0=26`, `A1=27`, `A2=28`, `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=16` | LED (managed) | `board.led()` |
 | `waveshare_rp2040_zero` | `A0=26`, `A1=27`, `A2=28`, `A3=29`, `SDA=4`, `SCL=5`, `SCK=10`, `MOSI=11`, `MISO=12`, `NEOPIXEL=16` | NeoPixel (GPIO 16, 1 × RGB) | `board.neopixel()` |
-| `waveshare_rp2040_pizero` | `SDA=2`, `SCL=3`, `SCK=18`, `MOSI=19`, `MISO=16` | — | — |
+| `waveshare_rp2040_pizero` | `SDA=2`, `SCL=3`, `SCK=10`, `MOSI=11`, `MISO=12` | — | — |
 | `waveshare_rp2040_touch_lcd_1.28` | `A0=26`, `A1=27`, `A2=28`, `SDA=6`, `SCL=7`, `SCK=10`, `MOSI=11`, `MISO=12` | GC9A01A LCD (240 × 240) | — |
 | `waveshare_rp2350_lcd_1.47_a` | `SDA=4`, `SCL=5`, `SCK=18`, `MOSI=19`, `MISO=0`, `NEOPIXEL=22` | NeoPixel (GPIO 22, 1 × GRB) + ST7789V3 LCD (172 × 320) | `board.neopixel()` |
 | `waveshare_rp2350_touch_lcd_1.69` | `A0=26`, `A1=27`, `A2=28`, `SDA=6`, `SCL=7`, `SCK=10`, `MOSI=11`, `MISO=12` | ST7789V2 LCD (240 × 280) | — |

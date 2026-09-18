@@ -1,0 +1,6 @@
+#ifndef MCUJS_TEST_BOARD_CONFIG_H
+#define MCUJS_TEST_BOARD_CONFIG_H
+#ifndef MCUJS_USB_SD_MSC
+#define MCUJS_USB_SD_MSC 0
+#endif
+#endif

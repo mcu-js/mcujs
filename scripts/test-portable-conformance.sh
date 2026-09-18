@@ -13,6 +13,7 @@ node --test \
     "${ROOT}/tests/runtime-registry.test.js" \
     "${ROOT}/tests/usb-sd-volumes.test.js" \
     "${ROOT}/tests/sd-asset.test.js" \
+    "${ROOT}/tests/sd-board-registry.test.js" \
     "${ROOT}/tests/display-capability-honesty.test.js" \
     "${ROOT}/tests/portable-api-conformance.test.js" \
     "${ROOT}/tests/examples-gpio-contract.test.js" \

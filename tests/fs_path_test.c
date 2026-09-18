@@ -12,13 +12,14 @@
 #include <unistd.h>
 static char observed[256], second[256];
 static unsigned calls;
+static bool open_real;
 static fs_result_t access_result = FS_OK;
 static fs_result_t ensure_initialized(void) { return access_result; }
 #if MCUJS_HAS_SD
-#define STICKY_SD_BASE_PATH "/mcujs-sd"
+#define SD_CARD_BASE_PATH "/mcujs-sd"
 static fs_result_t sd_access_result = FS_OK;
-static fs_result_t sticky_sd_mount(void) { return sd_access_result; }
-static fs_result_t sticky_sd_status(void) { return sd_access_result; }
+static fs_result_t sd_card_mount(void) { return sd_access_result; }
+static fs_result_t sd_card_status(void) { return sd_access_result; }
 static bool is_device_task(void) { return true; }
 #endif
 static int test_stat(const char *path, struct stat *stats) {
@@ -30,7 +31,7 @@ static int test_rename(const char *old, const char *new) {
     strcpy(second, new); return test_unlink(old);
 }
 static FILE *test_fopen(const char *path, const char *mode) {
-    (void)mode; test_unlink(path); errno = ENOENT; return NULL;
+    (void)mode; test_unlink(path); if (open_real) return tmpfile(); errno = ENOENT; return NULL;
 }
 static DIR *test_opendir(const char *path) { test_unlink(path); errno = ENOENT; return NULL; }
 #define stat(...) test_stat(__VA_ARGS__)
@@ -42,7 +43,13 @@ static DIR *test_opendir(const char *path) { test_unlink(path); errno = ENOENT; 
 #define opendir test_opendir
 #define MCUJS_FS_BASE_PATH "/mcujs"
 #define MCUJS_FS_PATH_MAX 192
-static atomic_uint s_open_files;
+static atomic_uint s_open_files, s_sd_open_files;
+#if MCUJS_USB_SD_MSC
+#include "esp-path-state.inc"
+#endif
+#ifndef MCUJS_SD_READONLY
+#define MCUJS_SD_READONLY 1
+#endif
 typedef struct { FILE *stream; bool sd; } esp_fs_file_t;
 #include "esp-path-functions.inc"
 static bool app_entry(const fs_entry_t *entry, void *data) {
@@ -108,6 +115,7 @@ static void test_sd(void) {
     assert(fs_exists("/sd/../app") == FS_ERROR_INVALID);
     assert(fs_exists("/sdfake/x") == FS_ERROR_NOT_FOUND);
     assert(fs_open(&(fs_file_t){0}, "/sd", FS_MODE_READ) == FS_ERROR_INVALID);
+#if MCUJS_SD_READONLY
     const fs_mode_t modes[] = {FS_MODE_WRITE, FS_MODE_CREATE, FS_MODE_APPEND,
         FS_MODE_TRUNCATE, FS_MODE_READ | FS_MODE_WRITE};
     for (unsigned i=0; i<sizeof(modes)/sizeof(*modes); i++)
@@ -115,16 +123,48 @@ static void test_sd(void) {
     assert(fs_remove("/sd/file.bin") == FS_ERROR_READ_ONLY);
     assert(fs_mkdir("/sd/new") == FS_ERROR_READ_ONLY);
     assert(fs_rename("/sd/a", "/sd/b") == FS_ERROR_READ_ONLY);
+#else
+    assert(fs_remove("/sd/file.bin") == FS_OK);
+    assert(fs_mkdir("/sd/new") == FS_OK);
+    assert(fs_rename("/sd/a", "/sd/b") == FS_OK);
+    before = calls;
+#endif
     assert(fs_rename("/sd/a", "/app/b") == FS_ERROR_CROSS_DEVICE);
     assert(fs_rename("/app/a", "/sd/b") == FS_ERROR_CROSS_DEVICE);
     assert(calls == before);
+    open_real = true;
+    fs_file_t file = {0};
+    assert(fs_open(&file, "/sd/file.bin", MCUJS_SD_READONLY ? FS_MODE_READ : FS_MODE_READ | FS_MODE_WRITE) == FS_OK);
+    assert(atomic_load(&s_sd_open_files) == 1 && atomic_load(&s_open_files) == 0);
+    unsigned char data[] = {0, 255, 128, 0, 42}, out[sizeof(data)] = {0};
+    size_t n = 99;
+#if MCUJS_SD_READONLY
+    assert(fs_write(&file, data, sizeof(data), &n) == FS_ERROR_READ_ONLY && n == 0);
+#else
+    assert(fs_write(&file, data, sizeof(data), &n) == FS_OK && n == sizeof(data));
+    assert(fs_seek(&file, 0) == FS_OK);
+    assert(fs_read(&file, out, sizeof(out), &n) == FS_OK && n == sizeof(out));
+    assert(!memcmp(data, out, sizeof(data)));
+#endif
+    (void)out;
+    assert(fs_close(&file) == FS_OK && atomic_load(&s_sd_open_files) == 0);
+    open_real = false;
+#if MCUJS_USB_SD_MSC
+    atomic_store(&s_sd_state, STORAGE_HOST_OWNED);
+    assert(fs_exists("/sd/file.bin") == FS_ERROR_BUSY);
+    assert(fs_exists("/app") == FS_OK);
+    atomic_store(&s_sd_state, STORAGE_FAULT);
+    assert(fs_exists("/sd") == FS_ERROR_IO);
+    assert(fs_exists("/app") == FS_OK);
+    atomic_store(&s_sd_state, STORAGE_DEVICE_OWNED);
+#endif
     sd_access_result = FS_ERROR_NO_MEDIA;
     assert(fs_exists("/sd") == FS_ERROR_NO_MEDIA);
     assert(fs_list_dir("/sd", root_entry, &entries) == FS_ERROR_NO_MEDIA);
     assert(fs_exists("/app") == FS_OK);
     sd_access_result = FS_ERROR_UNSUPPORTED;
     assert(fs_open(&(fs_file_t){0}, "/sd/file.bin", FS_MODE_READ) == FS_ERROR_UNSUPPORTED);
-    puts("ESP32 read-only SD namespace and independent ownership tests passed");
+    puts("ESP32 SD namespace, binary handles, read/write policy and independent access tests passed");
 }
 #endif
 #endif

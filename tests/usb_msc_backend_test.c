@@ -3,6 +3,9 @@
 #include "tusb.h"
 
 #include <assert.h>
+#if defined(MCUJS_TEST_ESP32)
+void tud_umount_cb(void);
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -79,10 +82,9 @@ fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
     s_write_calls++;
     return FS_OK;
 }
-#if !defined(MCUJS_TEST_ESP32)
-fs_result_t fs_volume_begin_host_access(uint8_t v) { assert(v == 0); return fs_begin_host_access(); }
-fs_result_t fs_volume_end_host_access(uint8_t v) { assert(v == 0); return fs_end_host_access(); }
-bool fs_volume_host_owned(uint8_t v) { assert(v == 0); return fs_host_owned(); }
+fs_result_t fs_volume_begin_host_access(uint8_t v) { assert(v == 0); return begin_host_access(); }
+fs_result_t fs_volume_end_host_access(uint8_t v) { assert(v == 0); return end_host_access(); }
+bool fs_volume_host_owned(uint8_t v) { assert(v == 0); return s_host_owned; }
 fs_result_t fs_volume_msc_status(uint8_t v) { assert(v == 0); return s_host_owned ? FS_OK : FS_ERROR_BUSY; }
 fs_result_t fs_volume_msc_sync(uint8_t v) { assert(v == 0); return fs_msc_sync(); }
 fs_result_t fs_volume_capacity(uint8_t v, uint32_t *n) { assert(v == 0); *n = 64; return FS_OK; }
@@ -93,7 +95,6 @@ fs_result_t fs_volume_read_sector(uint8_t v, uint32_t s, uint32_t o, void *b, ui
 fs_result_t fs_volume_write_sector(uint8_t v, uint32_t s, uint32_t o, const void *b, uint32_t n) {
     assert(v == 0); return fs_write_sector(s, o, b, n);
 }
-#endif
 void tud_msc_set_sense(uint8_t lun, uint8_t sense_key, uint8_t add_sense_code,
                        uint8_t add_sense_qualifier) {
     (void)lun;
@@ -122,11 +123,9 @@ static void test_backend_handoff_and_callbacks(void) {
     assert(s_begin_calls == 1);
     assert(tud_msc_test_unit_ready_cb(0));
     assert(tud_msc_is_writable_cb(0));
-#if !defined(MCUJS_TEST_ESP32)
     /* An unknown LUN must never alias writable app flash. */
     assert(!tud_msc_test_unit_ready_cb(2));
     assert(!tud_msc_is_writable_cb(2));
-#endif
 
     uint32_t blocks = 0;
     uint16_t block_size = 0;
@@ -146,7 +145,11 @@ static void test_backend_handoff_and_callbacks(void) {
 
     uint8_t sync_command[16] = {0x35};
     assert(tud_msc_scsi_cb(0, sync_command, NULL, 0) == 0);
+#if defined(MCUJS_TEST_ESP32)
+    assert(s_sync_calls == 2); /* WRITE10 durability plus explicit sync. */
+#else
     assert(s_sync_calls == 1);
+#endif
 
     backend_event(MCUJS_MSC_EVENT_RESET);
     backend_event(MCUJS_MSC_EVENT_SUSPEND);
@@ -169,10 +172,16 @@ static void test_backend_handoff_and_callbacks(void) {
     assert(s_host_owned);
     assert(s_begin_calls == 2);
 
+#if defined(MCUJS_TEST_ESP32)
+    tud_umount_cb(); /* Ambiguous deconfiguration must not release the volume. */
+    backend_task();
+    assert(s_host_owned);
+    backend_event(MCUJS_MSC_EVENT_DETACH); /* Explicit confirmed detach. */
+    backend_task();
+#else
     backend_event(MCUJS_MSC_EVENT_DETACH);
     backend_task();
-#if !defined(MCUJS_TEST_ESP32)
-    assert(s_host_owned); /* Generic USB unmount is not confirmed eject. */
+    assert(s_host_owned);
     assert(tud_msc_start_stop_cb(0, 0, false, true));
     backend_task();
 #endif

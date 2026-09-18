@@ -18,3 +18,5 @@ add_compile_definitions(
 )
 
 message(STATUS "Configuring for Raspberry Pi Pico 2 (RP2350)")
+
+include(${CMAKE_CURRENT_LIST_DIR}/../../src/generated/sd_config.cmake)

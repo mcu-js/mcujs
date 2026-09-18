@@ -281,7 +281,12 @@ check_api_schema
 check_runtime_registry
 check_release_artifacts
 check_platform_boundaries
+python3 "${ROOT_DIR}/tests/test-storage-fatfs-download.py"
 bash "${ROOT_DIR}/scripts/test-storage-fatfs.sh"
+sh "${ROOT_DIR}/tests/run-sd-spi-tests.sh"
+bash "${ROOT_DIR}/tests/run-sticky-sd-tests.sh"
+bash "${ROOT_DIR}/tests/run-esp-volume-tests.sh"
+bash "${ROOT_DIR}/tests/run-esp-sd-tests.sh"
 pass 'real FatFs USB-volume copy and preservation checks passed'
 check_docs_build
 

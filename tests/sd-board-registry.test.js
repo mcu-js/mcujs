@@ -3,6 +3,23 @@ const assert = require('node:assert/strict');
 const {boardDescriptors, manifestFor, validateSdConfiguration, sdDefinitionsFor} = require('../runtime/board-registry');
 const {generateSdConfigHeader, generateSdConfigCmake} = require('../scripts/generate-runtime-registry');
 const {execFileSync} = require('node:child_process');
+const {mkdtempSync, writeFileSync, rmSync, readFileSync} = require('node:fs');
+const {tmpdir} = require('node:os');
+const {join, resolve} = require('node:path');
+
+test('actual board CMake configurations select SD sources and compiler gates', () => {
+  const temp = mkdtempSync(join(tmpdir(), 'mcujs-sd-cmake-'));
+  try {
+    for (const id of Object.keys(boardDescriptors)) {
+      const enabled = ['waveshare_rp2040_pizero', 'waveshare_rp2350_lcd_1.47_a',
+        'waveshare_rp2350_touch_lcd_2.8', 'waveshare_esp32s3_epaper_1.54_v2', 'seeed_reterminal_sticky'].includes(id);
+      const exported = enabled && id !== 'seeed_reterminal_sticky';
+      writeFileSync(join(temp, 'CMakeLists.txt'), `cmake_minimum_required(VERSION 3.13)\nproject(sd_config NONE)\ninclude("${resolve(__dirname, '../board', id, 'board_config.cmake')}")\nif(NOT MCUJS_HAS_SD STREQUAL "${enabled ? 'ON' : 'OFF'}")\nmessage(FATAL_ERROR "wrong SD source selection")\nendif()\nget_directory_property(defs COMPILE_DEFINITIONS)\nif(NOT "MCUJS_HAS_SD=${Number(enabled)}" IN_LIST defs OR NOT "MCUJS_USB_SD_MSC=${Number(exported)}" IN_LIST defs)\nmessage(FATAL_ERROR "missing SD compiler gates")\nendif()\n`);
+      execFileSync('cmake', ['-S', temp, '-B', join(temp, id)], {stdio: 'pipe'});
+    }
+    assert.doesNotMatch(readFileSync(resolve(__dirname, '../board/waveshare_rp2040_pizero/board_config.h'), 'utf8'), /#define MCUJS_SPI0_/);
+  } finally { rmSync(temp, {recursive: true, force: true}); }
+});
 
 test('generated SD config compiles all board policies and selects RP sources', () => {
   const header = generateSdConfigHeader();

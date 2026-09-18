@@ -56,16 +56,8 @@
 #define MCUJS_I2C1_SDA_PIN      2
 #define MCUJS_I2C1_SCL_PIN      3
 
-/*
- * Default SPI pins (Pi Zero compatible header)
- * SPI0: Standard Pi SPI0 pins
- * SPI1: Directly used by SD card (directly controlled by board)
- */
-#define MCUJS_SPI0_SCK_PIN      18
-#define MCUJS_SPI0_MOSI_PIN     19
-#define MCUJS_SPI0_MISO_PIN     16
-#define MCUJS_SPI0_CS_PIN       17
-
+/* Public SPI1 header route. SPI0 is reserved for the onboard SD slot;
+ * its wiring is supplied exclusively by generated/sd_config.h. */
 #define MCUJS_SPI1_SCK_PIN      10
 #define MCUJS_SPI1_MOSI_PIN     11
 #define MCUJS_SPI1_MISO_PIN     12

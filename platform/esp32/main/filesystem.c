@@ -4,7 +4,7 @@
 #include "filesystem.h"
 #include "board_config.h"
 #if MCUJS_HAS_SD
-#include "sticky_sd.h"
+#include "sd_card.h"
 #endif
 
 #include "esp_err.h"
@@ -174,7 +174,7 @@ static fs_result_t translate_path(const char *path, char *translated, size_t tra
     const char *suffix = logical + 4;
 #if MCUJS_HAS_SD
     if (!strncmp(logical, "/sd", 3) && (!logical[3] || logical[3] == '/')) {
-        base = STICKY_SD_BASE_PATH;
+        base = SD_CARD_BASE_PATH;
         suffix = logical + 3;
     }
 #endif
@@ -185,15 +185,15 @@ static fs_result_t translate_path(const char *path, char *translated, size_t tra
 static bool is_root_path(const char *translated) {
     return !translated[0] || strcmp(translated, MCUJS_FS_BASE_PATH) == 0
 #if MCUJS_HAS_SD
-        || strcmp(translated, STICKY_SD_BASE_PATH) == 0
+        || strcmp(translated, SD_CARD_BASE_PATH) == 0
 #endif
         ;
 }
 
 static bool is_sd_path(const char *translated) {
 #if MCUJS_HAS_SD
-    size_t n = strlen(STICKY_SD_BASE_PATH);
-    return !strncmp(translated, STICKY_SD_BASE_PATH, n) &&
+    size_t n = strlen(SD_CARD_BASE_PATH);
+    return !strncmp(translated, SD_CARD_BASE_PATH, n) &&
         (!translated[n] || translated[n] == '/');
 #else
     (void)translated;
@@ -206,7 +206,7 @@ static fs_result_t path_ready(const char *path) {
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t result = translate_path(path, translated, sizeof(translated));
     if (result == FS_OK && is_sd_path(translated)) {
-        return is_device_task() ? sticky_sd_mount() : FS_ERROR_BUSY;
+        return is_device_task() ? sd_card_mount() : FS_ERROR_BUSY;
     }
 #else
     (void)path;
@@ -218,7 +218,7 @@ static fs_result_t file_ready(const fs_file_t *file) {
 #if MCUJS_HAS_SD
     if (file && file->is_open && file->internal &&
         ((esp_fs_file_t *)file->internal)->sd) {
-        return is_device_task() ? sticky_sd_status() : FS_ERROR_BUSY;
+        return is_device_task() ? sd_card_status() : FS_ERROR_BUSY;
     }
 #else
     (void)file;

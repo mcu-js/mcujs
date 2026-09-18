@@ -1,11 +1,14 @@
 /* Exercise production Sticky SD through its bus/VFS and diskio boundaries. */
-#include "sticky_sd.h"
+#include "sd_card.h"
 #include "sdmmc_cmd.h"
 #include "esp_vfs_fat.h"
 #include "diskio_impl.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef MCUJS_SD_READONLY
+#define MCUJS_SD_READONLY 1
+#endif
 static const char *scenario;
 static int pins[49], bus, bus_inits, frees, card_inits, devices, reads, mounts, unmounts;
 static int registrations, vfs_live;
@@ -52,6 +55,10 @@ esp_err_t sdmmc_read_sectors(sdmmc_card_t *card, void *bytes, size_t sector, siz
     assert(count && sector < 8192 && count <= 8192-sector);
     reads++; memset(bytes, 0x5a, count*512); return is("read-failure") ? -1 : ESP_OK;
 }
+esp_err_t sdmmc_get_status(sdmmc_card_t *c) { assert(c->csd.capacity == 8192); return ESP_OK; }
+esp_err_t sdmmc_write_sectors(sdmmc_card_t *c, const void *b, size_t s, size_t n) {
+    assert(!MCUJS_SD_READONLY && c->csd.capacity == 8192 && b && s < 8192 && n <= 8192-s); return ESP_OK;
+}
 esp_err_t ff_diskio_get_drive(BYTE *d) { *d = 2; return is("drive-failure") ? -1 : ESP_OK; }
 void ff_diskio_register(BYTE d, const ff_diskio_impl_t *impl) {
     assert(d == 2);
@@ -72,7 +79,8 @@ FRESULT f_mount(FATFS *fs, const char *drive, BYTE now) {
     assert(!strcmp(drive, "2:"));
     if (!fs) { assert(!now); unmounts++; volume.mounted = 0; return FR_OK; }
     assert(fs == &volume && disk && now == 1); mounts++; volume.mounted = 1;
-    assert(disk->init(2) == STA_PROTECT && disk->status(2) == STA_PROTECT);
+    assert(disk->init(2) == (MCUJS_SD_READONLY ? STA_PROTECT : 0));
+    assert(disk->status(2) == (MCUJS_SD_READONLY ? STA_PROTECT : 0));
     if (is("unsupported")) return FR_NO_FILESYSTEM;
     if (is("mount-failure")) return FR_DISK_ERR;
     return FR_OK;
@@ -80,22 +88,22 @@ FRESULT f_mount(FATFS *fs, const char *drive, BYTE now) {
 int main(int argc, char **argv) {
     assert(argc == 2); scenario = argv[1];
     if (is("foreign-bus") || is("gpio-failure")) {
-        assert(!sticky_sd_prepare());
+        assert(!sd_card_prepare());
         assert(!devices && !card_inits && !disk);
         assert(frees == (is("gpio-failure") ? 1 : 0));
         if (is("foreign-bus")) assert(!pins[8] && !pins[15] && !pins[10]);
     } else {
-        assert(sticky_sd_prepare()); /* Unavailable card must not disable display. */
+        assert(sd_card_prepare()); /* Unavailable card must not disable display. */
         assert(bus && pins[8] && pins[15] && pins[10] && !mounts);
-        assert(sticky_sd_prepare() && bus_inits == 1);
+        assert(sd_card_prepare() && bus_inits == 1);
         int init_count = card_inits;
-        fs_result_t result = sticky_sd_mount();
+        fs_result_t result = sd_card_mount();
         if (is("absent")) assert(result == FS_ERROR_NO_MEDIA && !devices);
         else if (is("unsupported") || is("sector-size")) assert(result == FS_ERROR_UNSUPPORTED);
         else if (is("host-failure") || is("device-failure") || is("drive-failure") || is("vfs-failure") || is("mount-failure")) assert(result == FS_ERROR_IO);
         else {
-            assert(result == FS_OK && sticky_sd_status() == FS_OK);
-            assert(sticky_sd_mount() == FS_OK && mounts == 1 && registrations == 1);
+            assert(result == FS_OK && sd_card_status() == FS_OK);
+            assert(sd_card_mount() == FS_OK && mounts == 1 && registrations == 1);
             BYTE bytes[1024] = {0}; DWORD value = 0; WORD size = 0;
             assert(disk->status(1) & STA_NOINIT);
             assert(disk->read(1, bytes, 0, 1) == RES_NOTRDY);
@@ -104,8 +112,8 @@ int main(int argc, char **argv) {
             assert(disk->read(2, bytes, 8192, 1) == RES_PARERR);
             assert(disk->read(2, bytes, 8191, 2) == RES_PARERR);
             assert(disk->read(2, bytes, 0xffffffffu, 2) == RES_PARERR && !reads);
-            assert(disk->write(2, bytes, 0, 1) == RES_WRPRT);
-            assert(disk->write(1, NULL, 0xffffffffu, 0) == RES_WRPRT);
+            assert(disk->write(2, bytes, 0, 1) == (MCUJS_SD_READONLY ? RES_WRPRT : RES_OK));
+            assert(disk->write(1, NULL, 0xffffffffu, 0) == (MCUJS_SD_READONLY ? RES_WRPRT : RES_NOTRDY));
             assert(disk->ioctl(2, CTRL_TRIM, bytes) == RES_WRPRT);
             assert(disk->ioctl(2, 255, bytes) == RES_WRPRT);
             assert(disk->ioctl(2, CTRL_SYNC, NULL) == RES_OK);
@@ -115,15 +123,15 @@ int main(int argc, char **argv) {
             assert(disk->ioctl(2, GET_SECTOR_SIZE, NULL) == RES_PARERR);
             DRESULT read_result = disk->read(2, bytes, 8190, 2);
             if (is("read-failure")) {
-                assert(read_result == RES_ERROR && sticky_sd_status() == FS_ERROR_IO);
-                assert(disk->status(2) == (STA_NOINIT | STA_PROTECT));
+                assert(read_result == RES_ERROR && sd_card_status() == FS_ERROR_IO);
+                assert(disk->status(2) == (STA_NOINIT | (MCUJS_SD_READONLY ? STA_PROTECT : 0)));
                 assert(disk->read(2, bytes, 0, 1) == RES_NOTRDY && reads == 1);
-                assert(sticky_sd_mount() == FS_ERROR_IO); /* No stale handle retarget. */
+                assert(sd_card_mount() == FS_ERROR_IO); /* No stale handle retarget. */
             } else assert(read_result == RES_OK && reads == 1 && bytes[0] == 0x5a && bytes[1023] == 0x5a);
         }
         if (result != FS_OK) {
             assert(!disk && !vfs_live);
-            assert(sticky_sd_mount() == result);
+            assert(sd_card_mount() == result);
             if (is("unsupported") || is("mount-failure")) assert(unmounts == mounts);
         }
         assert(card_inits == init_count && bus && !frees);

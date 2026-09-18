@@ -122,11 +122,9 @@ static void test_backend_handoff_and_callbacks(void) {
     assert(s_begin_calls == 1);
     assert(tud_msc_test_unit_ready_cb(0));
     assert(tud_msc_is_writable_cb(0));
-#if !defined(MCUJS_TEST_ESP32)
     /* An unknown LUN must never alias writable app flash. */
     assert(!tud_msc_test_unit_ready_cb(2));
     assert(!tud_msc_is_writable_cb(2));
-#endif
 
     uint32_t blocks = 0;
     uint16_t block_size = 0;

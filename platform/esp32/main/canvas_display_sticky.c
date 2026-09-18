@@ -1,6 +1,6 @@
 /* Private SSD1677 full-frame backend. See ../STICKY.md for vendor provenance. */
 #include "canvas_display.h"
-#include "sticky_sd.h"
+#include "sd_card.h"
 #ifdef ESP_PLATFORM
 #include "sdkconfig.h"
 #if !defined(CONFIG_SPIRAM) || !defined(CONFIG_SPIRAM_MODE_OCT) || !defined(CONFIG_SPIRAM_BOOT_INIT) || !defined(CONFIG_SPIRAM_USE_MALLOC)
@@ -137,7 +137,7 @@ bool canvas_display_sticky_init(canvas_display_t *d) {
     /* Put an inserted SD card in SPI mode before any display traffic.
      * The board-private owner retains SPI2 across display close/reopen. */
     spi_device_interface_config_t dev={.clock_speed_hz=10000000,.mode=0,.spics_io_num=CS,.queue_size=1};
-    if (!sticky_sd_prepare()) {free(pixels);return false;}
+    if (!sd_card_prepare()) {free(pixels);return false;}
     if (spi_bus_add_device(SPI2_HOST,&dev,&spi)!=ESP_OK) {
         spi=NULL;(void)gpio_set_level(CS,1);free(pixels);return false;
     }

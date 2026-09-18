@@ -15,10 +15,10 @@ static unsigned calls;
 static fs_result_t access_result = FS_OK;
 static fs_result_t ensure_initialized(void) { return access_result; }
 #if MCUJS_HAS_SD
-#define STICKY_SD_BASE_PATH "/mcujs-sd"
+#define SD_CARD_BASE_PATH "/mcujs-sd"
 static fs_result_t sd_access_result = FS_OK;
-static fs_result_t sticky_sd_mount(void) { return sd_access_result; }
-static fs_result_t sticky_sd_status(void) { return sd_access_result; }
+static fs_result_t sd_card_mount(void) { return sd_access_result; }
+static fs_result_t sd_card_status(void) { return sd_access_result; }
 static bool is_device_task(void) { return true; }
 #endif
 static int test_stat(const char *path, struct stat *stats) {

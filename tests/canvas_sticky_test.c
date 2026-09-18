@@ -25,7 +25,7 @@ void usb_cdc_task(void) {services++;}
 int spi_bus_initialize(int h,const spi_bus_config_t *b,int dma) {
  (void)h;(void)b;(void)dma;assert(!"display must not initialize the shared bus");return -1;
 }
-bool sticky_sd_prepare(void) {
+bool sd_card_prepare(void) {
  if(fail_bus)return false;
  bus_owned=1;return true; /* Real bus/card lifecycle is covered in sticky_sd_test. */
 }

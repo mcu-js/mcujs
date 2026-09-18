@@ -15,6 +15,7 @@ for f in ['src/ff.c','src/ff.h','src/ffconf.h','src/diskio.h','diskio/diskio_imp
 # small Sticky mount stub. The production adapter is compiled without edits.
 for f in ['sdmmc_cmd.h','esp_vfs_fat.h']:
     (tmp/f).write_bytes((root/'tests/sticky_sd_stubs'/f).read_bytes())
+(tmp/'sd_config.h').write_text('/* V2 policy supplied by compiler flags in this fixture. */\n')
 print('ESP-IDF FatFs source pinned to 9d7f2d69f50d1288526d4f1027108e314e8c879f')
 PY
 cc -std=gnu17 -Wall -Wextra -Werror -Wno-misleading-indentation ${SD_TEST_CFLAGS:-} \

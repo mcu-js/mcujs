@@ -1,8 +1,8 @@
 /* MCU.js ESP32-S3 partition-backed filesystem. */
 
+#include "board_config.h"
 #include "fs.h"
 #include "filesystem.h"
-#include "board_config.h"
 #if MCUJS_HAS_SD
 #include "sd_card.h"
 #endif
@@ -62,6 +62,7 @@ static FATFS *s_fatfs;
 static bool s_initialized;
 static TaskHandle_t s_device_task;
 static atomic_uint s_open_files;
+static atomic_uint s_sd_open_files;
 
 typedef enum {
     STORAGE_UNINITIALIZED = 0,
@@ -73,6 +74,10 @@ typedef enum {
 } storage_state_t;
 
 static atomic_int s_storage_state = STORAGE_UNINITIALIZED;
+#if MCUJS_USB_SD_MSC
+static atomic_int s_sd_state = STORAGE_UNINITIALIZED;
+static uint32_t s_sd_start, s_sd_sectors;
+#endif
 
 fs_result_t fs_access_status(void) {
     switch ((storage_state_t)atomic_load(&s_storage_state)) {
@@ -206,7 +211,14 @@ static fs_result_t path_ready(const char *path) {
     char translated[MCUJS_FS_PATH_MAX];
     fs_result_t result = translate_path(path, translated, sizeof(translated));
     if (result == FS_OK && is_sd_path(translated)) {
-        return is_device_task() ? sd_card_mount() : FS_ERROR_BUSY;
+        if (!is_device_task()) return FS_ERROR_BUSY;
+#if MCUJS_USB_SD_MSC
+        int state = atomic_load(&s_sd_state);
+        if (state == STORAGE_FAULT) return FS_ERROR_IO;
+        if (state == STORAGE_HOST_OWNED || state == STORAGE_CLAIMING_HOST ||
+            state == STORAGE_RELEASING_HOST) return FS_ERROR_BUSY;
+#endif
+        return sd_card_mount();
     }
 #else
     (void)path;
@@ -218,7 +230,14 @@ static fs_result_t file_ready(const fs_file_t *file) {
 #if MCUJS_HAS_SD
     if (file && file->is_open && file->internal &&
         ((esp_fs_file_t *)file->internal)->sd) {
-        return is_device_task() ? sd_card_status() : FS_ERROR_BUSY;
+        if (!is_device_task()) return FS_ERROR_BUSY;
+#if MCUJS_USB_SD_MSC
+        int state = atomic_load(&s_sd_state);
+        if (state == STORAGE_FAULT) return FS_ERROR_IO;
+        if (state == STORAGE_HOST_OWNED || state == STORAGE_CLAIMING_HOST ||
+            state == STORAGE_RELEASING_HOST) return FS_ERROR_BUSY;
+#endif
+        return sd_card_status();
     }
 #else
     (void)file;
@@ -295,6 +314,7 @@ static fs_result_t attach_fatfs(void) {
 
     FRESULT mount_result = f_mount(fatfs, drive, 1);
     if (mount_result != FR_OK) {
+        (void)f_mount(NULL, drive, 0);
         esp_vfs_fat_unregister_path(MCUJS_FS_BASE_PATH);
         ff_diskio_clear_pdrv_wl(s_wl_handle);
         ff_diskio_unregister(pdrv);
@@ -612,6 +632,108 @@ fs_result_t fs_write_sector(uint32_t sector, uint32_t offset,
     return FS_OK;
 }
 
+/* Volume 0 keeps its WL handle/geometry throughout the host lease. Volume 1
+ * owns an independent SD lease; only the runtime task can detach/remount VFS. */
+bool fs_volume_host_owned(uint8_t volume) {
+    if (volume == 0) return fs_host_owned();
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) return atomic_load(&s_sd_state) == STORAGE_HOST_OWNED;
+#endif
+    return false;
+}
+
+fs_result_t fs_volume_begin_host_access(uint8_t volume) {
+    if (volume == 0) return fs_begin_host_access();
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        int state = atomic_load(&s_sd_state);
+        if (state == STORAGE_FAULT) return FS_ERROR_IO;
+        if (!is_device_task() || atomic_load(&s_sd_open_files) ||
+            (state != STORAGE_DEVICE_OWNED && state != STORAGE_UNINITIALIZED))
+            return FS_ERROR_BUSY;
+        atomic_store(&s_sd_state, STORAGE_CLAIMING_HOST);
+        fs_result_t result = sd_card_export(&s_sd_start, &s_sd_sectors);
+        atomic_store(&s_sd_state, result == FS_OK ? STORAGE_HOST_OWNED :
+            result == FS_ERROR_IO ? STORAGE_FAULT : STORAGE_DEVICE_OWNED);
+        return result;
+    }
+#endif
+    return FS_ERROR_INVALID;
+}
+
+fs_result_t fs_volume_end_host_access(uint8_t volume) {
+    if (volume == 0) return fs_end_host_access();
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        if (!is_device_task() || !fs_volume_host_owned(1)) return FS_ERROR_BUSY;
+        atomic_store(&s_sd_state, STORAGE_RELEASING_HOST);
+        fs_result_t result = sd_card_import(s_sd_start, s_sd_sectors);
+        atomic_store(&s_sd_state, result == FS_OK ? STORAGE_DEVICE_OWNED : STORAGE_FAULT);
+        return result;
+    }
+#endif
+    return FS_ERROR_INVALID;
+}
+
+fs_result_t fs_volume_msc_status(uint8_t volume) {
+    if (volume == 0) return fs_host_owned() ? FS_OK : FS_ERROR_BUSY;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) {
+        if (atomic_load(&s_sd_state) == STORAGE_FAULT) return FS_ERROR_IO;
+        return fs_volume_host_owned(1) ? sd_card_media_status() : FS_ERROR_BUSY;
+    }
+#endif
+    return FS_ERROR_INVALID;
+}
+
+fs_result_t fs_volume_msc_sync(uint8_t volume) {
+    fs_result_t result = fs_volume_msc_status(volume);
+    if (result != FS_OK) return result;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) return sd_card_sync();
+#endif
+    return fs_msc_sync();
+}
+
+fs_result_t fs_volume_capacity(uint8_t volume, uint32_t *sectors) {
+    if (!sectors) return FS_ERROR_INVALID;
+    *sectors = 0;
+    fs_result_t result = fs_volume_msc_status(volume);
+    if (result != FS_OK) return result;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) { *sectors = s_sd_sectors; return FS_OK; }
+#endif
+    *sectors = fs_get_total_sectors();
+    return *sectors ? FS_OK : FS_ERROR_IO;
+}
+
+bool fs_volume_writable(uint8_t volume) {
+    return fs_volume_msc_status(volume) == FS_OK &&
+        (volume == 0 || !MCUJS_SD_READONLY);
+}
+
+fs_result_t fs_volume_read_sector(uint8_t volume, uint32_t sector, uint32_t offset,
+                                  void *buffer, uint32_t size) {
+    fs_result_t result = fs_volume_msc_status(volume);
+    if (result != FS_OK) return result;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) return sd_card_transfer(s_sd_start, s_sd_sectors,
+        sector, offset, buffer, size, false);
+#endif
+    return fs_read_sector(sector, offset, buffer, size);
+}
+
+fs_result_t fs_volume_write_sector(uint8_t volume, uint32_t sector, uint32_t offset,
+                                   const void *buffer, uint32_t size) {
+    fs_result_t result = fs_volume_msc_status(volume);
+    if (result != FS_OK) return result;
+#if MCUJS_USB_SD_MSC
+    if (volume == 1) return sd_card_transfer(s_sd_start, s_sd_sectors,
+        sector, offset, (void *)buffer, size, true);
+#endif
+    return fs_write_sector(sector, offset, buffer, size);
+}
+
 fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     if (file == NULL) {
         return FS_ERROR_INVALID;
@@ -628,7 +750,7 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     }
 
     if (is_root_path(translated)) return FS_ERROR_INVALID;
-    if (is_sd_path(translated) && (mode & (FS_MODE_WRITE | FS_MODE_CREATE |
+    if (MCUJS_SD_READONLY && is_sd_path(translated) && (mode & (FS_MODE_WRITE | FS_MODE_CREATE |
         FS_MODE_APPEND | FS_MODE_TRUNCATE))) return FS_ERROR_READ_ONLY;
 
     const char *open_mode = "rb";
@@ -661,7 +783,7 @@ fs_result_t fs_open(fs_file_t *file, const char *path, fs_mode_t mode) {
     internal->sd = is_sd_path(translated);
     file->internal = internal;
     file->is_open = true;
-    if (!internal->sd) atomic_fetch_add(&s_open_files, 1);
+    atomic_fetch_add(internal->sd ? &s_sd_open_files : &s_open_files, 1);
     return FS_OK;
 }
 
@@ -670,12 +792,12 @@ fs_result_t fs_close(fs_file_t *file) {
         return FS_ERROR_INVALID;
     }
     esp_fs_file_t *internal = file->internal;
-    int result = internal->sd ? 0 : fflush(internal->stream);
-    if (!internal->sd && result == 0) {
+    int result = internal->sd && MCUJS_SD_READONLY ? 0 : fflush(internal->stream);
+    if (!(internal->sd && MCUJS_SD_READONLY) && result == 0) {
         result = fsync(fileno(internal->stream));
     }
     int close_result = fclose(internal->stream);
-    if (!internal->sd) atomic_fetch_sub(&s_open_files, 1);
+    atomic_fetch_sub(internal->sd ? &s_sd_open_files : &s_open_files, 1);
     free(internal);
     file->internal = NULL;
     file->is_open = false;
@@ -709,7 +831,7 @@ fs_result_t fs_write(fs_file_t *file, const void *buffer, size_t size,
         return FS_ERROR_INVALID;
     }
     esp_fs_file_t *internal = file->internal;
-    if (internal->sd) {
+    if (MCUJS_SD_READONLY && internal->sd) {
         if (bytes_written) *bytes_written = 0;
         return FS_ERROR_READ_ONLY;
     }
@@ -779,7 +901,7 @@ fs_result_t fs_remove(const char *path) {
     if (is_root_path(translated)) {
         return FS_ERROR_INVALID;
     }
-    if (is_sd_path(translated)) return FS_ERROR_READ_ONLY;
+    if (MCUJS_SD_READONLY && is_sd_path(translated)) return FS_ERROR_READ_ONLY;
     struct stat stats;
     if (stat(translated, &stats) != 0) {
         return errno_to_fs(errno);
@@ -803,7 +925,7 @@ fs_result_t fs_rename(const char *old_path, const char *new_path) {
         return FS_ERROR_INVALID;
     }
     if (is_sd_path(old_translated) != is_sd_path(new_translated)) return FS_ERROR_CROSS_DEVICE;
-    if (is_sd_path(old_translated)) return FS_ERROR_READ_ONLY;
+    if (MCUJS_SD_READONLY && is_sd_path(old_translated)) return FS_ERROR_READ_ONLY;
     return rename(old_translated, new_translated) == 0 ? FS_OK : errno_to_fs(errno);
 }
 
@@ -818,7 +940,7 @@ fs_result_t fs_mkdir(const char *path) {
     if (is_root_path(translated)) {
         return FS_ERROR_INVALID;
     }
-    if (is_sd_path(translated)) return FS_ERROR_READ_ONLY;
+    if (MCUJS_SD_READONLY && is_sd_path(translated)) return FS_ERROR_READ_ONLY;
     return mkdir(translated, 0777) == 0 ? FS_OK : errno_to_fs(errno);
 }
 
@@ -845,8 +967,11 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
 #endif
         return FS_OK;
     }
+    atomic_uint *open_count = is_sd_path(translated) ? &s_sd_open_files : &s_open_files;
+    atomic_fetch_add(open_count, 1);
     DIR *directory = opendir(translated);
     if (directory == NULL) {
+        atomic_fetch_sub(open_count, 1);
         return errno_to_fs(errno);
     }
 
@@ -886,5 +1011,6 @@ fs_result_t fs_list_dir(const char *path, fs_dir_callback_t callback, void *user
     if (closedir(directory) != 0 && result == FS_OK) {
         result = errno_to_fs(errno);
     }
+    atomic_fetch_sub(open_count, 1);
     return result;
 }

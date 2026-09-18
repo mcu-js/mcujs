@@ -1,9 +1,10 @@
 #ifndef MCUJS_ESP32S3_BOARD_CONFIG_H
 #define MCUJS_ESP32S3_BOARD_CONFIG_H
 
+#include "sd_config.h"
+
 #ifdef MCUJS_BOARD_SEEED_RETERMINAL_STICKY
 #define MCUJS_BOARD_NAME "seeed_reterminal_sticky"
-#define MCUJS_HAS_SD 1
 #define MCUJS_LED_PIN 255
 #define MCUJS_HAS_TINYUF2 0
 #define MCUJS_FLASH_SIZE (32u * 1024u * 1024u)

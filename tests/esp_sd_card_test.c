@@ -11,7 +11,8 @@
 #define SECTORS 8192
 static unsigned char media[SECTORS][512];
 static const ff_diskio_impl_t *disk;
-static FATFS volume;
+static FATFS volume, app_volume;
+static unsigned char app_media[SECTORS][512];
 static unsigned writes, reads, inits, vfs_live;
 static int fail_read, fail_write, fail_sync;
 const PARTITION VolToPart[FF_VOLUMES]={{0,0},{1,0},{2,0}};
@@ -42,11 +43,11 @@ esp_err_t sdmmc_write_sectors(sdmmc_card_t *c, const void *b, size_t s, size_t n
 esp_err_t sdmmc_get_status(sdmmc_card_t *c) { assert(c->csd.capacity==SECTORS); return fail_sync?-1:ESP_OK; }
 esp_err_t ff_diskio_get_drive(BYTE *d) { assert(!disk); *d=1; return ESP_OK; }
 void ff_diskio_register(BYTE d, const ff_diskio_impl_t *impl) { assert(d==1); disk=impl; }
-DSTATUS disk_initialize(BYTE d) { return disk->init(d); }
-DSTATUS disk_status(BYTE d) { return disk->status(d); }
-DRESULT disk_read(BYTE d,BYTE *b,LBA_t s,UINT n) { return disk->read(d,b,s,n); }
-DRESULT disk_write(BYTE d,const BYTE *b,LBA_t s,UINT n) { return disk->write(d,b,s,n); }
-DRESULT disk_ioctl(BYTE d,BYTE cmd,void *b) { return disk->ioctl(d,cmd,b); }
+DSTATUS disk_initialize(BYTE d) { return d == 0 ? 0 : disk->init(d); }
+DSTATUS disk_status(BYTE d) { return d == 0 ? 0 : disk->status(d); }
+DRESULT disk_read(BYTE d,BYTE *b,LBA_t s,UINT n) { if (d == 0) { assert(s < SECTORS && n <= SECTORS-s); memcpy(b,app_media[s],n*512); return RES_OK; } return disk->read(d,b,s,n); }
+DRESULT disk_write(BYTE d,const BYTE *b,LBA_t s,UINT n) { if (d == 0) { assert(s < SECTORS && n <= SECTORS-s); memcpy(app_media[s],b,n*512); return RES_OK; } return disk->write(d,b,s,n); }
+DRESULT disk_ioctl(BYTE d,BYTE cmd,void *b) { if (d == 0) { if (cmd == GET_SECTOR_SIZE) { *(WORD *)b=512; return RES_OK; } return cmd == CTRL_SYNC ? RES_OK : RES_PARERR; } return disk->ioctl(d,cmd,b); }
 esp_err_t esp_vfs_fat_register_cfg(const esp_vfs_fat_conf_t *c,FATFS **out) {
     assert(!vfs_live && !strcmp(c->fat_drive,"1:") && !strcmp(c->base_path,SD_CARD_BASE_PATH));
     vfs_live=1; *out=&volume; return ESP_OK;
@@ -67,6 +68,12 @@ static void seed(unsigned start) {
 }
 int main(int argc,char **argv) {
     assert(argc==2); unsigned start=!strcmp(argv[1],"mbr")?128:0; seed(start);
+    memcpy(app_media, media, sizeof(media));
+    assert(f_mount(&app_volume,"0:",1)==FR_OK);
+    FIL app_file; UINT app_n;
+    assert(f_open(&app_file,"0:/APP.TXT",FA_WRITE|FA_CREATE_ALWAYS)==FR_OK);
+    assert(f_write(&app_file,"app intact",10,&app_n)==FR_OK && app_n==10);
+    assert(f_close(&app_file)==FR_OK);
     if(!strcmp(argv[1],"malformed")) {le16(media[0]+19,9000);}
     uint32_t base=99,count=99;
     fs_result_t r=sd_card_export(&base,&count);
@@ -88,5 +95,8 @@ int main(int argc,char **argv) {
     assert(f_open(&file,"1:/NATIVE.TXT",FA_READ)==FR_OK);
     assert(f_read(&file,b,sizeof(b),&n)==FR_OK && n==9 && !memcmp(b,"native rw",9));
     assert(f_close(&file)==FR_OK);
+    assert(f_open(&app_file,"0:/APP.TXT",FA_READ)==FR_OK);
+    assert(f_read(&app_file,b,sizeof(b),&app_n)==FR_OK && app_n==10 && !memcmp(b,"app intact",10));
+    assert(f_close(&app_file)==FR_OK);
     printf("PASS ESP IDF FatFs native RW/export/import %s (%u reads, %u writes)\n",argv[1],reads,writes);
 }

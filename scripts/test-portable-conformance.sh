@@ -12,6 +12,7 @@ node --test \
     "${ROOT}/tests/display-canvas.test.js" \
     "${ROOT}/tests/runtime-registry.test.js" \
     "${ROOT}/tests/usb-sd-volumes.test.js" \
+    "${ROOT}/tests/esp32-runtime-policy.test.js" \
     "${ROOT}/tests/sd-asset.test.js" \
     "${ROOT}/tests/sd-board-registry.test.js" \
     "${ROOT}/tests/display-capability-honesty.test.js" \

@@ -100,8 +100,9 @@ void app_main(void) {
         if (runtime_task_watched) {
             esp_task_wdt_reset();
         }
-        /* One RTOS tick is 10 ms with the IDF default. pdMS_TO_TICKS(1)
-         * rounds to zero and starves IDLE0, triggering the task watchdog. */
+        /* Runtime policy pins a 1ms tick so MSC is serviced promptly.
+         * Still block for a full tick: a zero-tick yield starves IDLE0
+         * and defeats the idle-task watchdog contract. */
         vTaskDelay(1);
     }
 }

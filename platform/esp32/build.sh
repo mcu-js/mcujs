@@ -95,6 +95,7 @@ validate_runtime_config() {
     }
 
     for required in \
+        'CONFIG_FREERTOS_HZ=1000' \
         'CONFIG_ESP_CONSOLE_UART_DEFAULT=y' \
         '# CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG is not set' \
         'CONFIG_ESP_CONSOLE_SECONDARY_NONE=y' \

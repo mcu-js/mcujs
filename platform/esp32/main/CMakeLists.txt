@@ -212,8 +212,12 @@ set_target_properties(mcujs_jerry_core PROPERTIES
 # ESP-IDF target so static archive ordering cannot discard the port objects.
 target_link_libraries(mcujs_jerry_core INTERFACE ${COMPONENT_LIB})
 target_link_libraries(${COMPONENT_LIB} INTERFACE mcujs_jerry_core m)
-if(MCUJS_EXPERIMENTAL_EPAPER_PARTIAL)
- target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_EXPERIMENTAL_EPAPER_PARTIAL=1)
+if(MCUJS_EXPERIMENTAL_CANVAS AND MCUJS_BOARD STREQUAL "waveshare_esp32s3_epaper_1.54_v2")
+ foreach(feature PARTIAL DIFF DITHER)
+  if(MCUJS_EXPERIMENTAL_EPAPER_${feature})
+   target_compile_definitions(${COMPONENT_LIB} PRIVATE MCUJS_EXPERIMENTAL_EPAPER_${feature}=1)
+  endif()
+ endforeach()
 endif()
 
 target_compile_definitions(${COMPONENT_LIB} PRIVATE

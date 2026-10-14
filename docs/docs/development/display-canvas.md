@@ -39,6 +39,41 @@ otherwise discards the pending frame. `present()` belongs to the display handle,
 not to the context. E-paper can retain an image after close and can take much
 longer to refresh. See [configured handle lifetime](device-display-handles.md).
 
+## Waveshare ePaper V2 development rendering
+
+The `waveshare_esp32s3_epaper_1.54_v2` development profile now enables Canvas,
+the existing vendor partial waveform, duplicate suppression and Bayer dithering
+by default. Other boards keep their existing defaults. Applications still use
+`display.canvas`; no new draw, refresh or shading API is needed.
+
+A fixed screen-space 4x4 Bayer pattern converts RGB565 shades into monochrome
+dots (not native panel greys). Black/white remain exact. Before touching panel
+power, reset, SPI or BUSY, an unchanged final 5000-byte packed image succeeds
+without a physical refresh, even if the source colors changed. First white and
+close/reopen always refresh. A changed image uses the existing full-first,
+up-to-four-partial-then-full cleaning policy; skipped updates do not consume it.
+History is committed only after successful refresh, sleep and power-off.
+Failures invalidate it and close the public handle; reopen to retry.
+
+`MCUJS_EXPERIMENTAL_EPAPER_PARTIAL`, `_DIFF` and `_DITHER` each accept environment
+`0` (or CMake `OFF`) as escape hatches. Disable all three to recover the original
+full-waveform/threshold conversion. `MCUJS_EXPERIMENTAL_CANVAS=0` disables the
+configured display; use a clean build directory or disable previously cached
+feature options too. The default surface is 90000 PSRAM bytes: one original
+RGB565 surface and two 5000-byte packed images, not a second RGB565 buffer.
+See `platform/esp32/EPAPER154.md` for build options and vendor provenance.
+
+The retained matched-PRE comparison used the same partial waveform and cleaning
+budget on both sides: POST skipped 8 of 16 duplicate-blink requests (20.690s
+versus 10.775s), with effectively unchanged changing-frame refresh rates. A
+separate exact-original replay used its original configuration and lacked
+native refresh telemetry; its synchronous elapsed durations are not the matched
+PRE result or visible FPS. Generic presentation-call counters include successful
+skips. Operator-observed POST shades belong to that retained experiment, not to
+new upstream firmware bytes. Ghosting, endurance, quantitative visible FPS and
+exact upstream-build hardware qualification remain open; this is still an
+experimental board outside the published release package.
+
 ## Bounded bitmap text
 
 Canvas now has `fillText(text, x, y)`, `measureText(text).width` and `font`.

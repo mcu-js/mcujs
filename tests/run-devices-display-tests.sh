@@ -44,7 +44,9 @@ PY
 
 compile_and_run() {
     local name="$1" adapter="$2" board="$3"
+    shift 3
     local flags=(
+        "$@"
         -std=gnu17 -Wall -Wextra -Werror -ffunction-sections -fdata-sections
         -DMCUJS_PLATFORM_ESP32=1 -DMCUJS_EXPERIMENTAL_CANVAS=1
         "-D${adapter}=1" "-D${board}=1"
@@ -75,3 +77,5 @@ compile_and_run() {
 }
 compile_and_run sticky MCUJS_CANVAS_STICKY MCUJS_BOARD_SEEED_RETERMINAL_STICKY
 compile_and_run epaper154 MCUJS_CANVAS_EPAPER154 MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2
+compile_and_run epaper154-production MCUJS_CANVAS_EPAPER154 MCUJS_BOARD_WAVESHARE_ESP32S3_EPAPER_1_54_V2 \
+    -DMCUJS_EXPERIMENTAL_EPAPER_PARTIAL=1 -DMCUJS_EXPERIMENTAL_EPAPER_DIFF=1 -DMCUJS_EXPERIMENTAL_EPAPER_DITHER=1

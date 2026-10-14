@@ -1,6 +1,6 @@
-# Waveshare ESP32-S3-ePaper-1.54 V2 — experimental bring-up
+# Waveshare ESP32-S3-ePaper-1.54 V2 — development profile
 
-Not a published release or a hardware-qualified port. Target `waveshare_esp32s3_epaper_1.54_v2`.
+Not a published release or a fully hardware-qualified port. Target `waveshare_esp32s3_epaper_1.54_v2`.
 N8R8: 8 MB flash, 8 MB octal PSRAM. Native CDC+MSC/FFAT runtime; no public GPIO,
 SPI, I2C, LED, audio, touch, RTC, SD or sensor support. Pins are reserved until qualified.
 XIAO remains the default ESP target with its original partitions/recovery.
@@ -22,35 +22,82 @@ commit `9957d0f4fc7cd40d1d42880cb1b74a8d6782a6c2`:
 Artifacts downloaded with urllib Mozilla UA and HTMLParser link discovery are in
 local investigation storage outside the repository (not vendored dependencies).
 
-## Canvas
-Build opt-in `MCUJS_EXPERIMENTAL_CANVAS=1`. Existing `require('canvas').display`
-is 200x200, using unchanged `host/bindings/canvas_renderer.c` and ctx 0.1.18.
-`CTX_PATH/ctx.h` SHA256 must be
+## Canvas — development defaults
+
+Normal builds of this V2 profile enable Canvas, the existing vendor partial
+waveform, packed-image duplicate suppression and screen-space Bayer dithering.
+Other ESP profiles retain their previous defaults. The public path is unchanged:
+`require('devices').display.open()` returns a handle with `display.canvas` and
+`display.present()`. The canvas is 200x200, using unchanged
+`host/bindings/canvas_renderer.c` and ctx 0.1.18. `CTX_PATH/ctx.h` SHA256 must be
 `bf2b18bcea31bf191f7e82c9beef98bd717bd5ccd635908f07ab8a8cf1698bb3`.
-RGB565 surface in PSRAM is converted to MSB-first monochrome by weighted luminance
-threshold 128. No application show/present API: engine presents after execution
-or timer processing only if dirty. Each update resets/wakes, uploads one full
-image, refreshes, waits (15-second BUSY timeout), sleeps, and disables panel power.
-SPI runs conservatively at 4 MHz instead of vendor's 40 MHz. Timeout closes the
-surface and cuts power; USB and watchdog are serviced while waiting. This is not
-an animation implementation in the default build.
 
-### Opt-in partial-waveform experiment
+Weighted RGB565 luminance is converted to MSB-first monochrome, 1=white, with a
+fixed screen-space 4x4 Bayer matrix. Uniform shades can cover 0 through 16 of the
+16 sites; these are monochrome dots, not native panel grey levels. Pure black
+and white remain exact. Moving geometry does not move the dither phase, and the
+source RGB565 surface is not modified.
 
-`MCUJS_EXPERIMENTAL_EPAPER_PARTIAL=1` additionally enables the vendor V2
-`WF_PARTIAL_1IN54_0` LUT and `0x22/CF` update sequence. The application still
-uses ordinary Canvas drawing. This is a partial **waveform**, not cropped SPI
-transfers: a complete 5000-byte monochrome image is sent.
+Before touching power, reset, SPI or BUSY, the driver compares the complete
+5000-byte packed candidate to the last **successful** image. An identical image
+returns success without any panel activity or consuming the partial budget,
+even if RGB565 values changed or a cleaning refresh is due. First presentation,
+including an all-white frame, always refreshes. History is committed only after
+BUSY completion, sleep and rail-off; any failed attempt invalidates it. Close
+and reopen start fresh. Normal builds contain no `EPAPER_AB` diagnostic logging.
+Generic successful-presentation counters include these skips; they are not
+physical refresh counts or visible FPS.
 
-First presentation is full; at most four subsequent presentations are partial,
-then a full cleaning refresh is forced. A 5000-byte previous-image cache is
-stored after the existing RGB565 surface in the same PSRAM allocation. It
-restores both controller RAM planes after power-on before the next partial
-update. There is no second RGB565 framebuffer. Every update still sleeps and
-cuts panel power; errors invalidate the base image and force the next update
-through the full path. These conservative choices favour a bounded experiment
-over maximum refresh speed. Ghosting, timing and long-term endurance require
-physical qualification; do not treat this as a production refresh policy.
+### Vendor partial waveform and escape hatches
+
+The existing `WF_PARTIAL_1IN54_0` LUT and `0x22/CF` sequence are unchanged. This
+is a partial **waveform**, not cropped SPI transfers: changed images still send
+a complete 5000-byte monochrome frame. First update is full; at most four
+successful changed updates are partial, then the next changed update is a full
+cleaning refresh. Both controller RAM planes are restored from the successful
+base after power-on before a partial update. No new waveforms or pin changes.
+
+The default PSRAM allocation is 90000 bytes: the original 80000-byte RGB565
+surface plus a 5000-byte successful history and a 5000-byte candidate. There is
+no second RGB565 framebuffer. Each actual update resets/wakes, uploads,
+refreshes, waits (15-second BUSY timeout), sleeps and disables panel power. SPI
+remains 4 MHz; USB and watchdog are serviced while BUSY. Errors cut power and
+force full recovery on the next driver update; the public handle closes on a
+presentation failure and must be reopened.
+
+The existing build-option names remain available. Each accepts environment
+`1`/`0` or CMake `ON`/`OFF`; environment 0/1 takes precedence:
+
+| Option | V2 Canvas-enabled default | OFF behavior |
+| --- | --- | --- |
+| `MCUJS_EXPERIMENTAL_EPAPER_PARTIAL` | ON | Full waveform for every changed image |
+| `MCUJS_EXPERIMENTAL_EPAPER_DIFF` | ON | No duplicate suppression; 85000 bytes with partial, otherwise 80000 |
+| `MCUJS_EXPERIMENTAL_EPAPER_DITHER` | ON | Original weighted-luminance threshold 128 |
+| `MCUJS_EXPERIMENTAL_CANVAS` | ON | No configured Canvas display; fresh feature defaults OFF |
+
+For the original full-refresh/threshold path, set PARTIAL, DIFF and DITHER to
+`0` together. For Canvas-off, disable any previously cached feature options too.
+Use a clean build directory when changing boards or validating defaults; CMake
+preserves explicit/cached options. Explicit ePaper features with Canvas off or
+on another board fail configuration.
+
+### Retained experiment evidence, not new-build qualification
+
+The matched instrumented PRE and POST both used the same vendor partial
+waveform and four-partial cleaning policy. In one synchronous duplicate-blink
+run, POST skipped 8 of 16 requests: elapsed time was 20.690s PRE versus 10.775s
+POST. Changing-frame moving/shading refresh rates were effectively unchanged
+under those matched flags; duplicate suppression is not a faster waveform.
+
+A separate exact-original firmware replay lacked native refresh telemetry and
+used its original configuration. Moving/blink/shades synchronous durations were
+24.067s/31.972s/16.123s versus POST 15.688s/10.775s/10.536s. These are replay
+durations, not measured visible FPS, and must not be confused with the matched
+PRE comparison. The operator observed distinct POST shades and selected POST.
+That physical evidence belongs to the retained experiment, not newly built
+upstream firmware. Quantitative visible FPS, ghosting, endurance and exact
+upstream-build hardware qualification remain open. The board is still
+experimental and outside the published release package.
 
 ## Parent-owned Docker build / provisioning
 Use the pinned image supplied by the parent; no host SDK installs. Mount source

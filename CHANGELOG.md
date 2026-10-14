@@ -4,6 +4,22 @@ All notable changes to mcujs will be documented in this file.
 
 ## [Unreleased] — development
 
+- Enable the selected Waveshare ePaper 1.54 V2 development display path by
+  default: unchanged `display.canvas`, vendor partial waveform and four-partial
+  cleaning budget, fixed screen-space 4x4 Bayer shading, and no panel activity
+  for an unchanged final packed image. Keep per-feature/Canvas-off build escape
+  hatches and the existing pin map, bounded BUSY/USB/watchdog handling and rail-off
+  cleanup. Use only two 5000-byte packed buffers beyond the original RGB565
+  surface; commit duplicate history after success and invalidate it on failure
+  or close. No normal-build A/B logging or new public API.
+- Add the eight-way ePaper host flag matrix and configured-display native/API
+  regressions. Retained matched-PRE hardware evidence showed duplicate-blink
+  skips, not faster changing-frame waveforms; the separate exact-original replay
+  measured synchronous durations without refresh telemetry. Presentation-call
+  counts include skipped updates and are not visible FPS. Exact upstream-build
+  hardware qualification, ghosting and endurance remain separate gates; V2 is
+  still experimental and outside the published release package.
+
 - Expose `/app` and `/sd` as separate USB mass-storage volumes on the configured
   Waveshare RP2350 LCD 1.47-A. The app drive root still maps directly to `/app`;
   the card keeps its existing label, format and contents. `fs.sd.hostTransfer`

@@ -223,6 +223,18 @@ static void discovery_and_lifecycle(void) {
     evaluate("h.present();");
     js_canvas_present();
     assert(io_count() == io && updates == refreshes); /* clean is a no-op */
+#if defined(MCUJS_CANVAS_EPAPER154) && defined(MCUJS_EXPERIMENTAL_EPAPER_DIFF)
+    /* Redrawing through the public Canvas makes it dirty but leaves the final
+     * panel image unchanged. Explicit and automatic presents must both skip. */
+    unsigned writes=gpio_writes, reads=busy_reads, attempts=spi_attempts;
+    int64_t before=now;
+    evaluate("paint(h);h.present();eq(h.state,'open','packed duplicate stays open');");
+    evaluate("paint(h);");js_canvas_present();
+    assert(io_count()==io&&updates==refreshes&&gpio_writes==writes);
+    assert(busy_reads==reads&&spi_attempts==attempts&&now==before);
+    js_canvas_present(); /* Successful skips must clear pending as normal. */
+    assert(io_count()==io&&updates==refreshes);
+#endif
     evaluate(
         "h.close();h.close();eq(h.state,'closed','repeated close');"
         "eq(desc.state,'idle','owner released');"
